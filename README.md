@@ -27,15 +27,12 @@ The program comes ready out of the box. If you want to add your own commands you
 
 ```
 module.exports = {
-  version: '0.0.1',
-  description: 'This command has a function..',
-  author: 'Me, Myself, I',
-  repository: '',
-  usage: ``,
-  command: 'my_command',
-  aliases: ['mycmd'],
+  command: 'template',
+  description: '',
+  requiresEntity: true,
+  author: 'me, myself, and irene',
   execute: function(sender, command, args) {
-  	// sender: true (if console), or username if player
+
   }
 }
 ```

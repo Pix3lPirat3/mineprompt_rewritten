@@ -49,13 +49,14 @@ $('#sidebar-accounts').on('click', '.box-user', function(e) {
   let el = $(e.currentTarget);
   let username = $(el).data('username');
   let auth = $(el).data('auth');
-  console.log(username, auth)
   let term_command = `connect -u ${username}`;
   if (auth) term_command += ` -a ${auth}`;
   term_command += ` -h `;
 
   term.set_command(term_command);
-  term.focus();
+  setTimeout(function() {
+    term.focus(); // requires a small timeout
+  }, 10)
 })
 
 // Open User Editor (User right clicked on a user)
@@ -64,7 +65,7 @@ $(document).on("contextmenu", "#sidebar-accounts .box-user", function(e) {
   let el = $(e.currentTarget);
   let username = $(el).data('username');
   let auth = $(el).data('auth');
-  window.console.log('EDITING:', username, auth)
+
 
   /*
   HOW TO REMOVE ACCOUNTS:

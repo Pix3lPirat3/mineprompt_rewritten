@@ -1,7 +1,7 @@
 {
   "name": "mineflayer-console-client",
   "productName": "mineflayer-console-client",
-  "version": "1.0.0",
+  "version": "5.0.0",
   "description": "A console client for mineflayer",
   "main": "src/electron.js",
   "scripts": {
