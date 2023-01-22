@@ -1,0 +1,145 @@
+* {
+    font-family: monospace!important;
+}
+
+@media (max-width: 390px) {
+    #left-sidebar {
+        display: none;
+    }
+    #header {
+      width: 100%!important; /* We shrink it contorts to the sidebar, but once it's gone we can enlarge it */
+    }
+    * {
+        font-size: 3vw!important;
+    }
+}
+
+#page-wrapper {
+    height: 100%; display: flex;
+}
+
+#terminal-wrapper {
+     height: 100%; width: 100%; overflow: hidden;
+}
+
+#terminal {
+    height: calc(100% - 63px); width: 100%; background-color: #25282c; margin-top: 38px;
+}
+
+#header {
+    background-color: #202225; height: 38px; display: block; padding-top: 7.5px; position: absolute; z-index: 1000; width: calc(100% - 60px)
+}
+
+#player-stats img {
+  display: inline;
+  --heart-size: 15px;
+  height: var(--heart-size);
+  width: var(--heart-size);
+}
+
+#player-stats {
+  display: flex;
+}
+
+#player-stats img {
+    display: inline-block;
+}
+#player-stats img:not(:first-child) {
+  margin-left: -2.5px;
+}
+
+#active-account-head {
+    float: left; height: 35px!important; width: 35px!important; margin: 0 5px;
+}
+
+#active-account-head-text {
+    float: left; color: rgba(171, 171, 171, 0.99); font-weight: bold;
+}
+
+html {
+    overflow: hidden;
+}
+
+html, body {
+	height: 100%;
+}
+
+#left-sidebar {
+	background-color: #202225; height: 100%; width: 65px; height: 100%; padding-top: 5px;
+}
+#left-sidebar .box-user {
+	text-align: center;
+	margin-bottom: 5px;
+}
+#left-sidebar .box-user .box-img {
+	display: block; /* Adds a patch for <a> link */
+	background-color: rgba(255,255,255,.05); margin: 0 5px; border-radius: 10px; border-color: transparent;
+    height: 50px; width: 50px;
+}
+#left-sidebar .box-user .box-img img {
+    --img-size: 44px;
+    margin-top: 2.5px;
+	height: var(--img-size); width: var(--img-size); max-height: var(--img-size); max-width: var(--img-size); overflow: hidden;
+}
+
+#left-sidebar ul {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    float: left;
+    position: absolute;
+    top: 14px;
+    left: 0;
+}
+#left-sidebar li {
+    cursor: pointer;
+    white-space: nowrap;
+}
+#left-sidebar li:hover {
+    background: #aaa;
+    color: #000;
+}
+#left-sidebar .cursor-wrapper {
+    position: relative;
+}
+
+/* this can be removed in version 2.1.0 */
+#left-sidebar .cmd [role="presentation"] {
+    overflow: visible;
+}
+
+#bot-effects img {
+    margin: 0 5px 0 0;
+    height: 20px;
+    width: 20px;
+}
+
+#footer {
+    height: 25px; background-color: #202225; width: 100%; line-height: 25px; color: rgba(171, 171, 171, 0.99); display: flex; font-weight: bold;
+}
+
+#bot-effects {
+    margin-top: 3.5px;
+}
+
+.context-menu-list, .context-menu-item {
+    background-color: rgb(37, 40, 44);
+    border: 1px solid #202225;
+    color: rgba(171, 171, 171, 0.99);
+}
+
+.context-menu-item {
+    border: none;
+}
+
+.context-menu-list input, .context-menu-list select {
+    color: rgba(171, 171, 171, 0.99);
+    background-color: transparent;
+}
+.context-menu-hover {
+    background: none!important;
+    color: rgba(171, 171, 171, 0.99)!important;
+}
+.context-menu-list textarea:focus, .context-menu-list input:focus, .context-menu-list select:focus {
+  outline: none;
+}

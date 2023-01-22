@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html style="overflow: hidden;">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="css/reset.css" />
+    <link rel="stylesheet" href="../node_modules/tippy.js/dist/tippy.css" />
+    <link rel="stylesheet" href="css/console-client.css" />
+    <link href="../node_modules/jquery.terminal/css/jquery.terminal.min.css" rel="stylesheet"/>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto">
+  </head>
+  <body>
+
+    <div id="page-wrapper">
+
+      <aside id="left-sidebar">
+        <div class="box-user">
+
+          <a id="sidebar-settings" class="box-img" href="#modal-settings" rel="modal:open" data-modal style="margin-bottom: 5px;" data-tippy-content="Settings">
+            <img src="img/heads/computer.png">
+          </a>
+
+          <a id="sidebar-add-account" class="box-img" href="#modal-add-account" rel="modal:open" data-modal data-tippy-content="Add Account">
+            <img src="img/heads/wood_plus.png" style="width: 48px">
+          </a>
+        </div>
+        <div id="sidebar-accounts">
+        </div>
+      </aside>
+
+      <div id="terminal-wrapper">
+
+        <div id="header">
+          <div id="player-stats">
+            <div style="float: left;">
+              <img id="active-account-head" src="img/heads/wood_question.png">
+              <div id="active-account-head-text">
+                <div><span data-replace="username">Console Client</span></div>
+                <div data-replace="position"></div>
+              </div>
+            </div>
+            <div style="float: right; margin: 0 5px 0 auto;">
+              <div id="bot-health">
+                <img src="img/hearts/heart-empty.png">
+                <img src="img/hearts/heart-empty.png">
+                <img src="img/hearts/heart-empty.png">
+                <img src="img/hearts/heart-empty.png">
+                <img src="img/hearts/heart-empty.png">
+                <img src="img/hearts/heart-empty.png">
+                <img src="img/hearts/heart-empty.png">
+                <img src="img/hearts/heart-empty.png">
+                <img src="img/hearts/heart-empty.png">
+                <img src="img/hearts/heart-empty.png">
+              </div>
+
+              <div id="bot-hunger">
+                <img src="img/hunger/hunger-empty.webp">
+                <img src="img/hunger/hunger-empty.webp">
+                <img src="img/hunger/hunger-empty.webp">
+                <img src="img/hunger/hunger-empty.webp">
+                <img src="img/hunger/hunger-empty.webp">
+                <img src="img/hunger/hunger-empty.webp">
+                <img src="img/hunger/hunger-empty.webp">
+                <img src="img/hunger/hunger-empty.webp">
+                <img src="img/hunger/hunger-empty.webp">
+                <img src="img/hunger/hunger-empty.webp">
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <div id="terminal">
+
+        </div>
+
+        <div id="footer">
+          <div id="bot-effects">
+            <!--
+            <div id="bot-effects" style="float: left; display: block; margin-left: auto; max-width: 100px; text-align: center;">
+              </div>
+            -->
+          </div>
+          <div style="margin: 0 5px 0 auto;">
+            <span data-replace="runtime"></span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Insert this line above script imports  -->
+    <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
+
+    <!-- normal script imports etc  -->
+    <script src="../node_modules/@popperjs/core/dist/umd/popper.js"></script>
+    <script src="../node_modules/tippy.js/dist/tippy.umd.min.js"></script>
+    <script src="../node_modules/jquery/dist/jquery.min.js"></script>
+    <script src="../node_modules/jquery.terminal/js/jquery.terminal.min.js"></script>
+    <script src="../node_modules/jquery.terminal/js/autocomplete_menu.js"></script>
+    <script src="../node_modules/jquery.terminal/js/unix_formatting.js"></script>
+    <script>
+
+      tippy('#sidebar-settings', {
+        placement: 'right'
+      })
+
+      tippy('#sidebar-add-account', {
+        placement: 'right'
+      });
+
+      tippy.delegate('#sidebar-accounts', {
+        target: '[data-tippy-content]',
+        placement: 'right',
+        allowHTML: true
+      });
+      tippy.delegate('#bot-effects', {
+        target: '[data-tippy-content]',
+        placement: 'top',
+        allowHTML: true
+      });
+    </script>
+
+    <link rel="stylesheet" href="../node_modules/jquery-contextmenu/dist/jquery.contextMenu.min.css">
+    <script src="../node_modules/jquery-contextmenu/dist/jquery.contextMenu.min.js"></script>
+    <script src="../node_modules/jquery-contextmenu/dist/jquery.ui.position.js"></script>
+
+    <script>
+      $.contextMenu({
+        selector: "#sidebar-accounts .box-user",
+        build: function(trigger) {
+          var options = {
+            callback: function(key, options) {
+              //var m = "clicked: " + key;
+              //window.console && console.log(m) || alert(m);
+            },
+            items: {
+              name: {
+                  name: "Username", 
+                  type: 'text', 
+                  value: $(trigger.currentTarget).data('username'),
+              },
+              select: {
+                  name: "Authentication", 
+                  type: 'select', 
+                  options: {1: 'microsoft', 2: 'offline'}, 
+                  selected: 2
+              }
+            },
+            events: {
+              show: function(opt) {
+                  // this is the trigger element
+                  var $this = this;
+                  // import states from data store 
+                  //$.contextMenu.setInputValues(opt, $this.data());
+                  // this basically fills the input commands from an object
+                  // like {name: "foo", yesno: true, radio: "3", &hellip;}
+              }, 
+              hide: function(opt) {
+                  // this is the trigger element
+                  var $this = $(this);
+                  // export states to data store
+                  let data = $.contextMenu.getInputValues(opt, $this.data());
+                  // this basically dumps the input commands' values to an object
+                  // like {name: "foo", yesno: true, radio: "3", &hellip;}
+              }
+          }
+          };
+          return options;
+        }
+      });
+    </script>
+
+    <script src="js/sidebar.js"></script>
+    <script src="js/terminal.js"></script>
+    <script src="js/ui-global.js"></script>
+    <script src="js/ui-mineflayer.js"></script>
+    <script src="js/discord.js"></script>
+    <!-- to be implemeneted..
+    <script src="js/ui-bedrock.js"></script>
+    -->
+    <!-- Insert this line after script imports -->
+    <script>if (window.module) module = window.module;</script>
+
+  </body>
+</html>

@@ -1,0 +1,43 @@
+{
+  "name": "mineflayer-console-client",
+  "productName": "mineflayer-console-client",
+  "version": "1.0.0",
+  "description": "A console client for mineflayer",
+  "main": "src/electron.js",
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "publish": "electron-forge publish",
+    "lint": "echo \"No linting configured\""
+  },
+  "keywords": [],
+  "author": {
+    "name": "Pix3lPirat3",
+    "email": "pix3lpirat3@yahoo.com"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@popperjs/core": "^2.11.6",
+    "bedrock-protocol": "^3.22.0",
+    "discord.js": "^14.7.1",
+    "electron-squirrel-startup": "^1.0.0",
+    "glob": "^8.0.3",
+    "jquery": "^3.6.3",
+    "jquery-contextmenu": "^3.0.0-beta.2",
+    "jquery.terminal": "^2.35.1",
+    "minecraft-protocol": "^1.39.0",
+    "mineflayer": "^4.7.0",
+    "mineflayer-pathfinder": "^2.4.2",
+    "minimist-string": "^1.0.2",
+    "string-similarity": "^4.0.4",
+    "string-table": "^0.1.5",
+    "tippy.js": "^6.3.7",
+    "vec3": "^0.1.7"
+  },
+  "devDependencies": {
+    "@electron-forge/cli": "^6.0.4",
+    "@electron-forge/maker-squirrel": "^6.0.4",
+    "electron": "^22.0.0"
+  }
+}

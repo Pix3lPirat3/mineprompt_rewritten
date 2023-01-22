@@ -1,3 +1,10 @@
+# Storage
+storage/accounts.json
+storage/discord.json
+
+# Packages
+out/
+
 # Logs
 logs
 *.log
