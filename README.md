@@ -1,8 +1,8 @@
-<img src="https://img.shields.io/github/license/pix3lpirat3/mineprompt">
-<img src="https://img.shields.io/github/package-json/v/pix3lpirat3/mineprompt">
-<img src="https://img.shields.io/github/repo-size/pix3lpirat3/mineprompt">
-<img src="https://img.shields.io/github/downloads/pix3lpirat3/mineprompt/total">
-<img src="https://img.shields.io/github/issues/pix3lpirat3/mineprompt">
+<img src="https://img.shields.io/github/license/pix3lpirat3/mineprompt_rewritten">
+<img src="https://img.shields.io/github/package-json/v/pix3lpirat3/mineprompt_rewritten">
+<img src="https://img.shields.io/github/repo-size/pix3lpirat3/mineprompt_rewritten">
+<img src="https://img.shields.io/github/downloads/pix3lpirat3/mineprompt_rewritten/total">
+<img src="https://img.shields.io/github/issues/pix3lpirat3/mineprompt_rewritten">
 <br>
 <img src="https://img.shields.io/discord/413438066984747026?label=Discord">
 
@@ -18,7 +18,7 @@ This project is written in `NodeJS`, and as such requires `NodeJS`, alongside `E
 
 Open the directory, then run `electron .` to launch the application
 ```SH
-cd C:/Users/Minecrafter/Documents/mineprompt
+cd C:/Users/Minecrafter/Documents/mineprompt_rewritten
 electron .
 ```
 
