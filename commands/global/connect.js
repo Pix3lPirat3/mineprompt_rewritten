@@ -4,12 +4,7 @@ module.exports = {
   description: 'Used to connect a bot to a server',
   author: 'Pix3lPirat3',
   repository: 'http://mineprompt.com',
-  usage: `
-  [optional]
-  <required>
-  {defaults}
-  (comment)
-  Basic Usage:
+  usage: `Basic Usage:
   connect -u <username> -h <hostname> -p [port {25565}] -v [version {auto}] 
 
   Flags:
