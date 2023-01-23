@@ -2,7 +2,9 @@ module.exports = {
   command: 'animation',
   usage: 'animation <type (left|right)>',
   description: 'Swing your main or off hand.',
-  requiresEntity: true,
+  requires: {
+    entity: true
+  },
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
     let type = args[0]?.toLowerCase();

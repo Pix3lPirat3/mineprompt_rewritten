@@ -2,7 +2,9 @@ module.exports = {
   command: 'dig',
   usage: 'dig [x y z]',
   description: 'Dig a block on a specific coordinate.',
-  requiresEntity: true,
+  requires: {
+    entity: true
+  },
   execute: async function(sender, command, args) {
     // Dig block at cursor
 

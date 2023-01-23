@@ -2,7 +2,9 @@ module.exports = {
   command: 'sneak',
   usage: 'sneak',
   description: 'Toggle the player sneaking',
-  requiresEntity: true,
+  requires: {
+    entity: true
+  },
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
     let isSneaking = bot.getControlState('sneak')

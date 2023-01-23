@@ -135,7 +135,7 @@ let mineflayer = {
       let command_module = commander.getCommand(command);
       if (!command_module) return bot.chat(`/msg ${sender} Unknown command. Type "help" in console for help.`);
 
-      if (!bot && command_module.requiresEntity) return console.log(`[${command_module.command}] This command requires the bot to be spawned.`)
+      if (!bot && command_module.requires?.entity) return console.log(`[${command_module.command}] This command requires the bot to be spawned.`)
       // Passed Checks : Execute Command
 
       command_module.execute({type: 'player', player: sender, reply: commander.reply.toPlayer}, command, args)

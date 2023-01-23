@@ -4,7 +4,9 @@ module.exports = {
   command: 'blockinfo',
   usage: 'blockinfo [\'cursor\' || x y z]',
   description: 'Print the block data at the target.',
-  requiresEntity: true,
+  requires: {
+    entity: true
+  },
   execute: function(sender, command, args) {
 
     // No Argument (or "cursor" argument) - Default to blockAtCursor

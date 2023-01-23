@@ -117,10 +117,10 @@ Usage: ${command.usage || '~'}
 
     // System/Console Commands, Player Commands
 
-    let system_commands = commands_array.filter(cmd => !cmd.requiresEntity).map(cmd => ({ command: cmd.command, description: cmd.description || 'This command does not have a description..' })).sort((a, b) => a.command > b.command)
+    let system_commands = commands_array.filter(cmd => !cmd.requires?.entity).map(cmd => ({ command: cmd.command, description: cmd.description || 'This command does not have a description..' })).sort((a, b) => a.command > b.command)
     console.log(`\nSystem Commands:\n` + stringTable.create(system_commands) + '\n')
 
-    let player_commands = commands_array.filter(cmd => cmd.requiresEntity).map(cmd => ({ command: cmd.command, description: cmd.description || 'This command does not have a description..' })).sort((a, b) => a.command > b.command)
+    let player_commands = commands_array.filter(cmd => cmd.requires?.entity).map(cmd => ({ command: cmd.command, description: cmd.description || 'This command does not have a description..' })).sort((a, b) => a.command > b.command)
     console.log(`\nPlayer Commands:\n` + stringTable.create(player_commands) + '\n')
   }
 

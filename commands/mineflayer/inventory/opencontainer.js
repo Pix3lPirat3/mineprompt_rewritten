@@ -10,8 +10,11 @@ function isContainer(block) {
 
 module.exports = {
   command: 'opencontainer',
+  usage: 'opencontainer [x y z]',
   description: 'Open a container at cursor, or at coordinates.',
-  requiresEntity: true,
+  requires: {
+    entity: true
+  },
   author: 'Pix3lPirat3',
   execute: async function(sender, command, args) {
 

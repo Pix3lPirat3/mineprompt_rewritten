@@ -3,7 +3,9 @@ module.exports = {
   usage: 'send <message>',
   aliases: ['chat', 'say'],
   description: 'Send a message or a command to the server.',
-  requiresEntity: true,
+  requires: {
+    entity: true
+  },
   author: 'Pix3lPirat3',
   autocomplete: function() {
     return Object.keys(bot.players);

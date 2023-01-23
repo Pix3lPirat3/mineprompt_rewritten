@@ -56,7 +56,7 @@ var term = $('#terminal').terminal(async function onCommandSubmit(input) {
     return console.log(`[Console] Did you mean: ${close_matches.join(', ')}`)
   }
 
-  if (!bot && command_module.requiresEntity) return console.log(`[${command_module.command}] This command requires the bot to be spawned.`)
+  if (!bot && command_module.requires?.entity) return console.log(`[${command_module.command}] This command requires the bot to be spawned.`)
     // Passed Checks : Execute Command
   // sender, command, args
   var command = $.terminal.parse_command(input)
@@ -75,7 +75,7 @@ var term = $('#terminal').terminal(async function onCommandSubmit(input) {
 
       // On the first word, if there's no matching modules - then return the list of all commands & aliases
       if (!command_module) return resolve(commander.commands_array.map(c => [c.command, c.aliases]).flat(2).filter(e => e !== undefined));
-      if (command_module.requiresEntity && !bot) return; // If bot is required, and no bot is found, don't do anything
+      if (command_module.requires?.entity && !bot) return; // If bot is required, and no bot is found, don't do anything
       if (!command.match(/\s/)) return resolve([]); // There is a command, but no space - don't generate a list yet
       var cursor = term.before_cursor(true); // Grab the word the user is actively typing
       if (!cursor) return resolve([]); // It's just a space

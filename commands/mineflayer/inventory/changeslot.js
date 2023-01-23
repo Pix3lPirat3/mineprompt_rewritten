@@ -1,8 +1,11 @@
 module.exports = {
   command: 'changeslot',
+  usage: 'changeslot <slot (0-8)>',
   aliases: ['setslot'],
   description: 'Change your selected slot in the hotbar.',
-  requiresEntity: true,
+  requires: {
+    entity: true
+  },
   execute: function(sender, command, args) {
     if (!args.length) return console.log('[Changeslot] You must specify a slot to change to.')
 

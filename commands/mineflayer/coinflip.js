@@ -2,7 +2,9 @@ module.exports = {
   command: 'coinflip',
   usage: 'coinflip',
   description: 'Flip a coin and get the results.',
-  requiresEntity: false,
+  requires: {
+    entity: true
+  },
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
 

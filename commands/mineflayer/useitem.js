@@ -3,7 +3,9 @@ module.exports = {
   usage: 'useitem',
   description: 'Use the item in hand.',
   usage: 'useitem [offhand]',
-  requiresEntity: true,
+  requires: {
+    entity: true
+  },
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
     var useOffhand = (args[0] === 'true');

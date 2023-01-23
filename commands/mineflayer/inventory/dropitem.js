@@ -2,8 +2,11 @@ var stringSimilarity = require("string-similarity");
 
 module.exports = {
   command: 'dropitem',
+  usage: 'dropitem <name>',
   description: 'Drop all items of a specific type from your inventory.',
-  requiresEntity: true,
+  requires: {
+    entity: true
+  },
   execute: async function(sender, command, args) {
 
     if (!args.length) return sender.reply('[Dropitem] You must specify an item, or "inventory"');

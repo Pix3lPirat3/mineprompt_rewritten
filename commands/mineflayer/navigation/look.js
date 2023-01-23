@@ -1,7 +1,10 @@
 module.exports = {
   command: 'look',
-  description: '',
-  requiresEntity: true,
+  usage: 'look <degrees>',
+  description: 'Look at a specific entity, block, or degree',
+  requires: {
+    entity: true
+  },
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
     

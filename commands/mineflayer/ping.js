@@ -2,7 +2,9 @@ module.exports = {
   command: 'ping',
   usage: 'ping [player]',
   description: 'Gets the player\'s ping according to the tablist.',
-  requiresEntity: true,
+  requires: {
+    entity: true
+  },
   author: 'Pix3lPirat3',
   autocomplete: function() {
     return Object.keys(bot.players);
