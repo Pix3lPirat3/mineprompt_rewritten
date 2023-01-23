@@ -1,7 +1,7 @@
 module.exports = {
   command: 'send',
-  aliases: ['chat', 'say'],
   usage: 'send <message>',
+  aliases: ['chat', 'say'],
   description: 'Send a message or a command to the server.',
   requiresEntity: true,
   author: 'Pix3lPirat3',

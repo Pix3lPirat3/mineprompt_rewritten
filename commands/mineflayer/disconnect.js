@@ -1,5 +1,6 @@
 module.exports = {
   command: 'disconnect',
+  usage: 'disconnect',
   description: 'Gracefully disconnect from the server.',
   requiresEntity: true,
   execute: function(sender, command, args) {

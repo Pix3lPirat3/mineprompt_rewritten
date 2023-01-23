@@ -1,5 +1,6 @@
 module.exports = {
   command: 'sneak',
+  usage: 'sneak',
   description: 'Toggle the player sneaking',
   requiresEntity: true,
   author: 'Pix3lPirat3',

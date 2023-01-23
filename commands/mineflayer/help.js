@@ -2,6 +2,7 @@ let stringTable = require('string-table')
 
 module.exports = {
   command: 'help',
+  usage: 'help [command]',
   description: 'Shows the help menu.',
   requiresEntity: false,
   autocomplete: function(command, args, cursor) {

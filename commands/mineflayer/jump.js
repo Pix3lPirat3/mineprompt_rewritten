@@ -1,5 +1,6 @@
 module.exports = {
   command: 'jump',
+  usage: 'jump',
   description: 'Have the bot jump.',
   requiresEntity: true,
   author: 'Pix3lPirat3',

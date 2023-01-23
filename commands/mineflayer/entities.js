@@ -5,8 +5,8 @@ let { GoalNear } = require('mineflayer-pathfinder').goals;
 
 module.exports = {
   command: 'entities',
-  description: 'Get a list of entities around you.',
   usage: 'entities <flags>',
+  description: 'Get a list of entities around you.',
   requiresEntity: true,
   execute: async function(sender, command, args) {
     if(sender.type === 'player') return sender.reply('[Entity] You must run this command from console.');

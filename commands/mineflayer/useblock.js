@@ -9,6 +9,7 @@ function isContainer(block) {
 
 module.exports = {
   command: 'useblock',
+  usage: 'useblock [x y z]',
   description: 'Place a block from a hand on a specific coordinate or open a container.',
   requiresEntity: true,
   author: 'Pix3lPirat3',

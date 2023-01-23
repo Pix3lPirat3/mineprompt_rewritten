@@ -1,5 +1,6 @@
 module.exports = {
   command: 'list',
+  usage: 'list',
   aliases: ['players', 'online'],
   description: 'List players on the server',
   requiresEntity: true,

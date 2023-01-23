@@ -1,5 +1,6 @@
 module.exports = {
   command: 'bed',
+  usage: 'bed <search range || x y z>',
   description: 'Allows you to make the bot sleep easily.',
   requiresEntity: true,
   execute: async function(sender, command, args) {

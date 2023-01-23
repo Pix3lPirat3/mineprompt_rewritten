@@ -1,5 +1,6 @@
 module.exports = {
   command: 'ping',
+  usage: 'ping [player]',
   description: 'Gets the player\'s ping according to the tablist.',
   requiresEntity: true,
   author: 'Pix3lPirat3',

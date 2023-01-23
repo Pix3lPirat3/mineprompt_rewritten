@@ -1,5 +1,6 @@
 module.exports = {
   command: 'coinflip',
+  usage: 'coinflip',
   description: 'Flip a coin and get the results.',
   requiresEntity: false,
   author: 'Pix3lPirat3',

@@ -1,5 +1,6 @@
 module.exports = {
   command: 'useitem',
+  usage: 'useitem',
   description: 'Use the item in hand.',
   usage: 'useitem [offhand]',
   requiresEntity: true,
