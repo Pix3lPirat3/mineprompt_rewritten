@@ -8,6 +8,9 @@
     <link rel="stylesheet" href="css/console-client.css" />
     <link href="../node_modules/jquery.terminal/css/jquery.terminal.min.css" rel="stylesheet"/>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto">
+    <script>
+      var timerStart = Date.now();
+    </script>
   </head>
   <body>
 
@@ -100,7 +103,6 @@
     <script src="../node_modules/jquery.terminal/js/autocomplete_menu.js"></script>
     <script src="../node_modules/jquery.terminal/js/unix_formatting.js"></script>
     <script>
-
       tippy('#sidebar-settings', {
         placement: 'right'
       })
@@ -176,6 +178,16 @@
     <script src="js/ui-global.js"></script>
     <script src="js/ui-mineflayer.js"></script>
     <script src="js/discord.js"></script>
+    <script>
+      let timeSinceStart = () => (Date.now() - timerStart);
+      $(document).on('ready', function() {
+        console.log("Time until DOMready: ", timeSinceStart());
+      });
+      $(window).on('load', function() {
+        console.log("Time until everything loaded: ", timeSinceStart());
+        console.log("Time until everything loaded: ", timeSinceStart());
+      });
+    </script>
     <!-- to be implemeneted..
     <script src="js/ui-bedrock.js"></script>
     -->
