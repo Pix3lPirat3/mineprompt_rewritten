@@ -1,5 +1,6 @@
 let glob = require('glob');
 let path = require('path');
+let stringSimilarity = require('string-similarity')
 global.appRoot = path.resolve(__dirname + '/../../');
 
 module.exports = {
@@ -18,7 +19,8 @@ module.exports = {
   setCommands: function(type) {
     let commander = this;
     commander.commands = {}
-    let files = glob.sync(path.join(global.appRoot, `/commands/${type}/**/*.js`).replace(/\\/g, '/'));
+    let files = [];
+    if(type) files = files.concat(glob.sync(path.join(global.appRoot, `/commands/${type}/**/*.js`).replace(/\\/g, '/')));
     files = files.concat(glob.sync(path.join(global.appRoot, `/commands/global/**/*.js`).replace(/\\/g, '/')));
 
     for (var a = 0; a < files.length; a++) {
