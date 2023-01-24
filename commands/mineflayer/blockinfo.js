@@ -2,7 +2,7 @@ const util = require('util')
 
 module.exports = {
   command: 'blockinfo',
-  usage: 'blockinfo [\'cursor\' || x y z]',
+  usage: 'blockinfo [\'cursor\' | x y z]',
   description: 'Print the block data at the target.',
   requires: {
     entity: true

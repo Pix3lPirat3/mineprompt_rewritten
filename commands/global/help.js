@@ -35,14 +35,14 @@ Description: ${command.description || 'There is no description for this command.
 
     let max_usage_length = 60;
 
-    let system_commands = commander.commands_array.filter(cmd => !cmd.requiresEntity).map(cmd => ({ command: cmd.command, usage: cmd.usage?.substring(0, max_usage_length), description: cmd.description || 'This command does not have a description..' })).sort((a, b) => a.command.localeCompare(b.command))
+    let system_commands = commander.commands_array.filter(cmd => !cmd.requires?.entity).map(cmd => ({ command: cmd.command, usage: cmd.usage?.substring(0, max_usage_length), description: cmd.description || 'This command does not have a description..' })).sort((a, b) => a.command.localeCompare(b.command))
     let system_commands_string = `\nSystem Commands:\n` + stringTable.create(system_commands) + '\n';
-    if(sender.type === 'discord') system_commands_string = '```' + system_commands_string + '```';
+    if(sender.type === 'discord') system_commands_string = '```' + system_commands_string.substring(0, 1994) + '```';
     sender.reply(system_commands_string)
 
-    let player_commands = commander.commands_array.filter(cmd => cmd.requiresEntity).map(cmd => ({ command: cmd.command, usage: cmd.usage?.substring(0, max_usage_length), description: cmd.description || 'This command does not have a description..' })).sort((a, b) => a.command.localeCompare(b.command))
+    let player_commands = commander.commands_array.filter(cmd => cmd.requires?.entity).map(cmd => ({ command: cmd.command, usage: cmd.usage?.substring(0, max_usage_length), description: cmd.description || 'This command does not have a description..' })).sort((a, b) => a.command.localeCompare(b.command))
     let player_commands_string = `\nPlayer Commands:\n` + stringTable.create(player_commands) + '\n'
-    if(sender.type === 'discord') player_commands_string = '```' + player_commands_string + '```';
+    if(sender.type === 'discord') player_commands_string = '```' + player_commands_string.substring(0, 1994) + '```';
     sender.reply(player_commands_string)
   }
 }
