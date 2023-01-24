@@ -7,6 +7,16 @@ var console = (function() {
       var args = Array.from(arguments);
       log.apply(console, args);
       term.echo(args.join(' '));
+    },
+    warn: function() {
+      var args = Array.from(arguments);
+      log.apply(console, args);
+      term.echo(args.join(' '));
+    },
+    error: function() {
+      var args = Array.from(arguments);
+      log.apply(console, args);
+      term.echo(args.join(' '));
     }
   }
 }(window.console));
