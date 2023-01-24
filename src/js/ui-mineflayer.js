@@ -1,10 +1,16 @@
-let { createBot } = require('mineflayer');
-const { pathfinder, Movements } = require('mineflayer-pathfinder');
-const { GoalNear } = require('mineflayer-pathfinder').goals
-var v = require('vec3');
-
+let createBot;
+let pathfinder, Movements;
 let mineflayer = {
   startClient: async function(options) {
+    commander.setCommands('mineflayer');
+    if(!createBot) {
+      createBot = require('mineflayer').createBot;
+      let pathfinder_module = require('mineflayer-pathfinder');
+      if(!pathfinder) pathfinder = pathfinder_module.pathfinder;
+      if(!Movements) Movements = pathfinder_module.Movements;
+    }
+
+
     if (bot) await bot.end();
     interface.reset();
 

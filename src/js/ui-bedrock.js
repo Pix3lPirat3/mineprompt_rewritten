@@ -1,7 +1,8 @@
-const { createClient } = require('bedrock-protocol');
+let createClient;
 
 let bedrock = {
   startClient: async function(options) {
+    if(!createClient) createClient = require('bedrock-protocol').createClient;
     console.log('Bedrock Options:', options)
     options.offline = true;
     try {
