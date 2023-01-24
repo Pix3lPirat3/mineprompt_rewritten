@@ -180,17 +180,11 @@
     <script src="js/discord.js"></script>
     <script>
       let timeSinceStart = () => (Date.now() - timerStart);
-      $(document).on('ready', function() {
-        console.log("Time until DOMready: ", timeSinceStart());
-      });
       $(window).on('load', function() {
-        console.log("Time until everything loaded: ", timeSinceStart());
-        console.log("Time until everything loaded: ", timeSinceStart());
+        console.log("[Stats] onLoad: ", timeSinceStart());
       });
     </script>
-    <!-- to be implemeneted..
     <script src="js/ui-bedrock.js"></script>
-    -->
     <!-- Insert this line after script imports -->
     <script>if (window.module) module = window.module;</script>
 
