@@ -1,8 +1,12 @@
 const { Client, Events, GatewayIntentBits } = require('discord.js');
 const discord_config = require('./../storage/discord.json');
 
-
 let discord;
+
+/// TODO:
+/*
+  Use the commander.commands_array and generate slash commands with the USAGE and DESCRIPTION
+*/
 
 function startDiscord() {  
   if(!discord_config.enabled && discord_config.token) return console.log(`[Discord] Discord token set, integration is disabled. (discord.json)`);
@@ -29,12 +33,13 @@ function startDiscord() {
 
     if (!bot && command_module.requiresEntity) return await message.channel.send(`[${command_module.command}] This command requires the bot to be spawned.`);
     
-    /*command_module.execute({type: 'discord', author: message.author, reply: async function(arguments) {
+    command_module.execute({type: 'discord', author: message.author, reply: async function(arguments) {
       await message.channel.send(arguments);
     }}, cmd, args)
-    */
+    
 
-    command_module.execute({type: 'discord', author: message.author, reply: commander.reply.toDiscord}, cmd, args)
+    // TODO: Upgrade to:
+    //command_module.execute({type: 'discord', author: message.author, reply: commander.reply.toDiscord}, cmd, args)
 
 
   });
