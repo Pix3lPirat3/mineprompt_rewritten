@@ -8,6 +8,8 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
+console.log('DIRNAME:', __dirname)
+
 const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
@@ -15,7 +17,7 @@ const createWindow = () => {
     autoHideMenuBar: true,
     width: 1100,
     height: 600,
-    icon: './src/img/heads/computer.png',
+    icon: __dirname + '/img/heads/computer.png',
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false,

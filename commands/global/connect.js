@@ -25,7 +25,7 @@ module.exports = {
 
     let opts = parseSentence(args.join(' '));
 
-    // NOTE : When using shorthand (-host) only one `-` is needed, when using longhand (--host) two are needed.
+    // NOTE : When using shorthand (-h) only one `-` is needed, when using longhand (--host) two are needed.
     let username = opts.u || opts.username;
     if (!username) return console.log('You must specify a username with -u or --username')
     let host = opts.h || opts.host;
@@ -47,6 +47,7 @@ module.exports = {
       version: version,
       auth: authentication ? 'microsoft' : undefined,
       skipValidation: !authentication,
+      profilesFolder: `./cache/${username}`,
       fakeHost: opts.fakeHost, // Used on servers with TCPShield
       onMsaCode: function(data) {
         console.log(`Use the code "${data.user_code}" on ${data.verification_uri} to authenticate your account.`)
@@ -57,8 +58,11 @@ module.exports = {
     let bedrock_edition = opts.b || opts.bedrock;
 
     console.log(`Connecting ${username} to ${host}:${port}`)
-    if(!bedrock_edition) return mineflayer.startClient(options);
-    bedrock.startClient(options)
+
+
+
+    if(bedrock_edition) return bedrock.startClient(options)
+    return mineflayer.startClient(options);
 
   }
 }

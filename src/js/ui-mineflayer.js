@@ -1,5 +1,6 @@
 let createBot;
 let pathfinder, Movements;
+
 let mineflayer = {
   startClient: async function(options) {
     commander.setCommands('mineflayer');
@@ -30,14 +31,14 @@ let mineflayer = {
       bot.pathfinder.setMovements(defaultMove)
     })
 
-    bot.on('login', function() {
-      interface.startSession(bot._client.username); // CHECK: Is username avaliable yet?
-      console.log('[Console] Logged into the server..');
+    bot.once('login', function() {
+      interface.startSession(bot.username);
+      if(i18n.__('mineflayer.events.login')) console.log(i18n.__('mineflayer.events.login', { bot: bot }));
     })
 
     bot.once('spawn', function() {
-      console.log('[Console] Spawned on the server..');
       interface.startRuntime();
+      if(i18n.__('mineflayer.events.spawn')) console.log(i18n.__('mineflayer.events.spawn', { bot: bot }));
 
       // These events are moved inside the 'spawn' event so UI events are registered at the same time
       // UI Event : Position
@@ -59,7 +60,7 @@ let mineflayer = {
 
     // UI Event : Session End : Empty Health, Skin, Username
     bot.once('end', function() {
-      console.log(`[Console] ${bot.username || options.username} has disconnected from the server.`);
+      if(i18n.__('mineflayer.events.spawn')) console.log(i18n.__('mineflayer.events.end', { bot: bot, username: bot.username || options.username }));
       interface.reset();
       interface.stopRuntime();
       bot = null;
@@ -79,8 +80,12 @@ let mineflayer = {
     })
 
     // TODO : Add a setting for colors on/off
+
+
+    let chat_use_colors = i18n.__('mineflayer.events.message.colors');
     bot.on('message', function(jsonMsg, position) {
-      console.log(toTerminal(jsonMsg.toMotd()))
+      if(!chat_use_colors && jsonMsg.getText()) return console.log(i18n.__('mineflayer.events.message.format', { message: toTerminal(jsonMsg.getText()) }));
+      console.log(i18n.__('mineflayer.events.message.format', { message: toTerminal(jsonMsg.toMotd()) }));
     })
 
     // Thank you for solving my toAnsi issue nea
@@ -110,8 +115,8 @@ let mineflayer = {
     }
 
     let toTerminal = function(message, codes = defaultAnsiCodes) {
-      for (const k in codes) {
-        message = message.replace(new RegExp(k, 'g'), codes[k])
+      for (const k in defaultAnsiCodes) {
+        message = message.replace(new RegExp(k, 'g'), defaultAnsiCodes[k])
       }
       const hexRegex = /§#?([a-fA-F\d]{2})([a-fA-F\d]{2})([a-fA-F\d]{2})/
       while (message.search(hexRegex) !== -1) {
@@ -124,7 +129,7 @@ let mineflayer = {
         // ANSI from https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#rgb-colors
         message = message.replace(hexRegex, `\u001b[38;2;${red};${green};${blue}m`)
       }
-      return codes['§r'] + message + codes['§r']
+      return defaultAnsiCodes['§r'] + message + defaultAnsiCodes['§r']
     }
 
     bot.on('error', console.log);
@@ -132,20 +137,16 @@ let mineflayer = {
 
     // Chat Listener for Commands
     bot.on('chat', function(sender, message) {
+      //TODO: config.commands.chat.enabled
+      //TODO: config.commands.chat.masters
       if(sender === bot.username) return;
       if (!message.startsWith('!')) return;
-
       const args = message.trim().split(/ +/g);
-      const command = args.shift().substring(1).toLowerCase();
-
+      const command = args.shift().substring(1)//.toLowerCase();
       let command_module = commander.getCommand(command);
-      if (!command_module) return bot.chat(`/msg ${sender} Unknown command. Type "help" in console for help.`);
-
-      if (!bot && command_module.requires?.entity) return console.log(`[${command_module.command}] This command requires the bot to be spawned.`)
-      // Passed Checks : Execute Command
-
-      command_module.execute({type: 'player', player: sender, reply: commander.reply.toPlayer}, command, args)
-
+      if (!command_module) return bot.chat(`/msg ${sender} ${i18n.__('commander.unknown_command')}`);
+      if (!bot && command_module.requires?.entity) return console.log(i18n.__('commander.requires_entity', { command: command }));
+      command_module.execute({type: 'player', player: sender, reply: commander.reply.toPlayer}, command, args);
     })
 
   }

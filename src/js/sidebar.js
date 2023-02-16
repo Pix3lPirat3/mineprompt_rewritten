@@ -1,86 +1,63 @@
 const fs = require('fs');
 
-let storage_accounts = JSON.parse(fs.readFileSync(__dirname + '/../storage/accounts.json', 'utf8'));
-
-fs.readFile(__dirname + '/../storage/accounts.json', (err, data) => {
-  if (err) console.log(err);
-  storage_accounts = JSON.parse(data)
-  loadSidebarAccounts();
-});
-
-
-function loadSidebarAccounts() {
-  $('#sidebar-accounts').empty()
-  storage_accounts.forEach(function(account) {
-    $('#sidebar-accounts').append(`<div class="box-user" data-username="${account.username}" data-auth="${account.auth}" data-tippy-content="${account.username} <ul style='padding-left: 14px;'><li>auth: ${account.auth}</li><li>right-click to delete</li></ul>">
-      <div class="box-img">
-        <img src="https://mc-heads.net/head/${account.username}/nohelm">
-      </div>
-    </div>`)
-  })
-}
-
-
-// Handles adding a new account
-$('#form-add-account').on('submit', function(e) {
-  e.preventDefault();
-  let username = $('#form-add-account-username').val().trim();
-  let auth = $('#form-add-account-auth').val();
-
-  let existing_index = storage_accounts.findIndex(i => i.username == username); // -1 = Does Not Exist (otherwise it returns the index of a found item)
-  if (existing_index > -1) {
-    storage_accounts[existing_index] = {
-      username: username,
-      auth: auth
+let sidebar = {
+  accounts: {
+    clear: function() {
+      $('#sidebar-accounts').empty()
+    },
+    add: function(account) {
+      //console.debug('[sidebar.js] Adding', account)
+      $('#sidebar-accounts').append(`<div class="box-user" data-username="${account.username}" data-auth="${account.authentication}" data-tippy-content="${account.username} <ul style='padding-left: 14px;'><li>auth: ${account.authentication}</li><li>right-click to delete</li></ul>">
+        <div class="account-delete" style="position: relative;">
+        <div class="delete-account" account-delete="${account.username}" style="cursor: pointer; display: none; top: 0; right: 0; position: absolute; color: indianred; border: 2px solid #7e7e7e; border-radius: 25px; padding: 1.5px 3px;">X</div>
+        <div class="box-img">
+          <img src="https://mc-heads.net/head/${account.username}/nohelm">
+        </div>
+        </div>
+      </div>`)
     }
-  } else {
-    storage_accounts.push({
-      username: username,
-      auth: auth
+  },
+  addListeners: function() {
+    $('#sidebar-accounts').on('mouseover', 'div.box-user', function(e) {
+      let elCurrentTarget = $(e.currentTarget); // .box-user
+      elCurrentTarget.find('.delete-account').show()
+    });
+
+    // Delete Account
+    $('#sidebar-accounts').on('mouseout', 'div.box-user', function(e) {
+      let elCurrentTarget = $(e.currentTarget); // .box-user
+      elCurrentTarget.find('.delete-account').hide()
+    });
+
+    // Open console for this user--
+    $('#sidebar-accounts').on('click', 'div.box-user', function(e) {
+      let el = $(e.currentTarget);
+      let elClickedElement = $(e.target);
+
+      let username = $(el).data('username');
+      let auth = $(el).data('auth');
+
+      if(elClickedElement.attr('account-delete')) return database.removeAccount(username);
+      
+      let term_command = `connect -u ${username}`;
+      if (auth) term_command += ` -a ${auth}`;
+      term_command += ` -h `;
+
+      term.set_command(term_command);
+      setTimeout(function() {
+        term.focus(); // requires a small timeout
+      }, 10)
     })
+
+    // Open User Editor (User right clicked on a user)
+    $(document).on("contextmenu", "#sidebar-accounts .box-user", function(e) {
+      e.preventDefault();
+      let el = $(e.currentTarget);
+      let username = $(el).data('username');
+      let auth = $(el).data('auth');
+
+      return false;
+    });
   }
-  fs.writeFileSync(__dirname + '/../storage/accounts.json', JSON.stringify(storage_accounts), 'utf8');
-
-  loadSidebarAccounts();
-})
-
-// Open console for this user--
-$('#sidebar-accounts').on('click', '.box-user', function(e) {
-  let el = $(e.currentTarget);
-  let username = $(el).data('username');
-  let auth = $(el).data('auth');
-  let term_command = `connect -u ${username}`;
-  if (auth) term_command += ` -a ${auth}`;
-  term_command += ` -h `;
-
-  term.set_command(term_command);
-  setTimeout(function() {
-    term.focus(); // requires a small timeout
-  }, 10)
-})
-
-// Open User Editor (User right clicked on a user)
-$(document).on("contextmenu", "#sidebar-accounts .box-user", function(e) {
-  e.preventDefault();
-  let el = $(e.currentTarget);
-  let username = $(el).data('username');
-  let auth = $(el).data('auth');
-
-
-  /*
-  HOW TO REMOVE ACCOUNTS:
-  storage_accounts = storage_accounts.filter(function( obj ) {
-    return obj.username !== username;
-  });
-
-  fs.writeFileSync(__dirname + '/../storage/accounts.json', JSON.stringify(storage_accounts), 'utf8');
-
-  */
-
-  loadSidebarAccounts()
-
-  window.console.log(storage_accounts)
-
-  //openAccount(username, auth)
-  return false;
-});
+}
+sidebar.addListeners();

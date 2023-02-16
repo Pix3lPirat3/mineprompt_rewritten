@@ -1,4 +1,4 @@
-let { GoalLookAtBlock } = require('mineflayer-pathfinder').goals;
+let { GoalLookAtBlock, GoalNear } = require('mineflayer-pathfinder').goals;
 
 //let Cuboid = require('./../../../src/js/cuboid.js')
 var v = require('vec3');
@@ -34,7 +34,11 @@ module.exports = {
     // loop through chest locations, navigate to each chest, open it, and store the chest items inside the bot's storage manager for later reference.
     for(let a = 0; a < chests.length; a++) {
       let chest = chests[a];
-      await bot.pathfinder.goto(new GoalLookAtBlock(chest, bot.world));
+      //await bot.pathfinder.goto(new GoalLookAtBlock(chest, bot.world));
+
+      // Only pathfind if we're greater than 3 blocks away
+      if(bot.entity.position.distanceTo(chest) > 3) await bot.pathfinder.goto(new GoalNear(chest.x, chest.y, chest.z, 3));
+
       let chest_window = await bot.openContainer(bot.blockAt(chest));
       // OPTIONAL: Delay for servers not loading chests fast enough.
       // await delay(1000)
@@ -49,3 +53,10 @@ module.exports = {
 
   }
 }
+
+// TODO:
+/* make sure it's a real chest
+bot.on('openChest AND closeChest', function() {
+  chest_window => store in storage.array
+})
+*/

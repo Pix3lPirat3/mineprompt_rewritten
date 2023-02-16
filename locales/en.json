@@ -1,0 +1,38 @@
+{
+	"interface": {
+		"settings": "Settings",
+		"console": {
+			"prompt": "Console"
+		},
+		"title": "MinePrompt Client",
+		"greetings": "\n      MinePrompt v5.0.0\n"
+	},
+	"commander": {
+		"suggest_commands": "[Console] Did you mean: {{suggestions}}",
+		"unknown_command": "[Console] Unknown command. Type \"help\" for help.",
+		"requires_entity": "[{{command}}] This command requires the bot to be spawned.",
+		"duplicate": "[Warning] Duplicate command registered (\"{{command}}\").\nRegistered: {{registered}}, Ignored: {{ignored}}",
+		"commands_loaded": "[Console] Loaded {{amount}} commands into the {{type}} client..",
+		"reloaded": "\n[Console] Now reloading the client..\n"
+	},
+	"commands": {
+		"help": {
+			"unknown_command": "[Help] There is no command matching \"{{command}}\"",
+			"console_only": "[Help] This command must be executed from console.",
+			"command": "Command: \"{{command.command}}\"\nVersion: {{command.version}}\nAuthor: {{command.author}}\nRepository: {{command.repository}}\nAliases: {{command.aliases}}\nDescription: {{command.description}}\nUsage: {{command.usage}}",
+			"system_commands": "\nSystem Commands:\n {{table}}",
+			"player_commands": "\nPlayer Commands:\n {{table}}"
+		}
+	},
+	"mineflayer": {
+		"events": {
+			"login": "[Player] {{bot.username}} has logged into the server..",
+			"spawn": "[Player] {{bot.username}} has spawned on the server..",
+			"end": "[Player] {{username}} has disconnected from the server..",
+			"message": {
+				"colors": true,
+				"format": "{{message}}"
+			}
+		}
+	}
+}

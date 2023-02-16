@@ -21,7 +21,7 @@ rl.on('line', function(line) {
 
     rl.prompt();
 }).on('close', function() {
-    console.log('Have a great day!');
+    console.log('LINUX - Goodbye!');
     process.exit(0);
 });
 

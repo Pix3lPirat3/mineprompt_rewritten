@@ -1,0 +1,11 @@
+/*"windowOpen" (window)
+Fires when you begin using a workbench, chest, brewing stand, etc.
+
+"windowClose" (window)
+Fires when you may no longer work with a workbench, chest, etc.
+
+check if chest at cursor, AND that it's open (lid property?)
+
+// NOTE:
+on windowClose store the closing window into the storage, NOT the windowOpening containerItems
+*/

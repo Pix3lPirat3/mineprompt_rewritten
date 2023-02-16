@@ -9,9 +9,11 @@ module.exports = {
   },
   author: 'Pix3lPirat3',
   execute: async function(sender, command, args) {
+    let username = args[0].trim();
     if(args.length === 1) {
-      let target = bot.players[args[0]]?.entity;
-      if(!target) sender.reply(`[Goto] I cannot see the player ${args[0]}`);
+      let target = bot.players[username]?.entity;
+      console.log('target:', target)
+      if(!target) sender.reply(`[Goto] I cannot see the player ${username}`);
       let { x, y, z } = target.position;
       sender.reply(`[Goto] Now navigating to ${target.username}`)
       await bot.pathfinder.goto(new GoalNear(x, y, z, 2))

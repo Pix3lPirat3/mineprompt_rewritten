@@ -13,10 +13,10 @@ let interface = {
   sessionStart: null,
   timerRuntimeFade: null,
   reset: function() {
-    elUsername.text(`Console Client`)
+    elUsername.text(i18n.__('interface.title'))
 
     //elRuntime.empty(); -> Don't empty runtime. It's "important data".
-    term.set_prompt(`Console » `);
+    term.set_prompt(`${i18n.__('interface.console.prompt')} » `);
     interface.resetHead();
     interface.resetPosition();
     interface.resetPotionEffects();
@@ -109,6 +109,13 @@ let interface = {
     elPotionEffects.empty();
   },
 }
+
+interface.reset()
+
+tippy('#sidebar-settings', {
+  content: i18n.__('interface.settings'),
+  placement: 'right'
+});
 
 /**
  * Translates seconds into human readable format of seconds, minutes, hours, days, and years

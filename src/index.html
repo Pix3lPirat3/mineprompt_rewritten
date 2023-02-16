@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="css/console-client.css" />
     <link href="../node_modules/jquery.terminal/css/jquery.terminal.min.css" rel="stylesheet"/>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto">
+    <script type="text/javascript" src="./js/i18n.config.js"></script>
     <script>
       var timerStart = Date.now();
     </script>
@@ -19,7 +20,7 @@
       <aside id="left-sidebar">
         <div class="box-user">
 
-          <a id="sidebar-settings" class="box-img" href="#modal-settings" rel="modal:open" data-modal style="margin-bottom: 5px;" data-tippy-content="Settings">
+          <a id="sidebar-settings" class="box-img" href="#modal-settings" rel="modal:open" data-modal style="margin-bottom: 5px;">
             <img src="img/heads/computer.png">
           </a>
 
@@ -38,7 +39,7 @@
             <div style="float: left;">
               <img id="active-account-head" src="img/heads/wood_question.png">
               <div id="active-account-head-text">
-                <div><span data-replace="username">Console Client</span></div>
+                <div><span data-replace="username"></span></div>
                 <div data-replace="position"></div>
               </div>
             </div>
@@ -92,6 +93,18 @@
 
     </div>
 
+
+    <!--Creates the popup body-->
+    <div class="popup-overlay" style="display: none">
+    <!--Creates the popup content-->
+      <div class="popup-content">
+        <h2>Pop-Up</h2>
+        <p> This is an example pop-up that you can make using jQuery.</p>
+       <!--popup's close button-->
+        <button class="close">Close</button>    
+      </div>
+    </div>
+
     <!-- Insert this line above script imports  -->
     <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
 
@@ -99,14 +112,19 @@
     <script src="../node_modules/@popperjs/core/dist/umd/popper.js"></script>
     <script src="../node_modules/tippy.js/dist/tippy.umd.min.js"></script>
     <script src="../node_modules/jquery/dist/jquery.min.js"></script>
+
+
+    <script>
+      $('#sidebar-add-account').on('click', function() {
+        $('#popup-overlay').show();
+      })
+    </script>
+
+
     <script src="../node_modules/jquery.terminal/js/jquery.terminal.min.js"></script>
     <script src="../node_modules/jquery.terminal/js/autocomplete_menu.js"></script>
     <script src="../node_modules/jquery.terminal/js/unix_formatting.js"></script>
     <script>
-      tippy('#sidebar-settings', {
-        placement: 'right'
-      })
-
       tippy('#sidebar-add-account', {
         placement: 'right'
       });
@@ -178,6 +196,10 @@
     <script src="js/ui-global.js"></script>
     <script src="js/ui-mineflayer.js"></script>
     <script src="js/discord.js"></script>
+    <script type="text/javascript" src="./js/config-manager.js"></script>
+    <script>
+      
+    </script>
     <script>
       let timeSinceStart = () => (Date.now() - timerStart);
       $(window).on('load', function() {

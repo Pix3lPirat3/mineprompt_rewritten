@@ -1,3 +1,5 @@
+let { GoalNear } = require('mineflayer-pathfinder').goals;
+
 module.exports = {
   command: 'bed',
   usage: 'bed <search range || x y z>',

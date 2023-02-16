@@ -16,7 +16,10 @@ var console = (function() {
     error: function() {
       var args = Array.from(arguments);
       log.apply(console, args);
-      term.echo(args.join(' '));
+    },
+    debug: function() {
+      var args = Array.from(arguments);
+      log.apply(console, args);
     }
   }
 }(window.console));
@@ -31,11 +34,11 @@ var term = $('#terminal').terminal(async function onCommandSubmit(input) {
   if (!command_module) {
     // The command was not found, let's see if we can suggest a close match (NOT including aliases - so we don't use the shortcut)
     let close_matches = commander.getCloseMatches(cmd, 3);
-    if (!close_matches.length) return console.log('[Console] Unknown command. Type "help" for help.');
-    return console.log(`[Console] Did you mean: ${close_matches.join(', ')}`);
+    if (!close_matches?.length) return console.log(i18n.__('commander.unknown_command')); // [Console] Unknown command. Type "help" for help.
+    return console.log(i18n.__('commander.suggest_commands', { suggestions: close_matches.join(', ') })); // [Console] Did you mean: ${close_matches.join(', ')}
   }
 
-  if (!bot && command_module.requires?.entity) return console.log(`[${command_module.command}] This command requires the bot to be spawned.`);
+  if (!bot && command_module.requires?.entity) return console.log(i18n.__('commander.requires_entity', { command: command_module.command }));
 
   var command = $.terminal.parse_command(input);
 
@@ -76,13 +79,11 @@ var term = $('#terminal').terminal(async function onCommandSubmit(input) {
   },
   onInit: function() {
     term = this;
-    commander.setCommands();
+    commander.setCommands('global');
   },
   exit: false,
   autocompleteMenu: true,
-  greetings: `
-Console Client v1.0.0
-  `,
-  name: 'Mineflayer Console Client',
-  prompt: 'Console » '
+  greetings: i18n.__('interface.greetings'),
+  name: 'Console Client',
+  prompt: `${i18n.__('interface.console.prompt')} » `
 });
