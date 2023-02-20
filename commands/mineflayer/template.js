@@ -7,6 +7,6 @@ module.exports = {
   },
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
-
+    sender.reply('[Template] This is a template command.')
   }
 }

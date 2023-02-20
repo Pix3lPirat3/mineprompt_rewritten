@@ -2,6 +2,12 @@
 storage/accounts.json
 storage/discord.json
 
+# Cache
+cache/*
+
+# Database
+mineprompt
+
 # Packages
 out/
 

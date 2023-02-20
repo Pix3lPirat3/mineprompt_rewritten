@@ -22,8 +22,8 @@ module.exports = {
     })).sort((a, b) => a.dist - b.dist);
 
     let sortFlags = Object.keys(entities[0]);
-    console.log('sortFlags:')
-    console.log(sortFlags);
+    //console.log('sortFlags:')
+    //console.log(sortFlags);
 
     console.log('entity:')
     console.log(entities)

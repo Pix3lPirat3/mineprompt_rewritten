@@ -7,7 +7,7 @@ let sidebar = {
     },
     add: function(account) {
       //console.debug('[sidebar.js] Adding', account)
-      $('#sidebar-accounts').append(`<div class="box-user" data-username="${account.username}" data-auth="${account.authentication}" data-tippy-content="${account.username} <ul style='padding-left: 14px;'><li>auth: ${account.authentication}</li><li>right-click to delete</li></ul>">
+      $('#sidebar-accounts').append(`<div class="box-user" data-username="${account.username}" data-auth="${account.authentication}" data-tippy-content="${account.username} <ul style='padding-left: 14px;'><li>auth: ${account.authentication}</li></ul>">
         <div class="account-delete" style="position: relative;">
         <div class="delete-account" account-delete="${account.username}" style="cursor: pointer; display: none; top: 0; right: 0; position: absolute; color: indianred; border: 2px solid #7e7e7e; border-radius: 25px; padding: 1.5px 3px;">X</div>
         <div class="box-img">

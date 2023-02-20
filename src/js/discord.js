@@ -10,6 +10,7 @@ let discord;
 
 function startDiscord() {  
   if(!discord_config.enabled && discord_config.token) return console.log(`[Discord] Discord token set, integration is disabled. (discord.json)`);
+  if(!discord_config.enabled && !discord_config.token) return;
 
   discord = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent] });
 

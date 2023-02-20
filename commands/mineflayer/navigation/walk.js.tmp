@@ -1,0 +1,2 @@
+walk n/e/s/w
+walk w 1 (move WEST 1 block)

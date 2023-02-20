@@ -1,7 +1,7 @@
 module.exports = {
   command: 'dig',
   usage: 'dig [x y z]',
-  description: 'Dig a block on a specific coordinate.',
+  description: 'Dig a block at a specific coordinate.',
   requires: {
     entity: true
   },

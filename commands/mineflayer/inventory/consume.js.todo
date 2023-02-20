@@ -1,0 +1,15 @@
+module.exports = {
+  command: 'consume',
+  usage: 'consume <item>',
+  aliases: ['setslot'],
+  description: 'Change your selected slot in the hotbar.',
+  requires: {
+    entity: true
+  },
+  execute: function(sender, command, args) {
+    if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`);
+
+    // whitelist,whitelist,whitelist || *
+    //
+  }
+}

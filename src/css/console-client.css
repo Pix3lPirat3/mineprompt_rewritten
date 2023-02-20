@@ -9,8 +9,8 @@
     #header {
       width: 100%!important; /* We shrink it contorts to the sidebar, but once it's gone we can enlarge it */
     }
-    * {
-        font-size: 3vw!important;
+    .terminal {
+      --size: 0.9!important;
     }
 }
 
@@ -143,3 +143,4 @@ html, body {
 .context-menu-list textarea:focus, .context-menu-list input:focus, .context-menu-list select:focus {
   outline: none;
 }
+

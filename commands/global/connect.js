@@ -40,6 +40,13 @@ module.exports = {
     if (authentication === 'false' || authentication === '0') authentication = false; // Convert to Boolean
     if (authentication === 'true' || authentication === '1' || authentication == undefined) authentication = true; // Convert to Boolean
 
+    // TODO: Allow all flags passable to mineflayer
+    /* 
+      opts.authentication = opts.authentication || opts.auth || opts.a
+      let options = opts;
+
+    */
+
     let options = {
       username: username,
       host: host,

@@ -1,7 +1,7 @@
 module.exports = {
   command: 'look',
   usage: 'look <degrees>',
-  description: 'Look at a specific entity, block, or degree',
+  description: 'Look at a specific entity, block, or degree (TODO: entity, block)',
   requires: {
     entity: true
   },
