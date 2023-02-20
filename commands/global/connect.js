@@ -19,7 +19,7 @@ module.exports = {
   aliases: ['conn'],
   execute: function(sender, command, args) {
 
-    if (bot) {
+    if (bot?.entity) {
       return console.log(`\n[[;indianred;]Connection Interrupted:]\nYou are already connected to a server with "${bot.username}"\nYou can disconnect this session with the "[[;steelblue;]disconnect]" command.\n`)
     }
 
