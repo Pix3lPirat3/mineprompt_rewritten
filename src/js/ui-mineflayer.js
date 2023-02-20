@@ -137,14 +137,13 @@ let mineflayer = {
         case "EAI_AGAIN":
           console.log(`EAI_AGAIN - a network connectivity error or proxy related error`)
           break;
-        case: "ENOTFOUND":
+        case "ENOTFOUND":
           console.log;
 
           break;
-
         default:
           console.log(error)
-          break:
+          break;
       }
       console.log('ERR CODE:', error.code)
     });
