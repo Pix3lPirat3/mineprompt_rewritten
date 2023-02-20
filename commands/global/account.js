@@ -2,7 +2,7 @@ let stringTable = require('string-table')
 
 module.exports = {
   command: 'account',
-  usage: 'account <add/delete> [username] [authentication]',
+  usage: 'account <add/delete> [username] [authentication (microsoft/offline)]',
   description: 'Add an account',
   author: 'Pix3lPirat3',
   requires: {
@@ -11,6 +11,8 @@ module.exports = {
   execute: async function(sender, command, args) {
 
     let authentication_types = ['microsoft', 'offline'];
+
+    if(!args.length) return console.log(`[Cache] Invalid Usage: ${this.usage}`);
 
     if(args[0] === 'add' && args.length === 3) {
       let username = args[1];
