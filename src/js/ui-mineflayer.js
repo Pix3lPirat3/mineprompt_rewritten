@@ -34,6 +34,14 @@ let mineflayer = {
     bot.once('login', function() {
       interface.startSession(bot.username);
       if(i18n.__('mineflayer.events.login')) console.log(i18n.__('mineflayer.events.login', { bot: bot }));
+
+      let stmt = database.db.prepare(`UPDATE accounts SET username = ? WHERE username = ?;`);
+      stmt.run(bot.username, options.username);
+      stmt.finalize(function(err) {
+        if(err) console.log(err);
+        database.setAccounts();
+      });
+
     })
 
     bot.once('spawn', function() {
