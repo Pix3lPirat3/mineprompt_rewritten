@@ -11,15 +11,11 @@ module.exports = {
   execute: async function(sender, command, args) {
 
     let authentication_types = ['microsoft', 'offline'];
-    let regex_username = /^[a-zA-Z0-9_]{2,16}$/
 
     if(args[0] === 'add' && args.length === 3) {
       let username = args[1];
       let authentication = args[2];
 
-      if(!regex_username.test(username)) {
-        return sender.reply(`[Account] "${username}" is not a valid username. (${regex_username})`)
-      }
       if(!authentication_types.includes(authentication)) {
         return sender.reply(`[Account] "${authentication}" is not a valid authenticaion type.\nTypes: ${authentication_types.join(', ')}`)
       }
