@@ -3,7 +3,7 @@
   "name": "mineprompt_rewritten",
   "author": "pix3lpirat3",
   "authors": "pix3lpirat3",
-  "version": "0.0.2-beta",
+  "version": "0.0.3-beta",
   "description": "MinePrompt is a cross-platform Minecraft TUI (Terminal User Interface) for Java (and eventually Bedrock) edition that allows you to perform simple tasks such as chatting, moving, and sending commands to automated tasks such as farming, building, and more.",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
