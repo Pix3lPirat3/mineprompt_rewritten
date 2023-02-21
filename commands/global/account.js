@@ -19,7 +19,16 @@ module.exports = {
     }
     let username = args[1];
 
-    if(args[0] === 'add' && args.length >= 2) return database.addAccount(username, authentication)
+    if(args[0] === 'add' && args.length >= 2) {
+      let stmt = database.db.prepare(`SELECT username FROM accounts WHERE username = ?;`);
+      stmt.each(username, function(err, row) {
+        if(err) console.log(err);
+      }, function(err, count) {
+        stmt.finalize();
+        if(count) return console.log(`[Account] There was already an account with the username "${username}"`);
+        return database.addAccount(username, authentication)
+      });
+    }
 
     if(args[0] === 'remove' && args.length === 2) {
 
