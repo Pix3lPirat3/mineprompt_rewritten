@@ -9,7 +9,7 @@ module.exports = {
   execute: function(sender, command, args) {
     let type = args[0]?.toLowerCase();
     let types = ['left', 'right']
-    if (!types.includes(type)) return sender.send(`[Animation] You must specify an animation type [${types.join(', ')}]`);
+    if (!types.includes(type)) return sender.reply(`[${this.command}] ${this.usage}`);
     bot.swingArm(type, true)
   }
 }

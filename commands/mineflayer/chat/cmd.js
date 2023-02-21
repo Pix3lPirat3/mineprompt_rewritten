@@ -11,10 +11,10 @@ module.exports = {
     return Object.keys(bot.players);
   },
   execute: function(sender, command, args) {
-    if (!args.length) return sender.reply(`[Cmd] You must specify a command to send.`);
+    if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`);
     let msg = args.join(' ').trim();
     if (msg.length > 256) return sender.reply(`[Cmd] Your command was bigger than 256 characters.`);
-    console.log(`SENDING: "/${msg}"`)
+    console.log(`> Sending "/${msg}" to the server.`)
     bot.chat('/' + msg)
 
   }
