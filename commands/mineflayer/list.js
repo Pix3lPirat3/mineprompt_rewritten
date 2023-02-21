@@ -11,5 +11,3 @@ module.exports = {
     sender.reply('\n[List] Online Players: ' + Object.keys(bot.players).join(', ') + '\n');
   }
 }
-
-// TODO: add 'whois' to print player info
