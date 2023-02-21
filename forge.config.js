@@ -1,7 +1,7 @@
 module.exports = {
   packagerConfig: {
     icon: "src/icons/win/computer",
-    ignore: ["/cache/*", "/mineprompt", "/generate-embed.js", ".tmp", ".todo"],
+    ignore: ["/cache/*", "/mineprompt", "/generate-embed.js", ".tmp", ".todo", "/commands/mineflayer/customs"],
   },
   rebuildConfig: {},
   makers: [

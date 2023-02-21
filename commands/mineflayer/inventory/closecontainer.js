@@ -1,6 +1,7 @@
 module.exports = {
   command: 'closecontainer',
   usage: 'closecontainer',
+  aliases: ['closewindow'],
   description: 'Close the currently opened container.',
   requires: {
     entity: true

@@ -11,7 +11,7 @@ module.exports = {
     return Object.keys(bot.players);
   },
   execute: function(sender, command, args) {
-    if (!args.length) return sender.reply(`[Send] You must specify a message to send.`);
+    if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`);
     let msg = args.join(' ');
     if (msg.length > 256) return sender.reply(`[Send] Your message was bigger than 256 characters.`)
     bot.chat(msg)

@@ -7,7 +7,7 @@ module.exports = {
     entity: true
   },
   execute: function(sender, command, args) {
-    if (!args.length) return console.log('[Changeslot] You must specify a slot to change to.')
+    if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`);
 
     let slot = cleanInt(args[0])
     if (slot < 0 || slot > 8 || isNaN(slot)) return sender.reply(`[Changeslot] You must specify a slot [0-8]`);
