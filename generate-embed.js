@@ -37,4 +37,4 @@ for(let a = 0; a < files.length; a++) {
 
 }
 
-console.log(`> The commands listed here may be incomplete or missing from the currently released version.`)
+console.log(`> The commands listed here may be missing commands from the currently released version.`)
