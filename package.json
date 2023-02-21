@@ -27,7 +27,7 @@
     "i18n": "^0.15.1",
     "jquery": "^3.6.3",
     "jquery-contextmenu": "^2.9.2",
-    "jquery.terminal": "^2.35.2",
+    "jquery.terminal": "^2.35.3",
     "mineflayer": "^4.8.1",
     "mineflayer-pathfinder": "^2.4.2",
     "minimist-string": "^1.0.2",
@@ -44,7 +44,7 @@
     "@electron-forge/maker-rpm": "^6.0.5",
     "@electron-forge/maker-squirrel": "^6.0.5",
     "@electron-forge/maker-zip": "^6.0.5",
-    "electron": "23.0.0",
+    "electron": "^23.1.0",
     "javascript-obfuscator": "^4.0.2"
   }
 }
