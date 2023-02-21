@@ -8,12 +8,12 @@ if (require('electron-squirrel-startup')) {
   app.quit();
 }
 
-console.log('DIRNAME:', __dirname)
+let package = require('./../package.json');
 
 const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    title: 'Console Client',
+    title: 'MinePrompt v' + package.version,
     autoHideMenuBar: true,
     width: 1100,
     height: 600,
