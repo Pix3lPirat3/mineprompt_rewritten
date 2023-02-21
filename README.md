@@ -1,10 +1,4 @@
-<img src="https://img.shields.io/github/license/pix3lpirat3/mineprompt_rewritten">
-<img src="https://img.shields.io/github/package-json/v/pix3lpirat3/mineprompt_rewritten">
-<img src="https://img.shields.io/github/repo-size/pix3lpirat3/mineprompt_rewritten">
-<img src="https://img.shields.io/github/downloads/pix3lpirat3/mineprompt_rewritten/total">
-<img src="https://img.shields.io/github/issues/pix3lpirat3/mineprompt_rewritten">
-<br>
-<img src="https://img.shields.io/discord/413438066984747026?label=Discord">
+<img src="https://img.shields.io/discord/1064620716403728537?label=Discord">
 
 # MinePrompt v5
 
