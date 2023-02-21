@@ -1,10 +1,10 @@
 {
   "main": "src/electron.js",
   "name": "mineprompt_rewritten",
-  "author": "",
+  "author": "pix3lpirat3",
   "authors": "pix3lpirat3",
-  "version": "5.0.0",
-  "description": "<img src=\"https://img.shields.io/github/license/pix3lpirat3/mineprompt_rewritten\">\r <img src=\"https://img.shields.io/github/package-json/v/pix3lpirat3/mineprompt_rewritten\">\r <img src=\"https://img.shields.io/github/repo-size/pix3lpirat3/mineprompt_rewritten\">\r <img src=\"https://img.shields.io/github/downloads/pix3lpirat3/mineprompt_rewritten/total\">\r <img src=\"https://img.shields.io/github/issues/pix3lpirat3/mineprompt_rewritten\">\r <br>\r <img src=\"https://img.shields.io/discord/413438066984747026?label=Discord\">",
+  "version": "0.0.2-beta",
+  "description": "MinePrompt is a cross-platform Minecraft TUI (Terminal User Interface) for Java (and eventually Bedrock) edition that allows you to perform simple tasks such as chatting, moving, and sending commands to automated tasks such as farming, building, and more.",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron-forge start",
@@ -31,7 +31,6 @@
     "mineflayer": "^4.8.1",
     "mineflayer-pathfinder": "^2.4.2",
     "minimist-string": "^1.0.2",
-    "prismarine-auth": "^2.2.0",
     "sqlite3": "^5.1.4",
     "string-similar": "^1.0.2",
     "string-similarity": "^4.0.4",
