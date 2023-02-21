@@ -112,8 +112,10 @@ let interface = {
 
 interface.reset()
 
-tippy('#sidebar-settings', {
-  content: i18n.__('interface.settings'),
+let package = require('./../package.json');
+
+tippy('#sidebar-computer', {
+  content: 'MinePrompt ' + package.version,
   placement: 'right'
 });
 
