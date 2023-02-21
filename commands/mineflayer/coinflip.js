@@ -7,10 +7,7 @@ module.exports = {
   },
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
-
     let face = getFace();
-
-    // Sender is console, respond in console
     if(sender !== true) return sender.reply(`[CoinFlip] I've flipped a coin and got ${face}`);    
     
     function getFace() {
