@@ -31,5 +31,7 @@ module.exports = {
     
     let player_commands = commander.commands_array.filter(cmd => cmd.requires?.entity).map(cmd => ({ command: cmd.command, usage: cmd.usage?.substring(0, max_usage_length), description: cmd.description || 'This command does not have a description..' })).sort((a, b) => a.command.localeCompare(b.command))
     sender.reply(i18n.__('commands.help.player_commands', { table: stringTable.create(player_commands) }))
+
+    sender.reply(`> Get a specific command's details by running "help <command>"`)
   }
 }
