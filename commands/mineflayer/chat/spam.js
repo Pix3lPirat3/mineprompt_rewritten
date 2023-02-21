@@ -1,6 +1,6 @@
 module.exports = {
   command: 'spam',
-  usage: 'spam list || start <message> || stop [id {all}]',
+  usage: 'spam list || start <interval {2500ms}> <message> || stop [id {all}]',
   aliases: ['repeat'],
   description: 'Send a message or a command to the server.',
   requires: {
@@ -34,7 +34,8 @@ module.exports = {
     }
 
     if (args[0] === 'start') {
-      const delay = parseInt(args[1])
+      if(args.length < 2) return sender.reply(`[${this.command}] ${this.usage}`)
+      const delay = parseInt(args[1]) || 2500
       const message = args.slice(2).join(' ')
       if (message.length > 256) return sender.reply(`[Send] Your message was bigger than 256 characters.`)
       const timer = startTimer(delay, message)
