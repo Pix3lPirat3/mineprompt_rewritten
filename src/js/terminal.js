@@ -84,6 +84,6 @@ var term = $('#terminal').terminal(async function onCommandSubmit(input) {
   exit: false,
   autocompleteMenu: true,
   greetings: i18n.__('interface.greetings'),
-  name: 'Console Client',
+  name: 'mineprompt',
   prompt: `${i18n.__('interface.console.prompt')} » `
 });
