@@ -1,5 +1,5 @@
 const { Client, Events, GatewayIntentBits } = require('discord.js');
-const discord_config = require('./../storage/discord.json');
+const discord_config = require('./storage/discord.json');
 
 let discord;
 
