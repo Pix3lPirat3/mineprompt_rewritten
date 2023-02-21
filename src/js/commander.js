@@ -21,7 +21,7 @@ module.exports = {
     commander.commands = {}
     let files = [];
     files = files.concat(glob.sync(path.join(global.appRoot, `/commands/global/**/*.js`).replace(/\\/g, '/'), { cache: false }));
-    if(type !== 'global') files = files.concat(glob.sync(path.join(global.appRoot, `/commands/${type}/**/*.js`).replace(/\\/g, '/'), { cache: false }));
+    if (type !== 'global') files = files.concat(glob.sync(path.join(global.appRoot, `/commands/${type}/**/*.js`).replace(/\\/g, '/'), { cache: false }));
 
     for (var a = 0; a < files.length; a++) {
       let file = files[a]
@@ -76,18 +76,18 @@ module.exports = {
     console.log(`[1] Reloading the commander | ${commander.commands_array.length} commands`)
     commander.commands_array.forEach(function(command) {
       let has_reloadpre = command.reload?.pre;
-      if(has_reloadpre) {
+      if (has_reloadpre) {
         console.log(`[pre-reload] pre-reloading ${command.command}`)
         command.reload?.pre()
       }
     });
 
     this.setCommands('mineflayer')
-    // TODO : WARNING : May have to await setCommands somehow to wait for commands to fully complete
+      // TODO : WARNING : May have to await setCommands somehow to wait for commands to fully complete
 
     commander.commands_array.forEach(function(command) {
       let has_reloadpost = command.reload?.post;
-      if(has_reloadpost) {
+      if (has_reloadpost) {
         console.log(`[post-reload] post-reloading ${command.command}`)
         command.reload?.post()
       }
