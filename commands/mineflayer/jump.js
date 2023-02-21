@@ -8,6 +8,6 @@ module.exports = {
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
     bot.setControlState('jump', true);
-    bot.setControlState('jump', false)
+    bot.setControlState('jump', false);
   }
 }
