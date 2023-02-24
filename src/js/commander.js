@@ -47,7 +47,7 @@ module.exports = {
 
     }
     commander.commands_array = Object.values(commander.commands)
-    console.log(i18n.__('commander.commands_loaded', { type: type, amount: commander.commands_array.length }))
+    console.debug(i18n.__('commander.commands_loaded', { type: type, amount: commander.commands_array.length }))
   },
   loadCommand: function() { // by name AND path ? for in-line and back-end usage
 
@@ -70,28 +70,16 @@ module.exports = {
     return close_matches.slice(0, max_matches).map(m => m.target);
   },
   reload: function() {
-    console.log(i18n.__('commander.reloaded'))
-      // Yes we're just calling the original function, however let's keep commander.reload seperate just incase..
+    console.log(i18n.__('commander.reloading', { commands: commander.commands_array.length }))
 
-    console.log(`[1] Reloading the commander | ${commander.commands_array.length} commands`)
-    commander.commands_array.forEach(function(command) {
-      let has_reloadpre = command.reload?.pre;
-      if (has_reloadpre) {
-        console.log(`[pre-reload] pre-reloading ${command.command}`)
-        command.reload?.pre()
-      }
-    });
+    commander.commands_array.forEach(cmd => cmd?.reload?.pre())
 
+    // TODO : WARNING : May have to await setCommands somehow to wait for commands to fully complete
     this.setCommands('mineflayer')
-      // TODO : WARNING : May have to await setCommands somehow to wait for commands to fully complete
 
-    commander.commands_array.forEach(function(command) {
-      let has_reloadpost = command.reload?.post;
-      if (has_reloadpost) {
-        console.log(`[post-reload] post-reloading ${command.command}`)
-        command.reload?.post()
-      }
-    });
+    commander.commands_array.forEach(cmd => cmd?.reload?.post())
+
+    console.log(i18n.__('commander.reloaded', { commands: commander.commands_array.length }))
 
   }
 
