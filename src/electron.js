@@ -25,11 +25,11 @@ const createWindow = () => {
     },
   });
 
-  // Send clicked links to the user's browser
-  mainWindow.webContents.on('new-window', function(e, url) {
-    e.preventDefault();
+  mainWindow.webContents.setWindowOpenHandler((details) => {
+    let url = details.url;
     shell.openExternal(url);
-  });
+    return { action: 'deny' }
+  })
 
   // and load the index.html of the app.
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
