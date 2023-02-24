@@ -7,8 +7,9 @@ module.exports = {
     entity: true
   },
   reload: {
+    timers: [],
     pre: function() {
-      if(this.timers) console.log(`[Reload] [Spam] Unloading the spam timers (${this.timers})`)
+      if(this.timers.length) console.log(`[Reload] [Spam] Unloading the spam timers (${this.timers})`)
       for (const timer of this.timers) {
         console.log(timer)
         clearInterval(timer.timer)
