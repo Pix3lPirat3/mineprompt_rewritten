@@ -13,7 +13,8 @@
 		"requires_entity": "[{{command}}] This command requires the bot to be spawned.",
 		"duplicate": "[Warning] Duplicate command registered (\"{{command}}\").\nRegistered: {{registered}}, Ignored: {{ignored}}",
 		"commands_loaded": "[Console] Loaded {{amount}} commands into the {{type}} client..",
-		"reloaded": "\n[Console] Now reloading the client..\n"
+		"reloading": "\n[Console] Client Reloading (Unloading {{commands}} commands)",
+		"reloaded": "[Console] Client Reloaded (Loaded {{commands}} commands)\n"
 	},
 	"commands": {
 		"help": {
