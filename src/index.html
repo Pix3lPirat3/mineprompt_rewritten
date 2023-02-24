@@ -10,7 +10,8 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto">
     <script type="text/javascript" src="./js/i18n.config.js"></script>
     <script>
-      var timerStart = Date.now();
+      // Page Load Time
+      var plt_start = Date.now();
     </script>
   </head>
   <body>
@@ -109,21 +110,10 @@
     <script src="../node_modules/tippy.js/dist/tippy.umd.min.js"></script>
     <script src="../node_modules/jquery/dist/jquery.min.js"></script>
 
-
-    <script>
-      $('#sidebar-add-account').on('click', function() {
-        $('#popup-overlay').show();
-      })
-    </script>
-
-
     <script src="../node_modules/jquery.terminal/js/jquery.terminal.min.js"></script>
     <script src="../node_modules/jquery.terminal/js/autocomplete_menu.js"></script>
     <script src="../node_modules/jquery.terminal/js/unix_formatting.js"></script>
     <script>
-      tippy('#sidebar-add-account', {
-        placement: 'right'
-      });
 
       tippy.delegate('#sidebar-accounts', {
         target: '[data-tippy-content]',
@@ -197,9 +187,9 @@
       
     </script>
     <script>
-      let timeSinceStart = () => (Date.now() - timerStart);
       $(window).on('load', function() {
-        console.log('[Stats] onLoad: ', timeSinceStart() + 'ms');
+        let plt_delay = Date.now() - plt_start;
+        console.debug(`[MinePrompt] The page took ${plt_delay}ms to load..`)
       });
     </script>
     <script src="js/ui-bedrock.js"></script>
