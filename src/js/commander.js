@@ -70,6 +70,7 @@ module.exports = {
     return close_matches.slice(0, max_matches).map(m => m.target);
   },
   reload: function() {
+    mineflayer.reload();
     console.log(i18n.__('commander.reloading', { commands: commander.commands_array.length }))
 
     commander.commands_array.forEach(cmd => cmd?.reload?.pre())
