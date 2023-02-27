@@ -31,16 +31,14 @@ let mineflayer = {
       bot.pathfinder.setMovements(defaultMove)
     })
 
-    bot.once('login', function() {
+    bot.once('login', async function() {
       interface.startSession(bot.username);
       if(i18n.__('mineflayer.events.login')) console.log(i18n.__('mineflayer.events.login', { bot: bot }));
 
-      let stmt = database.db.prepare(`UPDATE accounts SET username = ? WHERE username = ?;`);
-      stmt.run(bot.username, options.username);
-      stmt.finalize(function(err) {
-        if(err) console.log(err);
-        database.setAccounts();
-      });
+      // Update where an option other than the bot's username is set
+      const stmt = await database.db.prepare('UPDATE accounts SET username = ? WHERE username = ?;')
+      await stmt.bind({ 1: bot.username, 2: options.username })
+      return await stmt.get();
 
     })
 
@@ -182,5 +180,12 @@ let mineflayer = {
       })
     })
 
+  },
+  reload: function() {
+    if(bot) {
+      bot.pathfinder?.stop();
+      bot.stopDigging();
+      bot.clearControlStates();
+    }
   }
 }
