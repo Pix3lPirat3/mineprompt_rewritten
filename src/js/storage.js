@@ -1,107 +1,87 @@
 // TODO: Allow for MySQL support..?
 
-let sqlite3;
+let sqlite3 = require('sqlite3').verbose();
+let sqlite = require('sqlite');
 
 let database = {
   type: 'sqlite3',
   db: null,
   start: async function(type) {
-    this.require(type);
-    this.open(type);
+    //this.require(type);
+    await this.open(type);
     this.createTables(type);
   },
-  require: function(type) {
-    if(type === 'sqlite3') sqlite3 = require('sqlite3').verbose();
+  open: async function() {
+    this.db = await sqlite.open({
+      filename: './mineprompt.db',
+      driver: sqlite3.Database
+    })
+
+    // Print SQL Inputs
+    let debugdb = await this.getSetting('debugdb');
+    this.db.on('trace', (data) => {
+      if(debugdb !== '0') console.debug(data)
+    })
+
+    return this.db;
   },
-  open: function() {
-    if(database.type === 'sqlite3') {
-      this.db = new sqlite3.Database('mineprompt');
-    }
-  },
-  createTables: function() {
-    if(this.type === 'sqlite3') {
-      this.db.serialize(() => {
+  createTables: async function() {
 
-        this.db.run(`CREATE TABLE IF NOT EXISTS accounts (
-          username TEXT NOT NULL PRIMARY KEY,
-          authentication TEXT NOT NULL
-        );`)
+    await this.db.run(`CREATE TABLE IF NOT EXISTS accounts (
+      username TEXT NOT NULL PRIMARY KEY,
+      authentication TEXT NOT NULL
+    );`);
 
-        this.db.run(`CREATE TABLE IF NOT EXISTS settings (
-          setting TEXT NOT NULL PRIMARY KEY,
-          value TEXT NOT NULL
-        );`)
+    await this.db.run(`CREATE TABLE IF NOT EXISTS settings (
+      setting TEXT NOT NULL PRIMARY KEY,
+      value TEXT NOT NULL
+    );`);
 
-        // DEBUG SET 1 and 2
-        /*
-        this.addAccount('Pix3lPirat3', 'microsoft')
-        this.addAccount('Pix3lP3nguin', 'microsoft')
-        this.addAccount('Pix3lSlime', 'microsoft')
-        this.addAccount('Notch', 'microsoft')
-        this.addAccount('Dinnerbone', 'microsoft')
-        this.addAccount('DoctorWho', 'microsoft')
-        */
-          
-      });
-    }
+    await this.setSetting('debugdb', false)
+
     this.setAccounts();
   },
-  addAccount: function(username, authentication) {
-    let stmt = this.db.prepare(`INSERT OR IGNORE INTO accounts (username, authentication) VALUES (?, ?);`);
-    stmt.run(username, authentication);
-    stmt.finalize(function(err) {
-      if(err) console.log(err);
-      database.setAccounts();
-    });
+  addAccount: async function(username, authentication) {
+    const stmt = await this.db.prepare('INSERT OR IGNORE INTO accounts (username, authentication) VALUES (?, ?);')
+    await stmt.bind({ 1: username, 2: authentication })
+    return await stmt.get()
   },
-  removeAccount: function(username) {
-    let stmt = this.db.prepare(`DELETE FROM accounts WHERE username = ?;`);
-    stmt.run(username);
-    stmt.finalize(function(err) {
-      if(err) console.log(err);
-    });
+  removeAccount: async function(username) {
+    const stmt = await this.db.prepare('DELETE FROM accounts WHERE username = ?;')
+    await stmt.bind({ 1: username })
+    let result = await stmt.get();
     this.setAccounts();
   },
-  setAccounts: function() {
+  setAccounts: async function() {
     sidebar.accounts.clear();
     if(this.type === 'sqlite3') {
-      this.db.each("SELECT username, authentication FROM accounts", (err, row) => {
-        if(err) return console.error(err);
+      let accounts = await database.db.all('SELECT username FROM accounts');
+
+      accounts.forEach((row) => {
         let username = row.username;
         sidebar.accounts.add({ username: row.username, authentication: row.authentication })
       });
     }
   },
-  getAccount: function(username) {
-
+  getAccount: async function(username) {
+    const stmt = await this.db.prepare('SELECT * FROM accounts WHERE username = ?;')
+    await stmt.bind({ 1: username })
+    return await stmt.get();
   },
-  get: function(path) {
-
+  getSetting: async function(setting) {
+    const stmt = await this.db.prepare('SELECT * FROM settings WHERE setting = ?;')
+    await stmt.bind({ 1: setting })
+    return (await stmt.get())?.value;
   },
-  set: function(path) {
-
+  setSetting: async function(setting, value) {
+    console.debug(`[Settings] Set ${setting} to ${value}`)
+    const stmt = await this.db.prepare('INSERT OR REPLACE INTO settings(setting, value) VALUES (?, ?);')
+    await stmt.bind({ 1: setting, 2: value })
+    return await stmt.get();
   },
   close: function() {
-    if(this.type === 'sqlite3') this.db.close();
+    this.db.close();
   }
 }
 
-database.start('sqlite3');
-
-/*
-db.serialize(() => {
-    db.run("CREATE TABLE lorem (info TEXT)");
-
-    const stmt = db.prepare("INSERT INTO lorem VALUES (?)");
-    for (let i = 0; i < 10; i++) {
-        stmt.run("Ipsum " + i);
-    }
-    stmt.finalize();
-
-    db.each("SELECT rowid AS id, info FROM lorem", (err, row) => {
-        console.log(row.id + ": " + row.info);
-    });
-});
-
-db.close();
-*/
+database.start();
