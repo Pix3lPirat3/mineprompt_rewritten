@@ -13,6 +13,7 @@ module.exports = {
       this.isDigging = false;
     }
   },
+  autocomplete: () => ['start', 'stop'],
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
     let reloader = this.reload;
