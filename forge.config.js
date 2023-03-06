@@ -1,7 +1,11 @@
 module.exports = {
   packagerConfig: {
+    asar: true,
     icon: "src/icons/win/computer",
     ignore: ["^/cache/", "/mineprompt", "/generate-embed.js", ".tmp", ".todo", "/commands/mineflayer/customs"],
+  },
+  rebuildConfig: {
+    mode: 'parallel' // If this even works in Windows
   },
   rebuildConfig: {},
   makers: [{
@@ -11,13 +15,5 @@ module.exports = {
       // The ICO file to use as the icon for the generated Setup.exe
       //setupIcon: '/src/icons/win/computer.ico',
     }
-  }],
-  hooks: {
-    prePackage: function(platform, arch) {
-
-    },
-    preMake: function() {
-
-    }
-  }
+  }]
 };
