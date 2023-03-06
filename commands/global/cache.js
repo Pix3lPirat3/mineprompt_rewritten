@@ -7,6 +7,8 @@ module.exports = {
     console: true
   },
   execute: async function(sender, command, args) {
+    sender.reply('This command will be redone to use the global cache');
+    /*
     if(args.length === 1) {
       if(args[0] === 'list') {
         let folders = fs.readdirSync('./cache/');
@@ -23,5 +25,6 @@ module.exports = {
       }
     }
     console.log(`[Cache] Invalid Usage: ${this.usage}`);
+    */
   }
 }
