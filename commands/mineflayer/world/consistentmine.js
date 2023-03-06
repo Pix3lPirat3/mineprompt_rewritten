@@ -16,6 +16,10 @@ module.exports = {
   autocomplete: () => ['start', 'stop'],
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
+
+    // TODO: Flag to not break tool
+    // TODO: flag to switch tools before/after breaking
+
     let reloader = this.reload;
     if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`);
 
