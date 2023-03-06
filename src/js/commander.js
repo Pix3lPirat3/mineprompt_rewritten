@@ -73,12 +73,12 @@ module.exports = {
     mineflayer.reload();
     console.log(i18n.__('commander.reloading', { commands: commander.commands_array.length }))
 
-    commander.commands_array.forEach(cmd => cmd?.reload?.pre())
+    commander.commands_array.forEach(cmd => cmd?.reload?.pre?.())
 
     // TODO : WARNING : May have to await setCommands somehow to wait for commands to fully complete
     this.setCommands('mineflayer')
 
-    commander.commands_array.forEach(cmd => cmd?.reload?.post())
+    commander.commands_array.forEach(cmd => cmd?.reload?.post?.())
 
     console.log(i18n.__('commander.reloaded', { commands: commander.commands_array.length }))
 
