@@ -4,24 +4,23 @@ let sqlite3 = require('sqlite3').verbose();
 let sqlite = require('sqlite');
 
 let database = {
-  type: 'sqlite3',
   db: null,
-  start: async function(type) {
+  start: async function() {
     //this.require(type);
-    await this.open(type);
-    this.createTables(type);
+    await this.open();
+    this.createTables();
   },
   open: async function() {
     this.db = await sqlite.open({
-      filename: './mineprompt.db',
+      filename: './../mineprompt.db',
       driver: sqlite3.Database
     })
 
-    // Print SQL Inputs
-    let debugdb = await this.getSetting('debugdb');
+    /* Print SQL Inputs
     this.db.on('trace', (data) => {
-      if(debugdb !== '0') console.debug(data)
+      console.debug(data)
     })
+    */
 
     return this.db;
   },
@@ -36,9 +35,7 @@ let database = {
       setting TEXT NOT NULL PRIMARY KEY,
       value TEXT NOT NULL
     );`);
-
-    await this.setSetting('debugdb', false)
-
+    
     this.setAccounts();
   },
   addAccount: async function(username, authentication) {
