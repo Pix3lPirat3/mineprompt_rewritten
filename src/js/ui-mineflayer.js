@@ -7,15 +7,13 @@ let mineflayer = {
     if(!createBot) {
       createBot = require('mineflayer').createBot;
       let pathfinder_module = require('mineflayer-pathfinder');
+
       if(!pathfinder) pathfinder = pathfinder_module.pathfinder;
       if(!Movements) Movements = pathfinder_module.Movements;
     }
 
-
     if (bot) await bot.end();
     interface.reset();
-
-    options.skipPreview = true;
 
     bot = await createBot(options);
 
@@ -90,6 +88,7 @@ let mineflayer = {
 
     let chat_use_colors = i18n.__('mineflayer.events.message.colors');
     bot.on('message', function(jsonMsg, position) {
+      if(position === 'game_info') return;
       if(!chat_use_colors && jsonMsg.getText()) return console.log(i18n.__('mineflayer.events.message.format', { message: toTerminal(jsonMsg.getText()) }));
       console.log(i18n.__('mineflayer.events.message.format', { message: toTerminal(jsonMsg.toMotd()) }));
     })
