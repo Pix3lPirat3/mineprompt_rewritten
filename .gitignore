@@ -1,3 +1,6 @@
+# Customs
+commands/mineflayer/customs/*
+
 # Storage
 storage/accounts.json
 storage/discord.json
