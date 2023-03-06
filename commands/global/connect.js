@@ -54,7 +54,7 @@ module.exports = {
       version: version,
       auth: authentication ? 'microsoft' : undefined,
       skipValidation: !authentication,
-      profilesFolder: `./cache/${username}`,
+      //profilesFolder: `./cache/${username}`,
       fakeHost: opts.fakeHost, // Used on servers with TCPShield
       onMsaCode: function(data) {
         console.log(`Use the code "${data.user_code}" on ${data.verification_uri} to authenticate your account.`)
