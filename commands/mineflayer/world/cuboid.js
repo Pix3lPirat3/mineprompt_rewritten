@@ -12,6 +12,7 @@ module.exports = {
   author: 'Pix3lPirat3',
   execute: async function(sender, command, args) {
 
+    /*
     let cuboid = new Cuboid(v(93, 85, -30), v(70, 93, -56));
 
     let cuboid_positions = cuboid.getBlockPositions().sort((a, b) => b.y - a.y) // Sort by layers top to bottom
@@ -27,6 +28,7 @@ module.exports = {
       if(bot.blockAtCursor.position !== pos) await bot.lookAt(pos, true);
       await bot.dig(block)
     }
+    */
 
   }
 }
