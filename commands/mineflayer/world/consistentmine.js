@@ -22,9 +22,9 @@ module.exports = {
 
     let reloader = this.reload;
     if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`);
-    if(reloader.isDigging) return sender.reply(`[${this.command}] You must first stop the miner.`);
 
     if(args[0] === 'start') {
+      if(reloader.isDigging) return sender.reply(`[${this.command}] You must first stop the miner.`);
       sender.reply(`[${this.command}] Now running a consistentminer`)
       reloader.isDigging = true;
       dig();
@@ -34,7 +34,7 @@ module.exports = {
 
     async function dig() {
         if (!reloader.isDigging) return
-        const block = bot.blockAtCursor(3.5);
+        const block = bot.blockAtCursor(4);
         if (!block) {
             await sleep(100);
         } else {
