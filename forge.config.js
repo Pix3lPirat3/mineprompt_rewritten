@@ -2,7 +2,7 @@ module.exports = {
   packagerConfig: {
     asar: true,
     icon: "src/icons/win/computer",
-    ignore: ["^/cache/", "/mineprompt", "/generate-embed.js", ".tmp", ".todo", "/commands/mineflayer/customs"],
+    ignore: ["^/cache/", "/mineprompt", "/generate-embed.js", ".tmp", ".todo", "/commands/mineflayer/customs", "/forge.config.js"],
   },
   rebuildConfig: {
     mode: 'parallel' // If this even works in Windows
