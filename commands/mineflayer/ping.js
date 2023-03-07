@@ -6,9 +6,7 @@ module.exports = {
     entity: true
   },
   author: 'Pix3lPirat3',
-  autocomplete: function() {
-    return Object.keys(bot.players);
-  },
+  autocomplete: () => Object.keys(bot.players),
   execute: function(sender, command, args) {
     if(!args[0]) return sender.reply(`[Ping] Your ping is ${bot.players[bot.username].ping}`);
     let target = bot.players[args[0]];
