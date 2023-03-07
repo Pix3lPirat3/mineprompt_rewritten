@@ -7,6 +7,9 @@ module.exports = {
   requires: {
     entity: true
   },
+  autocomplete: function() {
+    return bot.inventory.items().map(item => item.name);
+  },
   execute: async function(sender, command, args) {
 
     if (!args.length) return sender.reply('[Dropitem] You must specify an item, or "inventory"');
