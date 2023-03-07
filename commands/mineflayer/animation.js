@@ -5,6 +5,7 @@ module.exports = {
   requires: {
     entity: true
   },
+  autocomplete: () => ['left', 'right'],
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
     let type = args[0]?.toLowerCase();
