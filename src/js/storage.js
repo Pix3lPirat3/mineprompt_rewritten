@@ -41,7 +41,8 @@ let database = {
   addAccount: async function(username, authentication) {
     const stmt = await this.db.prepare('INSERT OR IGNORE INTO accounts (username, authentication) VALUES (?, ?);')
     await stmt.bind({ 1: username, 2: authentication })
-    return await stmt.get()
+    await stmt.get()
+    return this.setAccounts();
   },
   removeAccount: async function(username) {
     const stmt = await this.db.prepare('DELETE FROM accounts WHERE username = ?;')
@@ -51,14 +52,13 @@ let database = {
   },
   setAccounts: async function() {
     sidebar.accounts.clear();
-    if(this.type === 'sqlite3') {
-      let accounts = await database.db.all('SELECT username FROM accounts');
-
-      accounts.forEach((row) => {
-        let username = row.username;
-        sidebar.accounts.add({ username: row.username, authentication: row.authentication })
-      });
-    }
+    let accounts = await this.db.all('SELECT username, authentication FROM accounts')
+    
+    accounts.forEach((row) => {
+      let username = row.username;
+      let authentication = row.authentication;
+      sidebar.accounts.add({ username: username, authentication: authentication })
+    });
   },
   getAccount: async function(username) {
     const stmt = await this.db.prepare('SELECT * FROM accounts WHERE username = ?;')
