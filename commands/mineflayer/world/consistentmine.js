@@ -22,9 +22,10 @@ module.exports = {
 
     let reloader = this.reload;
     if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`);
+    if(reloader.isDigging) return sender.reply(`[${this.command}] You must first stop the miner.`);
 
     if(args[0] === 'start') {
-      sender.reply(`[${this.command}] ${this.usage}`)
+      sender.reply(`[${this.command}] Now running a consistentminer`)
       reloader.isDigging = true;
       dig();
     }
