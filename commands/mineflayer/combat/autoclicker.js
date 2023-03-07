@@ -23,10 +23,9 @@ module.exports = {
   requires: {
     entity: true
   },
+  autocomplete: () => ['start', 'stop', 'speed'],
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
-
-
       if(!args.length) return sender.reply(`[${this.cmd}] ${this.usage}`);
 
       let interval = args[1] || 1000;
