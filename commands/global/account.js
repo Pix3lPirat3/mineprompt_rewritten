@@ -2,7 +2,7 @@ let stringTable = require('string-table')
 
 module.exports = {
   command: 'account',
-  usage: 'account <add/delete> [username] [authentication (microsoft/offline)]',
+  usage: 'account <add/remove> [username] [authentication (microsoft/offline)]',
   description: 'Add an account',
   author: 'Pix3lPirat3',
   requires: {
@@ -20,29 +20,18 @@ module.exports = {
     let username = args[1];
 
     if(args[0] === 'add' && args.length >= 2) {
-      let stmt = database.db.prepare(`SELECT username FROM accounts WHERE username = ?;`);
-      stmt.each(username, function(err, row) {
-        if(err) console.log(err);
-      }, function(err, count) {
-        stmt.finalize();
-        if(count) return console.log(`[Account] There was already an account with the username "${username}"`);
-        return database.addAccount(username, authentication)
-      });
+      const stmt = await database.db.prepare('SELECT * FROM accounts WHERE username = ?;')
+      await stmt.bind({ 1: username })
+      
+      let accounts = await stmt.get();
+      if(accounts) return sender.reply(`[Account] An account with this name already exists..`);
+
+      return database.addAccount(username, authentication)
+
     }
 
     if(args[0] === 'remove' && args.length === 2) {
-
-      let stmt = database.db.prepare(`SELECT username FROM accounts WHERE username = ?;`);
-      stmt.each(username, function(err, row) {
-        if(err) console.log(err);
-      }, function(err, count) {
-        stmt.finalize();
-        if(!count) return console.log(`[Account] There was no account with the username "${username}"`);
-        return database.removeAccount(username)
-        database.setAccounts();
-      });
-
-
+        return database.removeAccount(username);
     }
   }
 }
