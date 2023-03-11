@@ -22,7 +22,7 @@ const createWindow = () => {
       nodeIntegration: true,
       contextIsolation: false,
       backgroundThrottling: false // Keep 'false' (Performance drops when window is minimized)
-    },
+    }
   });
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
