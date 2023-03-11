@@ -1,5 +1,17 @@
 let createBot;
 let pathfinder, Movements;
+let ChatMessage;
+
+    // pos: Vec3
+    // {x: 145, y: 102, z: 30}
+    function getMapAt(pos, base64) {
+      let map_entities = Object.values(bot.entities).filter(ent => ent.name === 'item_frame');
+      let index = map_entities.findIndex(ent => ent.position.equals(pos));
+      console.log('Index:', index)
+      if(!index < 0) return console.log(`There is no map entity at that position.`);
+      let map = Object.values(bot.mapDownloader.maps)[index];
+      return new Buffer(map).toString('base64');
+    }
 
 let mineflayer = {
   startClient: async function(options) {
@@ -14,10 +26,39 @@ let mineflayer = {
 
     if (bot) await bot.end();
     interface.reset();
+    
+    //const { mapDownloader } = require('mineflayer-item-map-downloader')
 
     bot = await createBot(options);
 
+    ChatMessage = require('prismarine-chat')(bot.registry)
+
+    //options["mapDownloader-saveToFile"] = false; // Disable map saving to file
+    
+    //bot.loadPlugin(mapDownloader) // load it before spawning to get all maps
+
     bot.lastOptions = options;
+
+    /*(new_map, { name, png, id })
+    Emitted by the mapSaver and the bot when a new map was detected.
+    Parses an object when emitted:
+    name - String. The name that would be given to this map.
+    png - Buffer. The png Buffer of the created map.
+    id - Number. The map id off the map.
+    */
+    /*
+    bot.on('new_map', function(map) {
+      let maps = Object.values(bot.entities).filter(ent => ent.name === 'item_frame');
+      let map_entity = maps[map.id];
+      if(!map_entity) return console.log(`The map_entity for ID ${map.id} was not found.`)
+      console.log('map_entity:', map_entity)
+      let pos = map_entity.position;
+      let base64 = new Buffer(map.png).toString('base64')
+      $('html').prepend(`<img src="data:image/png;base64, ${base64}" alt="Minecraft Map" />`)
+
+      //console.log(base64);
+    })
+    */
 
     // Pathfinder Defaults
     bot.loadPlugin(pathfinder)
@@ -90,11 +131,7 @@ let mineflayer = {
     bot.on('message', function(jsonMsg, position) {
       if(position === 'game_info') return;
       if(!chat_use_colors && jsonMsg.getText()) return console.log(i18n.__('mineflayer.events.message.format', { message: toTerminal(jsonMsg.getText()) }));
-      console.log(i18n.__('mineflayer.events.message.format', { message: toTerminal(jsonMsg.toMotd()) }));
-    })
-
-    // Thank you for solving my toAnsi issue nea
-    const defaultAnsiCodes = {
+      console.log(i18n.__('mineflayer.events.message.format', { message: jsonMsg.toAnsi(bot.registry.language, {
         '§0': '\u001b[38;5;240m',
         '§1': '\u001b[38;5;19m',
         '§2': '\u001b[38;5;34m',
@@ -117,25 +154,8 @@ let mineflayer = {
         '§m': '\u001b[9m',
         '§k': '\u001b[6m',
         '§r': '\u001b[0m'
-    }
-
-    let toTerminal = function(message, codes = defaultAnsiCodes) {
-      for (const k in defaultAnsiCodes) {
-        message = message.replace(new RegExp(k, 'g'), defaultAnsiCodes[k])
-      }
-      const hexRegex = /§#?([a-fA-F\d]{2})([a-fA-F\d]{2})([a-fA-F\d]{2})/
-      while (message.search(hexRegex) !== -1) {
-        // Stolen from https://stackoverflow.com/questions/5623838/rgb-to-hex-and-hex-to-rgb
-        const hexCodes = hexRegex.exec(message)
-        // Iterate over each hexColorCode match (§#69420, §#ABCDEF, §#A1B2C3)
-        const red = parseInt(hexCodes[1], 16)
-        const green = parseInt(hexCodes[2], 16)
-        const blue = parseInt(hexCodes[3], 16)
-        // ANSI from https://gist.github.com/fnky/458719343aabd01cfb17a3a4f7296797#rgb-colors
-        message = message.replace(hexRegex, `\u001b[38;2;${red};${green};${blue}m`)
-      }
-      return defaultAnsiCodes['§r'] + message + defaultAnsiCodes['§r']
-    }
+      })}));
+    })
 
     bot.on('error', function(error) {
       switch(error.code) {
@@ -165,6 +185,7 @@ let mineflayer = {
       let command_module = commander.getCommand(command);
       if (!command_module) return bot.chat(`/msg ${sender} ${i18n.__('commander.unknown_command')}`);
       if (!bot && command_module.requires?.entity) return console.log(i18n.__('commander.requires_entity', { command: command }));
+      if(command_module.requires?.console) return bot.chat(`/msg ${sender} ${i18n.__('commands.generic.console_only')}`);
       command_module.execute({type: 'player', player: sender, reply: commander.reply.toPlayer}, command, args);
     })
 
