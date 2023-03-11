@@ -17,6 +17,9 @@
 		"reloaded": "[Console] Client Reloaded (Loaded {{commands}} commands)\n"
 	},
 	"commands": {
+		"generic": {
+			"console_only": "This command must be executed from console."
+		},
 		"help": {
 			"unknown_command": "[Help] There is no command matching \"{{command}}\"",
 			"console_only": "[Help] This command must be executed from console.",
