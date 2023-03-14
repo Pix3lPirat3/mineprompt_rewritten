@@ -1,6 +1,6 @@
 process.env['ELECTRON_DISABLE_SECURITY_WARNINGS'] = 'true'; // Disable warnings in the console for exposing Node
 
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const path = require('path');
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
@@ -17,14 +17,21 @@ const createWindow = () => {
     autoHideMenuBar: true,
     width: 1100,
     height: 600,
-    icon: __dirname + '/img/heads/computer.png',
+    icon: path.join(__dirname, '/img/heads/computer.png'),
     webPreferences: {
+      preload: path.join(__dirname, '/js/preload.js'),
       nodeIntegration: true,
       contextIsolation: false,
       backgroundThrottling: false // Keep 'false' (Performance drops when window is minimized)
     }
   });
 
+  // Triggers the flashing of the app's icon (Progress Bar)
+  ipcMain.handle('runtime_end', async (event, someArgument) => {
+    mainWindow.flashFrame(true);
+  })
+
+  // Open clicked links in the user's browser
   mainWindow.webContents.setWindowOpenHandler((details) => {
     let url = details.url;
     shell.openExternal(url);
