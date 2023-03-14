@@ -76,6 +76,9 @@ let interface = {
     elRuntime.css({
       'color': 'indianred'
     });
+
+    ipcRenderer.invoke('runtime_end');
+
     interface.timerRuntimeFade = setInterval(function() {
       elRuntime.fadeOut(750);
       elRuntime.fadeIn(750);
