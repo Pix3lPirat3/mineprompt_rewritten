@@ -7,9 +7,7 @@ module.exports = {
   requires: {
     entity: true
   },
-  autocomplete: function() {
-    return bot.inventory.items().map(item => item.name);
-  },
+  autocomplete: () => bot.inventory.items().map(item => item.name),
   execute: async function(sender, command, args) {
 
     if (!args.length) return sender.reply('[Dropitem] You must specify an item, or "inventory"');
@@ -26,7 +24,6 @@ module.exports = {
     if (!item) return sender.reply(`[Dropitem] "${args[0]}" not found, did you mean: "${closestStringInArray(args[0], bot.inventory.items().map(item => item.name))}"`);
 
     bot.toss(item.type, null, item.count)
-
 
     function closestStringInArray(str, array) {
 
