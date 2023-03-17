@@ -5,7 +5,7 @@
 			"prompt": "Console"
 		},
 		"title": "MinePrompt Client",
-		"greetings": "\n      MinePrompt v5.0.0\n"
+		"greetings": "\n      MinePrompt TUI {{version}}\n\n    Created by Pix3lPirat3#3858\n"
 	},
 	"commander": {
 		"suggest_commands": "[Console] Did you mean: {{suggestions}}",

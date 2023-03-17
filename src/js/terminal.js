@@ -1,4 +1,5 @@
 let commander = require('./js/commander.js');
+let packageVersion = require('./../package.json').version;
 
 var log = console.log;
 var console = (function() {
@@ -83,7 +84,7 @@ var term = $('#terminal').terminal(async function onCommandSubmit(input) {
   },
   exit: false,
   autocompleteMenu: true,
-  greetings: i18n.__('interface.greetings'),
+  greetings: i18n.__('interface.greetings', { version: packageVersion }),
   name: 'mineprompt',
   prompt: `${i18n.__('interface.console.prompt')} » `
 });
