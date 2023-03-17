@@ -1,4 +1,5 @@
-const parseSentence = require('minimist-string');
+const parseArgs = require('minimist')
+
 const path = require('path');
 const minecraftFolderPath = require('minecraft-folder-path');
 module.exports = {
@@ -25,7 +26,8 @@ module.exports = {
       return console.log(`\n[[;indianred;]Connection Interrupted:]\nYou are already connected to a server with "${bot.username}"\nYou can disconnect this session with the "[[;steelblue;]disconnect]" command.\n`)
     }
 
-    let opts = parseSentence(args.join(' '));
+    let opts = parseArgs(args);
+    console.log('opts:', opts)
 
     // NOTE : When using shorthand (-h) only one `-` is needed, when using longhand (--host) two are needed.
     let username = opts.u || opts.username;
