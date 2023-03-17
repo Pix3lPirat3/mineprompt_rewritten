@@ -27,38 +27,23 @@ let mineflayer = {
     if (bot) await bot.end();
     interface.reset();
     
-    //const { mapDownloader } = require('mineflayer-item-map-downloader')
-
     bot = await createBot(options);
-
-    ChatMessage = require('prismarine-chat')(bot.registry)
-
-    //options["mapDownloader-saveToFile"] = false; // Disable map saving to file
-    
-    //bot.loadPlugin(mapDownloader) // load it before spawning to get all maps
 
     bot.lastOptions = options;
 
-    /*(new_map, { name, png, id })
-    Emitted by the mapSaver and the bot when a new map was detected.
-    Parses an object when emitted:
-    name - String. The name that would be given to this map.
-    png - Buffer. The png Buffer of the created map.
-    id - Number. The map id off the map.
-    */
-    /*
-    bot.on('new_map', function(map) {
-      let maps = Object.values(bot.entities).filter(ent => ent.name === 'item_frame');
-      let map_entity = maps[map.id];
-      if(!map_entity) return console.log(`The map_entity for ID ${map.id} was not found.`)
-      console.log('map_entity:', map_entity)
-      let pos = map_entity.position;
-      let base64 = new Buffer(map.png).toString('base64')
-      $('html').prepend(`<img src="data:image/png;base64, ${base64}" alt="Minecraft Map" />`)
+    bot.once('login', async function() {
+      interface.startSession(bot.username);
 
-      //console.log(base64);
+      // The version and bot.registry is avaliable on login
+      ChatMessage = require('prismarine-chat')(bot.registry)
+
+      if(i18n.__('mineflayer.events.login')) console.log(i18n.__('mineflayer.events.login', { bot: bot }));
+
+      // Update where an option other than the bot's username is set (eg. email)
+      const stmt = await database.db.prepare('UPDATE accounts SET username = ? WHERE username = ?;')
+      await stmt.bind({ 1: bot.username, 2: options.username })
+      return await stmt.get();
     })
-    */
 
     // Pathfinder Defaults
     bot.loadPlugin(pathfinder)
@@ -70,16 +55,6 @@ let mineflayer = {
       bot.pathfinder.setMovements(defaultMove)
     })
 
-    bot.once('login', async function() {
-      interface.startSession(bot.username);
-      if(i18n.__('mineflayer.events.login')) console.log(i18n.__('mineflayer.events.login', { bot: bot }));
-
-      // Update where an option other than the bot's username is set
-      const stmt = await database.db.prepare('UPDATE accounts SET username = ? WHERE username = ?;')
-      await stmt.bind({ 1: bot.username, 2: options.username })
-      return await stmt.get();
-
-    })
 
     bot.once('spawn', function() {
       interface.startRuntime();
