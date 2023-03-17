@@ -24,8 +24,8 @@
 			"unknown_command": "[Help] There is no command matching \"{{command}}\"",
 			"console_only": "[Help] This command must be executed from console.",
 			"command": "Command: \"{{command.command}}\"\nVersion: {{command.version}}\nAuthor: {{command.author}}\nRepository: {{command.repository}}\nAliases: {{command.aliases}}\nDescription: {{command.description}}\nUsage: {{command.usage}}",
-			"system_commands": "\nSystem Commands:\n {{table}}",
-			"player_commands": "\nPlayer Commands:\n {{table}}"
+			"system_commands": "\nSystem Commands:\n{{table}}",
+			"player_commands": "\nPlayer Commands:\n{{table}}"
 		}
 	},
 	"mineflayer": {
