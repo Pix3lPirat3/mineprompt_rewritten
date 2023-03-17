@@ -1,4 +1,6 @@
 const parseSentence = require('minimist-string');
+const path = require('path');
+const minecraftFolderPath = require('minecraft-folder-path');
 module.exports = {
   version: '2.0.1',
   description: 'Used to connect a bot to a server',
@@ -54,11 +56,15 @@ module.exports = {
       version: version,
       auth: authentication ? 'microsoft' : undefined,
       skipValidation: !authentication,
-      //profilesFolder: `./cache/${username}`,
-      fakeHost: opts.fakeHost, // Used on servers with TCPShield
+      profilesFolder: path.join(minecraftFolderPath, 'mineprompt-cache', username.toUpperCase()),
+      fakeHost: opts.fakeHost || host, // Used on servers with TCPShield
       onMsaCode: function(data) {
-        console.log(`Use the code "${data.user_code}" on ${data.verification_uri} to authenticate your account.`)
-        console.log(`If you don't want to authenticate then add '-a false' (or --auth false)`)
+        console.log(`
+          [[b;;]Microsoft Authentication:]
+          Use the code "[[b;;]${data.user_code}]" on ${data.verification_uri} to authenticate your account.
+
+          If you don't want to authenticate then add '-a false' (or --auth false)
+          `.split('\n').map(line => line.trim()).join('\n'))
       }
     }
 
