@@ -1,4 +1,5 @@
-const util = require('util')
+const util = require('util');
+var v = require('vec3');
 
 module.exports = {
   command: 'blockinfo',
@@ -10,7 +11,7 @@ module.exports = {
   execute: function(sender, command, args) {
 
     // No Argument (or "cursor" argument) - Default to blockAtCursor
-    if (args.length === 0 || args[0].toLowerCase() === 'cursor') {
+    if (args.length === 0 || args[0] === 'cursor') {
       let blockAtCursor = bot.blockAtCursor();
       if (!blockAtCursor) return sender.reply(`[Blockinfo] There is no block at my cursor.`);
 
@@ -25,12 +26,12 @@ module.exports = {
     if (args.length === 3) {
       let [x, y, z] = args;
       x = cleanInt(x);
-      if (isNaN(x)) return sender.reply(`[Bed] Unable to go to bed, X: ${x} is invalid.`);
+      if (isNaN(x)) return sender.reply(`[BlockInfo] Unable to parse input, X: ${x} is invalid.`);
       y = cleanInt(y);
-      if (isNaN(y)) return sender.reply(`[Bed] Unable to go to bed, Y: ${y} is invalid.`);
+      if (isNaN(y)) return sender.reply(`[BlockInfo] Unable to parse input, Y: ${y} is invalid.`);
       z = cleanInt(z);
-      if (isNaN(y)) return sender.reply(`[Bed] Unable to go to bed, Z: ${z} is invalid.`);
-      return ''; // TODO: Get block at XYZ and print it
+      if (isNaN(y)) return sender.reply(`[BlockInfo] Unable to parse input, Z: ${z} is invalid.`);
+      return console.log('\n' + util.inspect(bot.blockAt(v(x, y, z)), { showHidden: false, depth: null, colors: true }) + '\n'); // TODO: Get block at XYZ and print it
     }
 
     function cleanInt(x) {
