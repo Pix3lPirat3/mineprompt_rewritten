@@ -27,7 +27,6 @@ module.exports = {
     }
 
     let opts = parseArgs(args);
-    console.log('opts:', opts)
 
     // NOTE : When using shorthand (-h) only one `-` is needed, when using longhand (--host) two are needed.
     let username = opts.u || opts.username;
