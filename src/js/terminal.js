@@ -63,8 +63,12 @@ var term = $('#terminal').terminal(async function onCommandSubmit(input) {
       if (!cursor) return resolve([]); // It's just a space
 
       if (command_module.autocomplete) {
+        if(typeof command_module.autocomplete != 'function') {
+          console.log(`[Error] Type of autocomplete in ${command_module.command} is not a function.`);
+          return resolve([]);
+        }
         let parsed_command = $.terminal.parse_command(command);
-        let autocomplete = await command_module.autocomplete(true, parsed_command.command, parsed_command)
+        let  autocomplete = await command_module.autocomplete(parsed_command.command, parsed_command.args)
         resolve(autocomplete)
       }
 

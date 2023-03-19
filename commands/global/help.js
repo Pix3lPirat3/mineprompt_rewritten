@@ -8,7 +8,7 @@ module.exports = {
   requires: {
     console: true
   },
-  autocomplete: function(command, args, cursor) {
+  autocomplete: function(command, args) {
     // Return an Array of commands and aliases
     return Object.values(commander.commands).map(c => [c.command, c.aliases]).flat(2).filter(e => e !== undefined);
   },
