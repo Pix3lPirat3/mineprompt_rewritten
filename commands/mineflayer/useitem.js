@@ -9,7 +9,7 @@ module.exports = {
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
     var useOffhand = (args[0] === 'true');
-    sender.reply(`[UseItem] Using item ${bot.heldItem?.name} (Offhand: ${useOffhand})`);
+    sender.reply(`[UseItem] Using item ${bot.heldItem?.name || 'AIR'} (Offhand: ${useOffhand})`);
     bot.activateItem(useOffhand)
   }
 }
