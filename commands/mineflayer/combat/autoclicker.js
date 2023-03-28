@@ -1,12 +1,13 @@
 const autoClicker = {
   running: undefined,
   click_interval: 1000,
-  blacklist: ['experience_orb'],
+  blacklist: ['experience_orb', 'item'],
   start: () => {
     if (autoClicker.running) return
     autoClicker.running = setInterval(async function () {
+      if(!bot?.entity) clearInterval(autoClicker.running);
       const entity = bot.entityAtCursor()
-      if (!entity || autoClicker.blacklist.includes(entity.name)) return bot.swingArm()
+      if (!entity || autoClicker.blacklist.includes(entity.name)) return bot.swingArm();
       bot.attack(entity, true)
     }, autoClicker.click_interval)
   },
