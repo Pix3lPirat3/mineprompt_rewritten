@@ -2,6 +2,7 @@ let { GoalNear } = require('mineflayer-pathfinder').goals;
 
 module.exports = {
   command: 'bed',
+  aliases: ['sleep'],
   usage: 'bed <search range || x y z>',
   description: 'Allows you to make the bot sleep easily.',
   requires: {
