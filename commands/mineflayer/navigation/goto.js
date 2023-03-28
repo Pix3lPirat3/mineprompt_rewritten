@@ -15,7 +15,6 @@ module.exports = {
     let username = args[0].trim();
     if(target = Object.values(bot.players).find(e => e.username === username)?.entity) {
       let range = args[1] || 2;
-      console.log('target:', target)
       if(!target) sender.reply(`[Goto] I cannot see the player ${username}`);
       let { x, y, z } = target.position;
       sender.reply(`[Goto] Now navigating to ${target.username}`)
