@@ -34,7 +34,7 @@ module.exports = {
 ## Configuration
 
 #### Add Accounts
-You can add accounts via the UI (User Interface) by clicking the "PLUS" player head (top left corner), filling out the required fields, and pressing submit. (Stored: `/storage/accounts.json)`
+You can add accounts via the command `accounts`
 
 #### Account Cache
-Caching is handled by node-minecraft-protocol, and on most systems the folder will be in `.minecraft/nmp-cache`
+Caching is handled by node-minecraft-protocol, and on most systems the folder will be in `.minecraft/nmp-cache`, however mineprompt uses its own subfolder.
