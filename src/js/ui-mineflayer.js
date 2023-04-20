@@ -52,6 +52,8 @@ let mineflayer = {
       const defaultMove = new Movements(bot)
       defaultMove.allow1by1towers = false;
       defaultMove.canDig = false;
+      defaultMove.allowFreeMotion = true;
+      defaultMove.scafoldingBlocks = [];
       bot.pathfinder.setMovements(defaultMove)
     })
 
@@ -74,6 +76,11 @@ let mineflayer = {
       bot.on('health', function() {
         interface.setHealth(bot.health);
         interface.setHunger(bot.food);
+      })
+
+      bot.on('windowOpen', function(window) {
+        // TODO: 1.8-1.13 support
+        console.log(`[Window] A window has opened: ${JSON.parse(bot.currentWindow.title).text}`)
       })
 
     })
@@ -105,8 +112,12 @@ let mineflayer = {
     let chat_use_colors = i18n.__('mineflayer.events.message.colors');
     bot.on('message', function(jsonMsg, position) {
       if(position === 'game_info') return;
-      if(!chat_use_colors && jsonMsg.getText()) return console.log(i18n.__('mineflayer.events.message.format', { message: toTerminal(jsonMsg.getText()) }));
-      console.log(i18n.__('mineflayer.events.message.format', { message: jsonMsg.toAnsi(bot.registry.language, {
+      // TODO: Implement "Don't use colors"
+      //if(!chat_use_colors && jsonMsg.getText()) return console.log(i18n.__('mineflayer.events.message.format', { message: toTerminal(jsonMsg.getText()) }));
+
+      let datestr = new Date().toTimeString().split(' ')[0]
+
+      console.log(i18n.__('mineflayer.events.message.format', { datestr: datestr, message: jsonMsg.toAnsi(bot.registry.language, {
         '§0': '\u001b[38;5;240m',
         '§1': '\u001b[38;5;19m',
         '§2': '\u001b[38;5;34m',
@@ -164,15 +175,36 @@ let mineflayer = {
       command_module.execute({type: 'player', player: sender, reply: commander.reply.toPlayer}, command, args);
     })
 
+    // Resource Pack Handling: https://github.com/PrismarineJS/mineflayer/issues/1888#issuecomment-833206221
     bot._client.on('resource_pack_send', (data) => {
-      bot._client.write('resource_pack_receive', { // This tells the server that the client accepted the resource pack.
-        hash: "Resourcepack", //Specific to Rust v2, IGNORES the first texture-pack prompt the server sends in the lobby
-        result: 3
+      const { url, hash } = data
+      bot.emit('resourcepack', { url, hash })
+    })
+
+    const TEXTURE_PACK_RESULTS = {
+      SUCCESSFULLY_LOADED: 0,
+      DECLINED: 1,
+      FAILED_DOWNLOAD: 2,
+      ACCEPTED: 3
+    }
+
+    bot.acceptResourcePack = () => {
+      bot._client.write('resource_pack_receive', {
+        result: TEXTURE_PACK_RESULTS.ACCEPTED
       })
-      bot._client.write('resource_pack_receive', { // This tells the server the client successfully loaded the resource pack.
-        hash: "Resourcepack", //See above
-        result: 0
+      bot._client.write('resource_pack_receive', {
+        result: TEXTURE_PACK_RESULTS.SUCCESSFULLY_LOADED
       })
+    }
+
+    bot.denyResourcePack = () => {
+      bot._client.write('resource_pack_receive', {
+        result: TEXTURE_PACK_RESULTS.DECLINED
+      })
+    }
+
+    bot.on('resourcepack', function() {
+      bot.acceptResourcePack();
     })
 
   },
