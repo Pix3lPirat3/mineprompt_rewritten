@@ -105,7 +105,7 @@ let interface = {
   setPotionEffects: function(effects) {
     for(let a = 0; a < effects.length; a++) {
       let effect = effects[a];
-      elPotionEffects.append(`<img src="img/effects/${effect.effect}.png" data-tippy-content="${effect.displayName}">`);
+      elPotionEffects.append(`<img src="img/effects/${effect.effect.toLowerCase()}.png" data-tippy-content="${effect.displayName}">`);
     }
   },
   resetPotionEffects: function() {
