@@ -17,6 +17,12 @@ module.exports = {
   author: 'Pix3lPirat3',
   execute: function(sender, command, args) {
 
+    function getRemainingDurability(item) {
+      let durabilityMax = bot.registry.itemsByName[item.name].maxDurability
+      let durabilityUsed = item.nbt.value.Damage.value;
+      return durabilityMax - durabilityUsed;
+    }
+
     // TODO: Flag to not break tool
     // TODO: flag to switch tools before/after breaking
 
@@ -38,11 +44,21 @@ module.exports = {
         if (!block) {
             await sleep(100);
         } else {
-            await bot.dig(block, "ignore", "raycast");
+
+          var safePickaxes = bot.inventory.items().filter(i => i.name.includes('pickaxe') && getRemainingDurability(i) > 10);
+          if(!safePickaxes.length) return; // Stop the process, there are no more SAFE pickaxes
+
+          if(!safePickaxes.includes(bot.heldItem)) {
+            await bot.equip(safePickaxes[0])
+          }
+
+          await bot.dig(block, "ignore", "raycast");
         }
         
         dig()
     }
+
+
 
   }
 }
