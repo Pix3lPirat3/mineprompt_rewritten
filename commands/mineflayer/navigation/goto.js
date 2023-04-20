@@ -12,7 +12,7 @@ module.exports = {
   },
   author: 'Pix3lPirat3',
   execute: async function(sender, command, args) {
-    let username = args[0].trim();
+    let username = args[0];
     if(target = Object.values(bot.players).find(e => e.username === username)?.entity) {
       let range = args[1] || 2;
       if(!target) sender.reply(`[Goto] I cannot see the player ${username}`);
