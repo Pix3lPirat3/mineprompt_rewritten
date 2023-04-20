@@ -3,7 +3,7 @@ let stringTable = require('string-table')
 module.exports = {
   command: 'window',
   usage: 'window',
-  //aliases: ['inv'],
+  aliases: ['container'],
   description: 'Show the bot\'s inventory.',
   requires: {
     entity: true,
