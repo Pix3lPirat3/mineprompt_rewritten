@@ -35,7 +35,7 @@
 			"end": "[Player] {{username}} has disconnected from the server..",
 			"message": {
 				"colors": true,
-				"format": "{{message}}"
+				"format": "[{{datestr}}] {{message}}"
 			}
 		}
 	}
