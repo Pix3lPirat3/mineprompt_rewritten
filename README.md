@@ -1,9 +1,8 @@
-<img src="https://img.shields.io/discord/1064620716403728537?label=Discord">
-
 # MinePrompt v5
 
 As of version 5.0.0 MinePrompt's gone under a whole rewrite from the ground up. Thanks to the people in the PrismarineJS community, I've been able to clean up a lot of the design and code.
 
+Discord: https://discord.gg/5FV56jKwpk
 ---
 ## Requirements
 
