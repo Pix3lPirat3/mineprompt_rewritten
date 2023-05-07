@@ -4,6 +4,8 @@ As of version 5.0.0 MinePrompt's gone under a whole rewrite from the ground up. 
 
 Discord: https://discord.gg/5FV56jKwpk
 ---
+[[[/images/path/to/image.ext](https://i.imgur.com/hgDRfkY.png)|MinePrompt Preview Image]]
+---
 ## Requirements
 
 #### Development 
