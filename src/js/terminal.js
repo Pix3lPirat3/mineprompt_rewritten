@@ -90,5 +90,8 @@ var term = $('#terminal').terminal(async function onCommandSubmit(input) {
   autocompleteMenu: true,
   greetings: i18n.__('interface.greetings', { version: packageVersion }),
   name: 'mineprompt',
-  prompt: `${i18n.__('interface.console.prompt')} » `
+  prompt: ``
 });
+term.set_prompt(`${i18n.__('interface.console.prompt')} » `, { typing: true, delay: 75 })
+
+//term.echo('<img src="./img/discord/discord-blurple.svg"/>', {raw: true});
