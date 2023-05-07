@@ -1,4 +1,5 @@
-const parseArgs = require('minimist')
+const parseArgs = require('minimist');
+let { supportedVersions, testedVersions } = require('mineflayer/lib/version')
 
 const path = require('path');
 const minecraftFolderPath = require('minecraft-folder-path');
@@ -37,43 +38,40 @@ module.exports = {
     if (!port) port = 25565;
     let version = opts.v || opts.version;
     if (!version) version = undefined;
+
+    if(version && !supportedVersions.includes(version) && !testedVersions.includes(version)) {
+      return console.log(`[[b;#999999;]Mine][[b;steelblue;]Prompt] » The version [[b;indianred;]${version}] is [[b;indianred;]unsupported], try a supported version.\n[[;steelblue;]Supported Versions:] ${supportedVersions.join(', ')}\n[[;steelblue;]Tested Versions:] ${testedVersions.join(', ')}`)
+    }
+
     let authentication = opts.a || opts.auth; // (Default: true)
-    if (!authentication) console.log('You can specify authentication with -a or --auth (-a=true/false)')
-      // Converting the "String" passed from the input to a Boolean (There must be a better way..)
-    if (authentication === 'false' || authentication === '0') authentication = false; // Convert to Boolean
-    if (authentication === 'true' || authentication === '1' || authentication == undefined) authentication = true; // Convert to Boolean
+    if(typeof authentication !== 'boolean') console.log(`[[b;#999999;]Mine][[b;steelblue;]Prompt] » [[b;indianred;]Auth] should be passed as [[b;indianred;]true] or [[b;indianred;]false]`)
 
     // TODO: Allow all flags passable to mineflayer
-    /* 
-      opts.authentication = opts.authentication || opts.auth || opts.a
-      let options = opts;
-
-    */
 
     let options = {
       username: username,
       host: host,
       port: port,
       version: version,
-      auth: authentication ? 'microsoft' : undefined,
+      auth: authentication,
       skipValidation: !authentication,
       profilesFolder: path.join(minecraftFolderPath, 'mineprompt-cache', username.toUpperCase()),
       fakeHost: opts.fakeHost || host, // Used on servers with TCPShield
       onMsaCode: function(data) {
         console.log(`
-          [[b;;]Microsoft Authentication:]
-          Use the code "[[b;;]${data.user_code}]" on ${data.verification_uri} to authenticate your account.
+          [[b;indianred;]Microsoft Authentication:]
+          Use the code "[[b;indianred;]${data.user_code}]" on [[b;indianred;]${data.verification_uri}] to authenticate your account.
 
-          If you don't want to authenticate then add '-a false' (or --auth false)
+          If you want to join an [[b;indianred;]offline-mode] server add [[b;indianred;]-a false] to your prompt.
           `.split('\n').map(line => line.trim()).join('\n'))
       }
     }
 
+    // TODO: Switch to -e or -edition (Java, Bedrock)
     let bedrock_edition = opts.b || opts.bedrock;
 
-    console.log(`Connecting ${username} to ${host}:${port}`)
-
-
+    console.log(`[[b;#999999;]Mine][[b;steelblue;]Prompt] » Opening a connection to [[b;seagreen;]${host}:${port}]`)
+    console.debug(`[Connect] Player: ${username}, Version: ${version}, Auth: ${authentication}`)
 
     if(bedrock_edition) return bedrock.startClient(options)
     return mineflayer.startClient(options);
