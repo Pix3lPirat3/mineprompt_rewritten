@@ -5,7 +5,7 @@
 			"prompt": "Console"
 		},
 		"title": "MinePrompt Client",
-		"greetings": "\n      MinePrompt TUI {{version}} (Single-User License) \n\n             Created by Pix3lPirat3#3858\n"
+		"greetings": "\n      [[b;#999999;]Mine][[b;steelblue;]Prompt] TUI {{version}} ([[b;indianred;]Single-User License]) \n\n   Created by Pix3lPirat3#3858   |   Support via [[!;#5865F2;;;https://discord.gg/5FV56jKwpk]Discord]\n"
 	},
 	"commander": {
 		"suggest_commands": "[Console] Did you mean: {{suggestions}}",
