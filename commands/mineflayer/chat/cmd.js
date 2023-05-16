@@ -14,8 +14,11 @@ module.exports = {
     if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`);
     let msg = args.join(' ').trim();
     if (msg.length > 256) return sender.reply(`[Cmd] Your command was bigger than 256 characters.`);
-    console.log(`> Sending "/${msg}" to the server.`)
-    bot.chat('/' + msg)
-
+    if(msg.match(/^login /)) {
+      console.log(`${i18n.__('console.prefix')} » Sending [[;red;]password] to the server`)
+    } else {
+      console.log(`${i18n.__('console.prefix')} » Sending "[[;#fff;]${msg}]" to the server.`)
+    }
+    bot.chat(`/${msg}`)
   }
 }
