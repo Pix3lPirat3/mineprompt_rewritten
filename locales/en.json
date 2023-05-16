@@ -1,4 +1,7 @@
 {
+	"console": {
+		"prefix": "[[b;#999999;]Mine][[b;steelblue;]Prompt]"
+	},
 	"interface": {
 		"settings": "Settings",
 		"console": {
@@ -30,12 +33,15 @@
 	},
 	"mineflayer": {
 		"events": {
-			"login": "[Player] {{bot.username}} has logged into the server..",
-			"spawn": "[Player] {{bot.username}} has spawned on the server..",
-			"end": "[Player] {{username}} has disconnected from the server..",
+			"login": "[[b;#999999;]Mine][[b;steelblue;]Prompt] » {{bot.username}} has logged into the server..",
+			"spawn": "[[b;#999999;]Mine][[b;steelblue;]Prompt] » {{bot.username}} has spawned on the server..",
+			"end": "[[b;#999999;]Mine][[b;steelblue;]Prompt] » {{username}} has disconnected from the server..",
+			"death": "[[b;#999999;]Mine][[b;steelblue;]Prompt] » {{bot.username}} has died..",
+			"kicked": "[[b;#999999;]Mine][[b;steelblue;]Prompt] » {{username}} was kicked:\n{{reason}}",
+			"collect": "[[b;#999999;]Mine][[b;steelblue;]Prompt] » {{bot.username}} collected [[b;indianred;]{{item.count}}x] of [[b;indianred;]{{item.displayName}}]",
 			"message": {
 				"colors": true,
-				"format": "[{{datestr}}] {{message}}"
+				"format": "{{message}}"
 			}
 		}
 	}

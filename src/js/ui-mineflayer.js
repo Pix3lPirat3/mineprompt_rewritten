@@ -2,17 +2,6 @@ let createBot;
 let pathfinder, Movements;
 let ChatMessage;
 
-    // pos: Vec3
-    // {x: 145, y: 102, z: 30}
-    function getMapAt(pos, base64) {
-      let map_entities = Object.values(bot.entities).filter(ent => ent.name === 'item_frame');
-      let index = map_entities.findIndex(ent => ent.position.equals(pos));
-      console.log('Index:', index)
-      if(!index < 0) return console.log(`There is no map entity at that position.`);
-      let map = Object.values(bot.mapDownloader.maps)[index];
-      return new Buffer(map).toString('base64');
-    }
-
 let mineflayer = {
   startClient: async function(options) {
     commander.setCommands('mineflayer');
@@ -57,7 +46,6 @@ let mineflayer = {
       bot.pathfinder.setMovements(defaultMove)
     })
 
-
     bot.once('spawn', function() {
       interface.startRuntime();
       if(i18n.__('mineflayer.events.spawn')) console.log(i18n.__('mineflayer.events.spawn', { bot: bot }));
@@ -83,7 +71,21 @@ let mineflayer = {
         console.log(`[Window] A window has opened: ${JSON.parse(bot.currentWindow.title).text}`)
       })
 
+      bot.on('death', function() {
+        if(i18n.__('mineflayer.events.death')) console.log(i18n.__('mineflayer.events.death', { bot: bot }));
+      })
+
+      bot.on('playerCollect', function(player, item) {
+        if(player.id !== bot.entity.id) return;
+        if(i18n.__('mineflayer.events.collect')) console.log(i18n.__('mineflayer.events.collect', { bot: player, entity: item, item: item.getDroppedItem() }));
+      })
+
     })
+
+    bot.on('kicked', function(reason) {
+      // The bot.registry may be unavaliable if not loaded
+      if(i18n.__('mineflayer.events.kicked')) console.log(i18n.__('mineflayer.events.kicked', { bot: bot, username: bot.username || options.username, reason: new ChatMessage(JSON.parse(reason)).toAnsi(bot.registry.language, ansiMap) }));
+    });
 
     // UI Event : Session End : Empty Health, Skin, Username
     bot.once('end', function() {
@@ -146,19 +148,45 @@ let mineflayer = {
     bot.on('error', function(error) {
       switch(error.code) {
         case "EAI_AGAIN":
-          console.log(`EAI_AGAIN - a network connectivity error or proxy related error`)
+          console.log(`[[b;#999999;]Mine][[b;steelblue;]Prompt] » EAI_AGAIN - A network connectivity or proxy error happened..`)
           break;
         case "ENOTFOUND":
-          console.log;
-
+          console.log(`[[b;#999999;]Mine][[b;steelblue;]Prompt] » ENOTFOUND - The host was invalid or the network connection failed..`)
           break;
+        case "ECONNRESET":
+          console.log(`[[b;#999999;]Mine][[b;steelblue;]Prompt] » ECONNRESET - The connection was dropped to the server (Check your internet)`)
+          // TODO: TIMEOUT
         default:
-          console.log(error)
+          console.log('ERR CODE:', error.code)
+          console.log('DEFAULT LOG:', error)
           break;
       }
-      console.log('ERR CODE:', error.code)
     });
-    bot.on('kicked', console.log);
+
+    let ansiMap = {
+      '§0': '\u001b[38;5;240m',
+      '§1': '\u001b[38;5;19m',
+      '§2': '\u001b[38;5;34m',
+      '§3': '\u001b[38;5;37m',
+      '§4': '\u001b[38;5;124m',
+      '§5': '\u001b[38;5;127m',
+      '§6': '\u001b[38;5;214m',
+      '§7': '\u001b[38;5;250m',
+      '§8': '\u001b[38;5;245m',
+      '§9': '\u001b[38;5;63m',
+      '§a': '\u001b[38;5;83m',
+      '§b': '\u001b[38;5;87m',
+      '§c': '\u001b[38;5;203m',
+      '§d': '\u001b[38;5;207m',
+      '§e': '\u001b[38;5;227m',
+      '§f': '\u001b[97m',
+      '§l': '\u001b[1m',
+      '§o': '\u001b[3m',
+      '§n': '\u001b[4m',
+      '§m': '\u001b[9m',
+      '§k': '\u001b[6m',
+      '§r': '\u001b[0m'
+    }
 
     // Chat Listener for Commands
     bot.on('chat', function(sender, message) {
