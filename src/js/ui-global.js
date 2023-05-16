@@ -98,7 +98,6 @@ let interface = {
   startSession: function(username) {
     interface.sessionStart = new Date();
     interface.anonymous.enabled ? term.set_prompt(`${interface.anonymous.anonymous_username} » `) && this.setHead(interface.anonymous.anonymous_username) : term.set_prompt(`${username} » `) && this.setHead(username);
-    //elHead.attr('src', `https://mc-heads.net/head/${username}/nohelm`);
     elUsername.text(username)
   },
   getRuntime: function() {
