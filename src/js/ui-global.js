@@ -26,6 +26,7 @@ let interface = {
       console.log(`${i18n.__('console.prefix')} Anonymous mode [[;seagreen;]enabled], now identifying you as ${this.anonymous_username}`);
       term.set_prompt(`${this.anonymous_username} » `);
 
+      interface.setHead(this.anonymous_username);
       if(!bot) return; // The bot is not logged in, don't change the elements
       interface.anonymous.hideElements();
     },
@@ -33,6 +34,7 @@ let interface = {
       this.enabled = false;
       console.log(`${i18n.__('console.prefix')} Anonymous mode [[;indianred;]disabled].`);
       if(!bot) return; // The bot is not logged in, don't change the elements
+      interface.setHead(bot.username);
       interface.anonymous.showElements();
     },
     toggle() {
@@ -95,8 +97,8 @@ let interface = {
   },
   startSession: function(username) {
     interface.sessionStart = new Date();
-    interface.anonymous.enabled ? term.set_prompt(`${interface.anonymous.anonymous_username} » `) : term.set_prompt(`${username} » `);
-    elHead.attr('src', `https://mc-heads.net/head/${username}/nohelm`);
+    interface.anonymous.enabled ? term.set_prompt(`${interface.anonymous.anonymous_username} » `) && this.setHead(interface.anonymous.anonymous_username) : term.set_prompt(`${username} » `) && this.setHead(username);
+    //elHead.attr('src', `https://mc-heads.net/head/${username}/nohelm`);
     elUsername.text(username)
   },
   getRuntime: function() {
