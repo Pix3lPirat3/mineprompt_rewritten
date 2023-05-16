@@ -11,14 +11,21 @@ Discord: https://discord.gg/5FV56jKwpk
 #### Development 
 This project is written in `NodeJS`, and as such requires `NodeJS`, alongside `ElectronJS`.
 
-Open the directory, then run `electron .` to launch the application
+Open the directory, then run `electron .` to launch the application.
+
+Install Electron (I use globally `-g` personally)
+```SH
+npm i electron -g
+```
+
+Go to the directory of the project in your terminal, then launch it with Electron.
 ```SH
 cd C:/Users/Minecrafter/Documents/mineprompt_rewritten
 electron .
 ```
 
 #### Standalone (Executable)
-The program comes ready out of the box. If you want to add your own commands you just need to find the appropriate `/commands/` directory, add your file `my_command.js`, and follow the command structure.
+The program comes ready out of the box. If you want to add your own commands you just need to find the appropriate `/commands/` directory, add your file `my_command.js`, and follow the command structure. Check the structure of other commands for extra options.
 
 ```
 module.exports = {
