@@ -8,10 +8,49 @@ let elHunger = $('#bot-hunger');
 let elPosition = $('[data-replace="position"]');
 let elPotionEffects = $('#bot-effects');
 
+let default_usernames = ['Steve', 'Alex', 'Noor', 'Sunny', 'Ari', 'Zuri', 'Makena', 'Kai', 'Efe']
+
 let timerRuntimeFade = null;
 let interface = {
   sessionStart: null,
   timerRuntimeFade: null,
+  anonymous: {
+    enabled: false,
+    anonymous_username: null,
+    enable: function(username) {
+      if(this.enabled) return console.log(`${i18n.__('console.prefix')} Anonymous mode is already enabled.`);
+      this.enabled = true;
+
+      // See if the user specified a username to use, otherwise use a random one.
+      username ? this.anonymous_username = username : this.anonymous_username = default_usernames[Math.floor(Math.random()*default_usernames.length)];
+      console.log(`${i18n.__('console.prefix')} Anonymous mode [[;seagreen;]enabled], now identifying you as ${this.anonymous_username}`);
+      term.set_prompt(`${this.anonymous_username} » `);
+
+      if(!bot) return; // The bot is not logged in, don't change the elements
+      interface.anonymous.hideElements();
+    },
+    disable() {
+      this.enabled = false;
+      console.log(`${i18n.__('console.prefix')} Anonymous mode [[;indianred;]disabled].`);
+      if(!bot) return; // The bot is not logged in, don't change the elements
+      interface.anonymous.showElements();
+    },
+    toggle() {
+      this.enabled ? this.disable() : this.enable();
+    },
+    hideElements() {
+      jQuery(`span:contains("${bot.username}")`).each(function(key, el) {
+            let text = $(el).text().replaceAll(bot.username, `<span style="color: yellow; display: inline; margin-right: -2px;">${interface.anonymous.anonymous_username}</span>`);
+            $(el).html(`<span>${text}</span>`);
+          })
+    },
+    showElements() {
+      jQuery(`span:contains("${this.anonymous_username}")`).each(function(key, el) {
+            let text = $(el).text().replaceAll(interface.anonymous.anonymous_username, `<span style="color: yellow; display: inline; margin-right: -2px;">${bot.username}</span>`);
+            $(el).html(`<span>${text}</span>`);
+          })
+    }
+  },
   reset: function() {
     elUsername.text(i18n.__('interface.title'))
 
@@ -56,7 +95,7 @@ let interface = {
   },
   startSession: function(username) {
     interface.sessionStart = new Date();
-    term.set_prompt(`${username} » `);
+    interface.anonymous.enabled ? term.set_prompt(`${interface.anonymous.anonymous_username} » `) : term.set_prompt(`${username} » `);
     elHead.attr('src', `https://mc-heads.net/head/${username}/nohelm`);
     elUsername.text(username)
   },
@@ -112,6 +151,10 @@ let interface = {
     elPotionEffects.empty();
   },
 }
+
+$.terminal.new_formatter(function(string, position) {
+  return $.terminal.tracking_replace(string, /^cmd login [\s\S]*/g, 'cmd login [[;indianred;]********]');
+});
 
 interface.reset()
 

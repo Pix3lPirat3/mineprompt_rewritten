@@ -7,6 +7,11 @@ var console = (function() {
     log: function() {
       var args = Array.from(arguments);
       log.apply(console, args);
+      if(bot) args = args.map(obj => typeof obj === "string" ? obj.replaceAll(bot.username, `[[bu;indianred;]${bot.username}]`) : obj)
+      if(interface.anonymous.enabled && bot) {
+        let pattern = new RegExp(bot.username, "gi");
+        args = args.map(obj => typeof obj === "string" ? obj.replaceAll(pattern, interface.anonymous.anonymous_username) : obj)
+      }
       term.echo(args.join(' '));
     },
     warn: function() {
