@@ -64,7 +64,8 @@ module.exports = {
 
           If you want to join an [[b;indianred;]offline-mode] server add [[b;indianred;]-a false] to your prompt.
           `.split('\n').map(line => line.trim()).join('\n'))
-      }
+      },
+      logErrors: false
     }
 
     // TODO: Switch to -e or -edition (Java, Bedrock)
