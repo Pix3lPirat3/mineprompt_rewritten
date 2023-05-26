@@ -25,9 +25,7 @@ module.exports = {
       return durabilityMax - durabilityUsed;
     }
 
-    // TODO: Flag to not break tool
-    // TODO: flag to switch tools before/after breaking
-    // TODO: flag for whitelist/blacklist
+    // TODO: Flag to not break tool - to switch tools before/after breaking - for whitelist/blacklist
 
     let reloader = this.reload;
     if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`);
