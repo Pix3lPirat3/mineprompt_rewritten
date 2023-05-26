@@ -36,7 +36,7 @@ module.exports = {
     if (!host) return console.log('You must specify a host with -h or --host')
     let port = opts.p || opts.port;
     if (!port) port = 25565;
-    let version = opts.v || opts.version;
+    let version = String(opts.v || opts.version);
     if (!version) version = undefined;
 
     if(version && !supportedVersions.includes(version) && !testedVersions.includes(version)) {
