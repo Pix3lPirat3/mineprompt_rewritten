@@ -19,12 +19,15 @@ module.exports = {
 
     function getRemainingDurability(item) {
       let durabilityMax = bot.registry.itemsByName[item.name].maxDurability
-      let durabilityUsed = item.nbt.value.Damage.value;
+
+      // 1.12 and below does not have nbt.Damage, use bot.heldItem.metadata
+      let durabilityUsed = bot.registry.version['<']('1.13') ? bot.heldItem.metadata : item.nbt.value.Damage.value;
       return durabilityMax - durabilityUsed;
     }
 
     // TODO: Flag to not break tool
     // TODO: flag to switch tools before/after breaking
+    // TODO: flag for whitelist/blacklist
 
     let reloader = this.reload;
     if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`);
