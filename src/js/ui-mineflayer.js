@@ -82,9 +82,12 @@ let mineflayer = {
 
     })
 
+
+    // Reminder: The kicked event is fired before the 'end' event
     bot.on('kicked', function(reason) {
       // The bot.registry may be unavaliable if not loaded
-      if(i18n.__('mineflayer.events.kicked')) console.log(i18n.__('mineflayer.events.kicked', { bot: bot, username: bot.username || options.username, reason: new ChatMessage(JSON.parse(reason)).toAnsi(bot.registry.language, ansiMap) }));
+      if(i18n.__('mineflayer.events.kicked')) console.log(i18n.__('mineflayer.events.kicked', { bot: bot, username: bot?.username || options.username, reason: new ChatMessage(JSON.parse(reason)).toAnsi(bot.registry.language, ansiMap) }));
+      bot = null;
     });
 
     // UI Event : Session End : Empty Health, Skin, Username
@@ -92,7 +95,6 @@ let mineflayer = {
       if(i18n.__('mineflayer.events.spawn')) console.log(i18n.__('mineflayer.events.end', { bot: bot, username: bot?.username || options.username }));
       interface.reset();
       interface.stopRuntime();
-      bot = null;
     })
 
     // UI Event : Entity Effects
