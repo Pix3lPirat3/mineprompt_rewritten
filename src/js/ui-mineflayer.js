@@ -68,7 +68,7 @@ let mineflayer = {
 
       bot.on('windowOpen', function(window) {
         // TODO: 1.8-1.13 support
-        console.log(`[Window] A window has opened: ${JSON.parse(bot.currentWindow.title).text}`)
+        console.log(`[Window] A window has opened: ${new ChatMessage(JSON.parse(bot.currentWindow.title)).toAnsi()}`)
       })
 
       bot.on('death', function() {
@@ -82,10 +82,10 @@ let mineflayer = {
 
     })
 
-
     // Reminder: The kicked event is fired before the 'end' event
     bot.on('kicked', function(reason) {
-      // The bot.registry may be unavaliable if not loaded
+      if(!ChatMessage) ChatMessage = require('prismarine-chat')(bot.registry)
+      console.log(bot.registry)
       if(i18n.__('mineflayer.events.kicked')) console.log(i18n.__('mineflayer.events.kicked', { bot: bot, username: bot?.username || options.username, reason: new ChatMessage(JSON.parse(reason)).toAnsi(bot.registry.language, ansiMap) }));
       bot = null;
     });
@@ -234,6 +234,7 @@ let mineflayer = {
     }
 
     bot.on('resourcepack', function() {
+      console.log(i18n.__('mineflayer.events.resource_pack_received', { bot: bot }));
       bot.acceptResourcePack();
     })
 
