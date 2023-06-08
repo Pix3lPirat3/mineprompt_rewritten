@@ -7,6 +7,10 @@ module.exports = {
     console: true
   },
   execute: async function(sender, command, args) {
-    sender.reply('[Error] This command is not yet implemented.')
+
+    let last_connection = await database.getConnection();
+    if(!last_connection) return console.log(`[Reconnect] No connection stored, try connecting to a server first.`);
+
+    term.exec(`connect ${last_connection}`)
   }
 }
