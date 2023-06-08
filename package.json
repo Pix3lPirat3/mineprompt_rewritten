@@ -30,6 +30,7 @@
     "jquery.terminal": "^2.35.3",
     "minecraft-folder-path": "^1.2.0",
     "mineflayer": "^4.8.1",
+    "mineflayer-cuboid": "^1.0.1",
     "mineflayer-pathfinder": "^2.4.2",
     "minimist": "^1.2.8",
     "sqlite": "^4.1.2",
