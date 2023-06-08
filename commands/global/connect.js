@@ -53,7 +53,7 @@ module.exports = {
       host: host,
       port: port,
       version: version,
-      auth: authentication,
+      auth: (authentication === true) ? 'microsoft' : 'offline',
       skipValidation: !authentication,
       profilesFolder: path.join(minecraftFolderPath, 'mineprompt-cache', username.toUpperCase()),
       fakeHost: opts.fakeHost || host, // Used on servers with TCPShield
@@ -73,6 +73,8 @@ module.exports = {
 
     console.log(`[[b;#999999;]Mine][[b;steelblue;]Prompt] » Opening a connection to [[b;seagreen;]${host}:${port}]`)
     console.debug(`[Connect] Player: ${username}, Version: ${version}, Auth: ${authentication}`)
+
+    database.addConnection(args.join(' '))
 
     if(bedrock_edition) return bedrock.startClient(options)
     return mineflayer.startClient(options);
