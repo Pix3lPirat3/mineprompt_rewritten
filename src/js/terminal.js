@@ -26,6 +26,10 @@ var console = (function() {
     debug: function() {
       var args = Array.from(arguments);
       log.apply(console, args);
+    },
+    terminal: function(args) {
+      var args = Array.from(arguments);
+      term.echo(args.join(' '));
     }
   }
 }(window.console));
