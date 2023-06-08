@@ -39,6 +39,8 @@
 			"death": "[[b;#999999;]Mine][[b;steelblue;]Prompt] » {{bot.username}} has died..",
 			"kicked": "[[b;#999999;]Mine][[b;steelblue;]Prompt] » {{username}} was kicked:\n{{reason}}",
 			"collect": "[[b;#999999;]Mine][[b;steelblue;]Prompt] » {{bot.username}} collected [[b;indianred;]{{item.count}}x] of [[b;indianred;]{{item.displayName}}]",
+			"resource_pack_received": "[[b;#999999;]Mine][[b;steelblue;]Prompt] » A resource pack has been received from [[b;indianred;]{{bot._client.socket._host}}], accepting..",
+			"resource_pack_saved": "",
 			"message": {
 				"colors": true,
 				"format": "{{message}}"
