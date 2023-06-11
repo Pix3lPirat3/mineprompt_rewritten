@@ -17,7 +17,7 @@ module.exports = {
     if(!inventory_items.length) return sender.reply(`[window] There are no items in your open window.`);
 
     let items = Object.values(inventory_items).map((item, index) => ({
-        slot: index,
+        slot: item.slot,
         name: item ? item.name : null,
         count: item ? item.count : null,
         displayName: item ? getCustomName(item) : null, // displayName gets the outer field (toAnsi breaks character width)
