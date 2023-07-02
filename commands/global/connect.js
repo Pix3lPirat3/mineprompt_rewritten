@@ -39,6 +39,9 @@ module.exports = {
     let version = String(opts.v || opts.version);
     if (!version) version = undefined;
 
+    // Temp Patch: 
+    if(version == '1.2') version = '1.20'
+
     if(version && !supportedVersions.includes(version) && !testedVersions.includes(version)) {
       return console.log(`[[b;#999999;]Mine][[b;steelblue;]Prompt] » The version [[b;indianred;]${version}] is [[b;indianred;]unsupported], try a supported version.\n[[;steelblue;]Supported Versions:] ${supportedVersions.join(', ')}\n[[;steelblue;]Tested Versions:] ${testedVersions.join(', ')}`)
     }
