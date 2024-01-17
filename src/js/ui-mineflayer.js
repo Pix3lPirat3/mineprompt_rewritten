@@ -12,6 +12,7 @@ let mineflayer = {
       if(!pathfinder) pathfinder = pathfinder_module.pathfinder;
       if(!Movements) Movements = pathfinder_module.Movements;
     }
+    
 
     if (bot) await bot.end();
     interface.reset();
@@ -68,7 +69,7 @@ let mineflayer = {
 
       bot.on('windowOpen', function(window) {
         // TODO: 1.8-1.13 support
-        console.log(`[Window] A window has opened: ${new ChatMessage(JSON.parse(bot.currentWindow.title)).toAnsi()}`)
+        console.log(`[Window] A window has opened: ${ChatMessage.fromNotch(bot.currentWindow.title).toAnsi()}`)
       })
 
       bot.on('death', function() {
@@ -86,7 +87,7 @@ let mineflayer = {
     bot.on('kicked', function(reason) {
       if(!ChatMessage) ChatMessage = require('prismarine-chat')(bot.registry)
       console.log(bot.registry)
-      if(i18n.__('mineflayer.events.kicked')) console.log(i18n.__('mineflayer.events.kicked', { bot: bot, username: bot?.username || options.username, reason: new ChatMessage(JSON.parse(reason)).toAnsi(bot.registry.language, ansiMap) }));
+      if(i18n.__('mineflayer.events.kicked')) console.log(i18n.__('mineflayer.events.kicked', { bot: bot, username: bot?.username || options.username, reason: ChatMessage.fromNotch(reason).toAnsi(bot.registry.language, ansiMap) }));
       bot = null;
     });
 
@@ -241,7 +242,7 @@ let mineflayer = {
   },
   reload: function() {
     if(bot) {
-      bot.pathfinder?.stop();
+      if(bot.pathfinder.isMoving()) bot.pathfinder?.stop();
       bot.stopDigging();
       bot.clearControlStates();
     }
