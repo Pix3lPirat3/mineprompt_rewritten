@@ -37,14 +37,18 @@ module.exports = {
     let port = opts.p || opts.port;
     if (!port) port = 25565;
     let version = String(opts.v || opts.version);
+
+    console.log("Version Specified:", version)
+
     if (!version) version = undefined;
+    console.log('Passed Version:', version)
 
     // Temp Patch: 
     if(version == '1.2') version = '1.20'
 
-    if(version && !supportedVersions.includes(version) && !testedVersions.includes(version)) {
-      return console.log(`[[b;#999999;]Mine][[b;steelblue;]Prompt] » The version [[b;indianred;]${version}] is [[b;indianred;]unsupported], try a supported version.\n[[;steelblue;]Supported Versions:] ${supportedVersions.join(', ')}\n[[;steelblue;]Tested Versions:] ${testedVersions.join(', ')}`)
-    }
+    // if(version && !supportedVersions.includes(version) && !testedVersions.includes(version)) {
+    //   return console.log(`[[b;#999999;]Mine][[b;steelblue;]Prompt] » The version [[b;indianred;]${version}] is [[b;indianred;]unsupported], try a supported version.\n[[;steelblue;]Supported Versions:] ${supportedVersions.join(', ')}\n[[;steelblue;]Tested Versions:] ${testedVersions.join(', ')}`)
+    // }
 
     let authentication = opts.a || opts.auth; // (Default: true)
     if(typeof authentication !== 'boolean') console.log(`[[b;#999999;]Mine][[b;steelblue;]Prompt] » [[b;indianred;]Auth] should be passed as [[b;indianred;]true] or [[b;indianred;]false]`)
