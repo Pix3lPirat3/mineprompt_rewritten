@@ -99,7 +99,8 @@ var term = $('#terminal').terminal(async function onCommandSubmit(input) {
   autocompleteMenu: true,
   greetings: i18n.__('interface.greetings', { version: packageVersion }),
   name: 'mineprompt',
-  prompt: ``
+  prompt: ``,
+  scrollOnEcho: false
 });
 term.set_prompt(`${i18n.__('interface.console.prompt')} » `, { typing: true, delay: 75 })
 
