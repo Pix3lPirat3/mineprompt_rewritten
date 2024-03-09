@@ -11,16 +11,19 @@ MinePrompt Discord: https://discord.gg/5FV56jKwpk
 #### Development 
 This project is written in `NodeJS`, and as such requires `NodeJS`, alongside `ElectronJS`.
 
-Open the directory, then run `electron .` to launch the application.
+Install Dependencies
+```SH
+npm i
+```
 
 Install Electron (I use globally `-g` personally)
 ```SH
 npm i electron -g
 ```
 
-Go to the directory of the project in your terminal, then launch it with Electron.
+Go to the directory of the project, then launch it with Electron.
 ```SH
-cd C:/Users/Minecrafter/Documents/mineprompt_rewritten
+cd C:/path/to/project
 electron .
 ```
 
