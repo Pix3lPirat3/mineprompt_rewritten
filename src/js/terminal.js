@@ -36,7 +36,7 @@ var console = (function() {
 
 var term = $('#terminal').terminal(async function onCommandSubmit(input) {
   if (input === '') return;
-  var command = $.terminal.parse_command(input);
+  var command = $.terminal.split_command(input);
   let cmd = command.name;
 
   let command_module = commander.getCommand(cmd);
@@ -50,7 +50,7 @@ var term = $('#terminal').terminal(async function onCommandSubmit(input) {
 
   if (!bot && command_module.requires?.entity) return console.log(i18n.__('commander.requires_entity', { command: command_module.command }));
 
-  var command = $.terminal.parse_command(input);
+  var command = $.terminal.split_command(input);
 
   command_module.execute({type: 'terminal', reply: commander.reply.toTerminal}, cmd, command.args);
 
