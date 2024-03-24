@@ -6,7 +6,6 @@
   "version": "1.0.0-beta",
   "description": "MinePrompt is a cross-platform Minecraft TUI (Terminal User Interface) for Java (and eventually Bedrock) edition that allows you to perform simple tasks such as chatting, moving, and sending commands to automated tasks such as farming, building, and more.",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
     "start": "electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
