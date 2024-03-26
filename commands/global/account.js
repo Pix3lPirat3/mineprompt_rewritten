@@ -16,7 +16,13 @@ module.exports = {
 
     if(args[0] === 'add') {
       if(args.length < 3) return console.log(`[Account] You must specify a [[bu;indianred;]username] and [[bu;indianred;]authentication]`);
-      let authentication = args[2];
+
+      // You'd think that converting a string bool to a bool bool would be easier
+      const a = args[2];
+	    let authentication = "bad option";
+	    if (a === "true") authentication = true;
+	    if (a === "false") authentication = false;
+      
       if(typeof authentication !== 'boolean') return console.log(`[Account] Type of authentication must be [[bu;indianred;]true] or [[bu;indianred;]false]`);
 
       // Check if the account already exists
