@@ -59,6 +59,7 @@ module.exports = {
     // NOTE : When using shorthand (-h) only one `-` is needed, when using longhand (--host) two are needed.
     if (!opts.username) return console.log('You must specify a username with -u or --username')
     if (!opts.host) return console.log('You must specify a host with -h or --host')
+    if (!opts.version) return console.log('You must specify a version with -v or --version'); // This is to prevent issues with auto-detect, doesn't like to load stuff right
     if (!opts.port) opts.port = 25565;
 
     let options = {
