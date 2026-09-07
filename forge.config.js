@@ -4,9 +4,8 @@ module.exports = {
     executableName: 'MinePrompt',
     icon: 'src/icons/win/computer',
     ignore: [
-      '^/\\.git/',
-      '^/test/',
-      '\\.todo$'
+      '^/\\.git($|/)',
+      '^/test($|/)'
     ]
   },
   rebuildConfig: {},

@@ -153,7 +153,7 @@ function renderAccounts(accounts = []) {
     edit.className = 'account__edit';
     edit.title = `Edit ${account.username}`;
     edit.setAttribute('aria-label', `Edit ${account.username}`);
-    edit.textContent = '···';
+    edit.textContent = 'Edit';
     edit.addEventListener('click', () => openProfile(account));
     row.append(connect, edit);
     elements.accountList.append(row);
@@ -190,9 +190,9 @@ function renderState(nextState = {}) {
   state = { ...state, ...nextState };
   const connected = state.status === 'online';
   const displayName = state.displayName || state.username;
-  elements.activeName.textContent = displayName || (state.status === 'connecting' ? 'Connecting…' : 'Not connected');
+  elements.activeName.textContent = displayName || (state.status === 'connecting' ? 'Connecting...' : 'Not connected');
   elements.activeHead.src = playerHead(displayName);
-  elements.activePosition.textContent = state.position || (connected ? 'Waiting for position…' : 'Connect to a Java server to begin');
+  elements.activePosition.textContent = state.position || (connected ? 'Waiting for position...' : 'Connect to a Java server to begin');
   elements.status.textContent = state.status === 'online' ? 'Online' : state.status === 'connecting' ? 'Connecting' : 'Offline';
   elements.status.className = `status status--${state.status || 'disconnected'}`;
   renderVital(elements.health, state.health, 'hearts', 'heart');
@@ -216,7 +216,7 @@ function formatDuration(milliseconds) {
 }
 
 function updateRuntime() {
-  elements.runtime.textContent = state.sessionStartedAt ? formatDuration(Date.now() - state.sessionStartedAt) : '—';
+  elements.runtime.textContent = state.sessionStartedAt ? formatDuration(Date.now() - state.sessionStartedAt) : '--';
 }
 
 function echoLog(event) {
@@ -300,7 +300,7 @@ async function initialize() {
     if (input.trim()) await window.mineprompt.execute(input);
   }, {
     name: 'mineprompt',
-    prompt: 'mineprompt › ',
+    prompt: 'mineprompt > ',
     greetings: false,
     historySize: 500,
     outputLimit: 1000,

@@ -17,10 +17,10 @@ module.exports = {
       const { parsed } = await nbt.parse(buffer);
       const servers = nbt.simplify(parsed).servers || [];
       if (!servers.length) return sender.reply('[Servers] No saved servers were found.');
-      return sender.reply(servers.map((server, index) => `${index + 1}. ${server.name} — ${server.ip}`).join('\n'));
+      return sender.reply(servers.map((server, index) => `${index + 1}. ${server.name} - ${server.ip}`).join('\n'));
     } catch (error) {
       console.debug(error);
-      return sender.reply('[Servers] Minecraft’s servers.dat file could not be read.');
+      return sender.reply("[Servers] Minecraft's servers.dat file could not be read.");
     }
   }
 };

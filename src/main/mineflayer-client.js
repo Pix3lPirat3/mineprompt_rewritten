@@ -92,7 +92,7 @@ class MineflayerClient {
     bot.on('playerCollect', (collector, item) => {
       if (collector.id !== bot.entity?.id) return;
       const dropped = item.getDroppedItem?.();
-      if (dropped) this.logger.info(`[Inventory] Collected ${dropped.count} × ${dropped.displayName}.`);
+      if (dropped) this.logger.info(`[Inventory] Collected ${dropped.count} x ${dropped.displayName}.`);
     });
 
     bot.on('message', (message, position) => {

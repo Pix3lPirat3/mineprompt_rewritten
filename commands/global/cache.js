@@ -27,7 +27,7 @@ module.exports = {
     const action = args[0]?.toLowerCase() || 'list';
     const folders = await getDirectories();
     if (action === 'list') {
-      return sender.reply(folders.length ? `[Cache]\n${folders.map((folder) => `• ${folder}`).join('\n')}` : '[Cache] No cached accounts.');
+      return sender.reply(folders.length ? `[Cache]\n${folders.map((folder) => `- ${folder}`).join('\n')}` : '[Cache] No cached accounts.');
     }
     if (action !== 'delete' || !args[1]) return sender.reply(`[Cache] Usage: ${this.usage}`);
 

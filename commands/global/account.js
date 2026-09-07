@@ -14,7 +14,7 @@ module.exports = {
     if (action === 'list') {
       const accounts = await database.getAccounts();
       if (!accounts.length) return sender.reply('[Account] No profiles are saved.');
-      return sender.reply(accounts.map((account) => `• ${account.username} (${account.authentication ? 'microsoft' : 'offline'})`).join('\n'));
+      return sender.reply(accounts.map((account) => `- ${account.username} (${account.authentication ? 'microsoft' : 'offline'})`).join('\n'));
     }
 
     const username = args[1]?.trim();

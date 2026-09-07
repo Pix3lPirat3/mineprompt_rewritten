@@ -7,7 +7,7 @@ The current 2.0 beta replaces the original renderer-owned runtime with a securit
 ## Highlights
 
 - Microsoft and offline-mode connections
-- Saved account profiles and quick connection setup
+- Graphical profile, connection, and security settings
 - 40+ built-in commands with aliases and autocomplete
 - Live health, hunger, position, effects, and session time
 - Robust quoted command-line arguments
@@ -69,7 +69,7 @@ account list
 account remove Alex
 ```
 
-Selecting a profile in the sidebar prepares a connection command; it does not connect until a host is entered and the command is submitted.
+Profiles can also be created and edited from the sidebar. Selecting one opens a connection form without requiring terminal syntax.
 
 ## Security settings
 
@@ -84,6 +84,13 @@ Resource packs are declined unless explicitly enabled:
 ```text
 settings resource-packs accept
 settings resource-packs deny
+```
+
+Online player heads are also disabled by default because fetching one shares the player name with `mc-heads.net`. They can be enabled from the graphical settings or explicitly:
+
+```text
+settings player-heads enable
+settings player-heads disable
 ```
 
 Commands sent from Minecraft chat are ignored by default. Enabling them still requires each player to be added to the allowlist:
@@ -120,4 +127,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the command contract and project chec
 
 ## License
 
-Review [LICENSE](LICENSE) and [TERMS.md](TERMS.md) for the project’s licensing and usage terms.
+Review [LICENSE](LICENSE) and [TERMS.md](TERMS.md) for the project's licensing and usage terms.

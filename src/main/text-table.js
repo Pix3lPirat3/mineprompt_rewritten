@@ -6,7 +6,9 @@ function printable(value) {
 
 function truncate(value, width) {
   const text = printable(value);
-  return text.length > width ? `${text.slice(0, Math.max(0, width - 1))}…` : text;
+  if (text.length <= width) return text;
+  if (width <= 3) return '.'.repeat(width);
+  return `${text.slice(0, width - 3)}...`;
 }
 
 function createTextTable(rows, columns = Object.keys(rows[0] || {}), maximumWidth = 36) {
@@ -17,7 +19,7 @@ function createTextTable(rows, columns = Object.keys(rows[0] || {}), maximumWidt
   )));
   const render = (row) => columns.map((column, index) => truncate(row[column], widths[index]).padEnd(widths[index])).join('  ');
   const header = render(Object.fromEntries(columns.map((column) => [column, column])));
-  return [header, widths.map((width) => '─'.repeat(width)).join('  '), ...rows.map(render)].join('\n');
+  return [header, widths.map((width) => '-'.repeat(width)).join('  '), ...rows.map(render)].join('\n');
 }
 
 module.exports = { createTextTable };

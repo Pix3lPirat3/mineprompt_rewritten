@@ -22,7 +22,7 @@ module.exports = {
     if (!action) return sender.reply(`[Spam] Usage: ${this.usage}`);
     if (action === 'list') {
       if (!timers.size) return sender.reply('[Spam] No repeaters are running.');
-      return sender.reply([...timers.entries()].map(([id, timer]) => `${id}. every ${timer.delay} ms — ${timer.message}`).join('\n'));
+      return sender.reply([...timers.entries()].map(([id, timer]) => `${id}. every ${timer.delay} ms - ${timer.message}`).join('\n'));
     }
     if (action === 'start') {
       const delay = Number(args[1]);

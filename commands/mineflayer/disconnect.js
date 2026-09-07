@@ -8,7 +8,7 @@ module.exports = {
   requires: { entity: true },
 
   async execute(sender) {
-    sender.reply('[Connection] Disconnecting…');
+    sender.reply('[Connection] Disconnecting...');
     await mineflayer.disconnect();
   }
 };

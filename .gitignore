@@ -22,3 +22,10 @@ storage/
 cache/
 mineprompt
 mineprompt.db
+*.jar
+.mineprompt-test-lab/
+private-lab/
+test-lab/
+eula.txt
+server.properties
+velocity.toml
