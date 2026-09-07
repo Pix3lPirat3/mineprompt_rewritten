@@ -1,51 +1,121 @@
-# MinePrompt Rewritten
+# MinePrompt
 
-As of MinePrompt Rewritten the project has gone under a whole rewrite from the ground up. Thanks to the people in the PrismarineJS community, I've been able to clean up a lot of the design and code.
+MinePrompt is a desktop command client for Minecraft Java Edition. It connects through [mineflayer](https://github.com/PrismarineJS/mineflayer) and provides a focused terminal for chat, movement, inventory work, navigation, and repeatable automation.
 
-MinePrompt Discord: https://discord.gg/5FV56jKwpk
----
-![MinePrompt Preview Image](https://i.imgur.com/1DsWXlX.png)
----
+The current 2.0 beta replaces the original renderer-owned runtime with a security-focused Electron architecture. Minecraft connections, commands, and storage run outside the web page; the interface can access them only through a small, validated preload API.
+
+## Highlights
+
+- Microsoft and offline-mode connections
+- Saved account profiles and quick connection setup
+- 40+ built-in commands with aliases and autocomplete
+- Live health, hunger, position, effects, and session time
+- Robust quoted command-line arguments
+- Atomic JSON storage in Electron's application-data directory
+- Context-isolated renderer with no Node.js integration
+- Remote player commands disabled by default and restricted by an allowlist
+- Server resource packs declined by default
+
 ## Requirements
 
-#### Development 
-This project is written in `NodeJS`, and as such requires `NodeJS`, alongside `ElectronJS`.
+- Node.js 22 or newer
+- npm 10 or newer
+- A supported Windows, macOS, or Linux desktop
 
-Install Dependencies
-```SH
-npm i
+No global Electron installation is needed.
+
+## Development
+
+```sh
+git clone https://github.com/Pix3lPirat3/mineprompt_rewritten.git
+cd mineprompt_rewritten
+npm ci
+npm start
 ```
 
-Install Electron (I use globally `-g` personally)
-```SH
-npm i electron -g
+Run the full quality check before committing:
+
+```sh
+npm run check
 ```
 
-Go to the directory of the project, then launch it with Electron.
-```SH
-cd C:/path/to/project
-electron .
+Build a distributable for the current platform with:
+
+```sh
+npm run make
 ```
 
-#### Standalone (Executable)
-The program comes ready out of the box. If you want to add your own commands you just need to find the appropriate `/commands/` directory, add your file `my_command.js`, and follow the command structure. Check the structure of other commands for extra options.
+## Getting connected
 
-```
-module.exports = {
-  command: 'template',
-  description: '',
-  requiresEntity: true,
-  author: 'me, myself, and irene',
-  execute: function(sender, command, args) {
+Microsoft authentication is the default:
 
-  }
-}
+```text
+connect --username player@example.com --host play.example.net
 ```
 
-## Configuration
+For an offline-mode server:
 
-#### Add Accounts
-You can add accounts via the command `accounts`
+```text
+connect --username Alex --auth offline --host localhost --port 25565
+```
 
-#### Account Cache
-Caching is handled by node-minecraft-protocol, and on most systems the folder will be in `.minecraft/nmp-cache`, however mineprompt uses its own subfolder.
+Server version detection is automatic. If a server requires an explicit protocol version, add `--version`, such as `--version 1.21.8`.
+
+Save a reusable profile:
+
+```text
+account add Alex offline
+account list
+account remove Alex
+```
+
+Selecting a profile in the sidebar prepares a connection command; it does not connect until a host is entered and the command is submitted.
+
+## Security settings
+
+Review the active policy:
+
+```text
+settings
+```
+
+Resource packs are declined unless explicitly enabled:
+
+```text
+settings resource-packs accept
+settings resource-packs deny
+```
+
+Commands sent from Minecraft chat are ignored by default. Enabling them still requires each player to be added to the allowlist:
+
+```text
+settings remote-player add PlayerName
+settings remote-commands enable
+```
+
+Disable access or remove a player at any time:
+
+```text
+settings remote-commands disable
+settings remote-player remove PlayerName
+```
+
+Treat an allowed remote player as someone with control over the connected bot. Commands marked console-only remain unavailable through game chat.
+
+## Data locations
+
+MinePrompt stores profiles, preferences, and recent connection arguments in Electron's per-user application-data directory as `mineprompt.json`. Microsoft authentication tokens remain in `.minecraft/mineprompt-cache` and can be reviewed or removed with the `cache` command.
+
+The store contains authentication mode, not account passwords. Login and registration command arguments are redacted from terminal output.
+
+## Command extensions
+
+Commands are CommonJS modules inside `commands/global` or `commands/mineflayer`. Use `commands/mineflayer/template.js` as the starting point, then press <kbd>Ctrl</kbd>+<kbd>R</kbd> while the app is running to reload command modules.
+
+The directories `commands/mineflayer/customs` and `commands/mineflayer/incomplete` are intentionally excluded from runtime and packaged builds.
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the command contract and project checks.
+
+## License
+
+Review [LICENSE](LICENSE) and [TERMS.md](TERMS.md) for the project’s licensing and usage terms.
