@@ -3,7 +3,7 @@
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { parseArgs } = require('node:util');
-const minecraftFolderPath = require('minecraft-folder-path');
+const { authenticationCachePath } = require('../../src/main/data-paths');
 
 function parseAuthentication(value) {
   if (value === undefined || value === 'true' || value === 'microsoft') return 'microsoft';
@@ -15,7 +15,7 @@ module.exports = {
   command: 'connect',
   aliases: ['conn'],
   description: 'Connect to a Minecraft Java server.',
-  usage: 'connect --username <name> --host <server> [--port 25565] [--version <version>] [--auth microsoft|offline]',
+  usage: 'connect --username <name> --host <server> [--port 25565] [--version <version>] [--auth microsoft|offline] [--fake-host <host>]',
 
   async execute(sender, command, args) {
     if (bot) {
@@ -34,7 +34,7 @@ module.exports = {
           host: { type: 'string', short: 'h' },
           port: { type: 'string', short: 'p' },
           version: { type: 'string', short: 'v' },
-          fakeHost: { type: 'string' }
+          'fake-host': { type: 'string' }
         }
       }));
     } catch (error) {
@@ -63,8 +63,8 @@ module.exports = {
       host,
       port,
       auth,
-      profilesFolder: path.join(minecraftFolderPath, 'mineprompt-cache', `${cachePrefix}-${cacheHash}`),
-      fakeHost: values.fakeHost || host,
+      profilesFolder: path.join(authenticationCachePath(), `${cachePrefix}-${cacheHash}`),
+      fakeHost: values['fake-host'] || host,
       logErrors: false,
       onMsaCode(data) {
         sender.reply(`[Microsoft] Open ${data.verification_uri} and enter code ${data.user_code}.`);

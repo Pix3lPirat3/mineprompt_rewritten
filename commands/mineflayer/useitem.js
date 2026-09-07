@@ -1,15 +1,19 @@
+'use strict';
+
 module.exports = {
   command: 'useitem',
-  usage: 'useitem [offhand]',
-  description: 'Use the item in hand.',
-  requires: {
-    entity: true
-  },
-  author: 'Pix3lPirat3',
-  execute: function(sender, command, args) {
-    const useOffhand = ['offhand', 'true'].includes(args[0]?.toLowerCase());
-    sender.reply(`[UseItem] Using item ${bot.heldItem?.name || 'AIR'} (Offhand: ${useOffhand})`);
-    bot.activateItem(useOffhand)
-    return undefined;
+  aliases: ['activateitem'],
+  usage: 'useitem [mainhand|offhand]',
+  description: 'Use the item in the selected hand.',
+  requires: { entity: true },
+  autocomplete: () => ['mainhand', 'offhand'],
+
+  execute(sender, command, args) {
+    if (args.length > 1 || (args[0] && !['mainhand', 'offhand'].includes(args[0].toLowerCase()))) {
+      return sender.reply(`[UseItem] Usage: ${this.usage}`);
+    }
+    const offhand = args[0]?.toLowerCase() === 'offhand';
+    bot.activateItem(offhand);
+    return sender.reply(`[UseItem] Activated the ${offhand ? 'off hand' : 'main hand'}.`);
   }
-}
+};

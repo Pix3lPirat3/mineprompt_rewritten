@@ -1,16 +1,17 @@
+'use strict';
+
 module.exports = {
   command: 'animation',
-  usage: 'animation <type (left|right)>',
-  description: 'Swing your main or off hand.',
-  requires: {
-    entity: true
-  },
+  aliases: ['swing'],
+  usage: 'animation <left|right>',
+  description: 'Swing the main hand or off hand.',
+  requires: { entity: true },
   autocomplete: () => ['left', 'right'],
-  author: 'Pix3lPirat3',
-  execute: function(sender, command, args) {
-    let type = args[0]?.toLowerCase();
-    let types = ['left', 'right']
-    if (!types.includes(type)) return sender.reply(`[${this.command}] ${this.usage}`);
-    bot.swingArm(type, true)
+
+  execute(sender, command, args) {
+    const hand = args[0]?.toLowerCase();
+    if (!['left', 'right'].includes(hand) || args.length !== 1) return sender.reply(`[Animation] Usage: ${this.usage}`);
+    bot.swingArm(hand, true);
+    return sender.reply(`[Animation] Swung the ${hand} hand.`);
   }
-}
+};

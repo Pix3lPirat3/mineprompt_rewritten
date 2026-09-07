@@ -1,13 +1,18 @@
+'use strict';
+
 module.exports = {
   command: 'list',
   usage: 'list',
   aliases: ['players', 'online'],
-  description: 'List players on the server',
-  requires: {
-    entity: true
-  },
-  author: 'Pix3lPirat3',
-  execute: function(sender, command, args) {
-    sender.reply('\n[List] Online Players: ' + Object.keys(bot.players).join(', ') + '\n');
+  description: 'List players in the server tab list.',
+  requires: { entity: true },
+
+  execute(sender, command, args) {
+    if (args.length) return sender.reply(`[Players] Usage: ${this.usage}`);
+    const players = Object.values(bot.players)
+      .map((player) => player.username)
+      .filter(Boolean)
+      .toSorted((left, right) => left.localeCompare(right));
+    return sender.reply(`[Players] ${players.length ? players.join(', ') : 'No players are listed.'}`);
   }
-}
+};

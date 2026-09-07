@@ -23,7 +23,10 @@
         <section class="account-section">
           <div class="section-heading">
             <h2>Profiles</h2>
-            <button id="add-account" class="icon-button" type="button" title="Add account" aria-label="Add account">+</button>
+            <div class="section-actions">
+              <button id="open-settings" class="icon-button" type="button" title="Settings" aria-label="Open settings">⚙</button>
+              <button id="add-account" class="icon-button" type="button" title="Add account" aria-label="Add account">+</button>
+            </div>
           </div>
           <div id="account-list" class="account-list" role="list"></div>
           <p id="account-empty" class="empty-state">No saved profiles yet.</p>
@@ -48,6 +51,8 @@
             </div>
           </div>
 
+          <button id="quick-connect" class="secondary-button" type="button">Connect</button>
+
           <div class="vitals" aria-label="Player vitals">
             <div id="health" class="vital-row" title="Health"></div>
             <div id="hunger" class="vital-row" title="Hunger"></div>
@@ -65,6 +70,126 @@
         </footer>
       </section>
     </main>
+
+    <dialog id="profile-dialog" class="dialog">
+      <form id="profile-form" class="dialog__form">
+        <header class="dialog__header">
+          <div>
+            <span class="dialog__eyebrow">Profile</span>
+            <h2 id="profile-title">Add profile</h2>
+          </div>
+          <button class="dialog__close" type="button" data-close="profile-dialog" aria-label="Close">×</button>
+        </header>
+        <input id="profile-original" type="hidden">
+        <label class="field">
+          <span>Account name or email</span>
+          <input id="profile-username" name="username" required maxlength="254" autocomplete="username">
+        </label>
+        <label class="field">
+          <span>Authentication</span>
+          <select id="profile-auth" name="authentication">
+            <option value="microsoft">Microsoft</option>
+            <option value="offline">Offline mode</option>
+          </select>
+        </label>
+        <p id="profile-error" class="dialog__error" role="alert"></p>
+        <footer class="dialog__actions dialog__actions--split">
+          <button id="delete-profile" class="danger-button" type="button">Delete</button>
+          <div>
+            <button class="secondary-button" type="button" data-close="profile-dialog">Cancel</button>
+            <button class="primary-button" type="submit">Save profile</button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="connect-dialog" class="dialog">
+      <form id="connect-form" class="dialog__form">
+        <header class="dialog__header">
+          <div>
+            <span class="dialog__eyebrow">Java Edition</span>
+            <h2>Connect to a server</h2>
+          </div>
+          <button class="dialog__close" type="button" data-close="connect-dialog" aria-label="Close">×</button>
+        </header>
+        <div class="field-grid">
+          <label class="field field--wide">
+            <span>Account name or email</span>
+            <input id="connect-username" required maxlength="254" autocomplete="username">
+          </label>
+          <label class="field">
+            <span>Authentication</span>
+            <select id="connect-auth">
+              <option value="microsoft">Microsoft</option>
+              <option value="offline">Offline mode</option>
+            </select>
+          </label>
+          <label class="field field--wide">
+            <span>Server address</span>
+            <input id="connect-host" required placeholder="play.example.net" spellcheck="false">
+          </label>
+          <label class="field">
+            <span>Port</span>
+            <input id="connect-port" type="number" min="1" max="65535" value="25565" required>
+          </label>
+          <label class="field">
+            <span>Version</span>
+            <input id="connect-version" placeholder="Automatic" spellcheck="false">
+          </label>
+          <label class="field field--wide">
+            <span>Handshake address</span>
+            <input id="connect-fake-host" placeholder="Optional proxy hostname" spellcheck="false">
+          </label>
+        </div>
+        <p id="connect-error" class="dialog__error" role="alert"></p>
+        <footer class="dialog__actions">
+          <button class="secondary-button" type="button" data-close="connect-dialog">Cancel</button>
+          <button class="primary-button" type="submit">Connect</button>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="settings-dialog" class="dialog">
+      <form id="settings-form" class="dialog__form">
+        <header class="dialog__header">
+          <div>
+            <span class="dialog__eyebrow">MinePrompt</span>
+            <h2>Security settings</h2>
+          </div>
+          <button class="dialog__close" type="button" data-close="settings-dialog" aria-label="Close">×</button>
+        </header>
+        <label class="field">
+          <span>Server resource packs</span>
+          <select id="settings-resource-packs">
+            <option value="deny">Decline by default</option>
+            <option value="accept">Accept automatically</option>
+          </select>
+        </label>
+        <label class="toggle-field">
+          <span>
+            <strong>Online player heads</strong>
+            <small>Fetch profile images from mc-heads.net. Enabling this shares player names with that service.</small>
+          </span>
+          <input id="settings-external-heads" type="checkbox">
+        </label>
+        <label class="toggle-field">
+          <span>
+            <strong>Remote chat commands</strong>
+            <small>Allow listed players to control the connected bot with !commands.</small>
+          </span>
+          <input id="settings-remote-enabled" type="checkbox">
+        </label>
+        <label class="field">
+          <span>Allowed player names</span>
+          <textarea id="settings-remote-players" rows="4" placeholder="One Java username per line" spellcheck="false"></textarea>
+        </label>
+        <p id="settings-error" class="dialog__error" role="alert"></p>
+        <footer class="dialog__actions">
+          <button class="secondary-button" type="button" data-close="settings-dialog">Cancel</button>
+          <button class="primary-button" type="submit">Save settings</button>
+        </footer>
+      </form>
+    </dialog>
 
     <script src="../node_modules/jquery/dist/jquery.min.js"></script>
     <script src="../node_modules/jquery.terminal/js/jquery.terminal.min.js"></script>

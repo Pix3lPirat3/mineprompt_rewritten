@@ -1,19 +1,20 @@
-let { GoalNear } = require('mineflayer-pathfinder').goals;
+'use strict';
+
+const { GoalNear } = require('mineflayer-pathfinder').goals;
 
 module.exports = {
   command: 'come',
   usage: 'come',
-  description: 'The bot will go to the player who types the command.',
-  requires: {
-    entity: true
-  },
-  author: 'Pix3lPirat3',
-  execute: async function(sender, command, args) {
-    if(sender.type !== 'player') return sender.reply(`[Come] This command can only be ran by a player. Use 'goto' instead.`);
-    let player = sender.player;
-    let entity = bot.players[player]?.entity;
-    if(!entity) return sender.reply(`[Come] I cannot see you ${player}`);
-    let { x, y, z } = entity.position;
-    await bot.pathfinder.goto(new GoalNear(x, y, z, 2));
+  description: 'Navigate to the player who sent the command.',
+  requires: { entity: true },
+
+  async execute(sender, command, args) {
+    if (args.length) return sender.reply(`[Come] Usage: ${this.usage}`);
+    if (sender.type !== 'player') return sender.reply('[Come] This command must come from an allowed player. Use "goto" from MinePrompt.');
+    const target = Object.values(bot.players).find((player) => player.username?.toLowerCase() === sender.player.toLowerCase());
+    if (!target?.entity) return sender.reply(`[Come] ${sender.player} is not currently visible.`);
+    const { x, y, z } = target.entity.position;
+    sender.reply(`[Come] Navigating to ${target.username}.`);
+    return bot.pathfinder.goto(new GoalNear(x, y, z, 2));
   }
-}
+};

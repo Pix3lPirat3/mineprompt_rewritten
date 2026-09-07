@@ -10,11 +10,24 @@ function readableReason(reason) {
 }
 
 class MineflayerClient {
-  constructor({ logger, interfaceState, store, getCommands }) {
+  constructor({
+    logger,
+    interfaceState,
+    store,
+    getCommands,
+    createBotImpl = createBot,
+    pathfinderPlugin = pathfinder,
+    MovementsClass = Movements,
+    chatFactory = (registry) => require('prismarine-chat')(registry)
+  }) {
     this.logger = logger;
     this.interface = interfaceState;
     this.store = store;
     this.getCommands = getCommands;
+    this.createBot = createBotImpl;
+    this.pathfinderPlugin = pathfinderPlugin;
+    this.Movements = MovementsClass;
+    this.chatFactory = chatFactory;
     this.bot = null;
     this.chatMessageClass = null;
     this.connectionAttempt = 0;
@@ -29,10 +42,10 @@ class MineflayerClient {
     const attempt = ++this.connectionAttempt;
     this.interface.setStatus('connecting');
     const { accountUsername, ...connectionOptions } = options;
-    const bot = createBot(connectionOptions);
+    const bot = this.createBot(connectionOptions);
     this.bot = bot;
     bot.lastOptions = { ...options };
-    bot.loadPlugin(pathfinder);
+    bot.loadPlugin(this.pathfinderPlugin);
     this.bindEvents(bot, { ...connectionOptions, accountUsername }, attempt);
     return bot;
   }
@@ -40,8 +53,7 @@ class MineflayerClient {
   bindEvents(bot, options, attempt) {
     bot.once('login', async () => {
       if (!this.isCurrent(bot, attempt)) return;
-      this.chatMessageClass = require('prismarine-chat')(bot.registry);
-      this.interface.startSession(bot.username);
+      this.chatMessageClass = this.chatFactory(bot.registry);
       this.logger.info(`[Connection] Logged in as ${bot.username}.`);
       if (options.accountUsername && options.accountUsername !== bot.username) {
         await this.store.renameAccount(options.accountUsername, bot.username).catch((error) => this.logger.warn(error.message));
@@ -50,7 +62,8 @@ class MineflayerClient {
 
     bot.once('spawn', () => {
       if (!this.isCurrent(bot, attempt)) return;
-      const movements = new Movements(bot);
+      this.interface.startSession(bot.username);
+      const movements = new this.Movements(bot);
       movements.allow1by1towers = false;
       movements.canDig = false;
       movements.allowFreeMotion = true;

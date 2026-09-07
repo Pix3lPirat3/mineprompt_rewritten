@@ -5,6 +5,8 @@ const elements = {
   accountList: document.querySelector('#account-list'),
   accountEmpty: document.querySelector('#account-empty'),
   addAccount: document.querySelector('#add-account'),
+  openSettings: document.querySelector('#open-settings'),
+  quickConnect: document.querySelector('#quick-connect'),
   activeHead: document.querySelector('#active-head'),
   activeName: document.querySelector('#active-name'),
   activePosition: document.querySelector('#active-position'),
@@ -12,11 +14,36 @@ const elements = {
   health: document.querySelector('#health'),
   hunger: document.querySelector('#hunger'),
   effects: document.querySelector('#effects'),
-  runtime: document.querySelector('#runtime')
+  runtime: document.querySelector('#runtime'),
+  profileDialog: document.querySelector('#profile-dialog'),
+  profileForm: document.querySelector('#profile-form'),
+  profileTitle: document.querySelector('#profile-title'),
+  profileOriginal: document.querySelector('#profile-original'),
+  profileUsername: document.querySelector('#profile-username'),
+  profileAuth: document.querySelector('#profile-auth'),
+  profileError: document.querySelector('#profile-error'),
+  deleteProfile: document.querySelector('#delete-profile'),
+  connectDialog: document.querySelector('#connect-dialog'),
+  connectForm: document.querySelector('#connect-form'),
+  connectUsername: document.querySelector('#connect-username'),
+  connectAuth: document.querySelector('#connect-auth'),
+  connectHost: document.querySelector('#connect-host'),
+  connectPort: document.querySelector('#connect-port'),
+  connectVersion: document.querySelector('#connect-version'),
+  connectFakeHost: document.querySelector('#connect-fake-host'),
+  connectError: document.querySelector('#connect-error'),
+  settingsDialog: document.querySelector('#settings-dialog'),
+  settingsForm: document.querySelector('#settings-form'),
+  settingsResourcePacks: document.querySelector('#settings-resource-packs'),
+  settingsExternalHeads: document.querySelector('#settings-external-heads'),
+  settingsRemoteEnabled: document.querySelector('#settings-remote-enabled'),
+  settingsRemotePlayers: document.querySelector('#settings-remote-players'),
+  settingsError: document.querySelector('#settings-error')
 };
 
 let terminal;
 let state = { status: 'disconnected', sessionStartedAt: null };
+let snapshot = { accounts: [], preferences: {} };
 
 $.terminal.new_formatter((value) => String(value).replace(
   /^(cmd\s+\/?(?:login|register)\s+)\S+/iu,
@@ -28,7 +55,7 @@ function assetPath(category, file) {
 }
 
 function playerHead(username) {
-  return username
+  return username && snapshot.preferences?.externalPlayerHeadsEnabled
     ? `https://mc-heads.net/head/${encodeURIComponent(username)}/nohelm`
     : assetPath('heads', 'wood_question.png');
 }
@@ -38,15 +65,72 @@ function quote(value) {
   return /^[\w.@:/-]+$/u.test(text) ? text : `"${text.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 }
 
+function errorMessage(error) {
+  return String(error?.message || error || 'The request could not be completed.')
+    .replace(/^Error invoking remote method '[^']+': Error: /u, '');
+}
+
+function setError(element, error = '') {
+  element.textContent = error ? errorMessage(error) : '';
+}
+
+function showDialog(dialog, focusTarget) {
+  if (!dialog.open) dialog.showModal();
+  requestAnimationFrame(() => focusTarget?.focus());
+}
+
+function closeDialog(dialog) {
+  if (dialog.open) dialog.close();
+}
+
+function openProfile(account = null) {
+  elements.profileTitle.textContent = account ? 'Edit profile' : 'Add profile';
+  elements.profileOriginal.value = account?.username || '';
+  elements.profileUsername.value = account?.username || '';
+  elements.profileAuth.value = account?.authentication ? 'microsoft' : 'offline';
+  elements.deleteProfile.hidden = !account;
+  elements.deleteProfile.dataset.confirming = '';
+  elements.deleteProfile.textContent = 'Delete';
+  setError(elements.profileError);
+  showDialog(elements.profileDialog, elements.profileUsername);
+}
+
+function openConnection(account = null) {
+  const fallbackAccount = account || snapshot.accounts?.[0];
+  elements.connectUsername.value = fallbackAccount?.username || '';
+  elements.connectAuth.value = fallbackAccount?.authentication ? 'microsoft' : 'offline';
+  elements.connectHost.value = '';
+  elements.connectPort.value = '25565';
+  elements.connectVersion.value = '';
+  elements.connectFakeHost.value = '';
+  setError(elements.connectError);
+  showDialog(elements.connectDialog, elements.connectUsername.value ? elements.connectHost : elements.connectUsername);
+}
+
+function openPreferences() {
+  const preferences = snapshot.preferences || {};
+  elements.settingsResourcePacks.value = preferences.resourcePackPolicy === 'accept' ? 'accept' : 'deny';
+  elements.settingsExternalHeads.checked = preferences.externalPlayerHeadsEnabled === true;
+  elements.settingsRemoteEnabled.checked = preferences.remoteCommandsEnabled === true;
+  elements.settingsRemotePlayers.value = Array.isArray(preferences.remoteCommandPlayers)
+    ? preferences.remoteCommandPlayers.join('\n')
+    : '';
+  setError(elements.settingsError);
+  showDialog(elements.settingsDialog, elements.settingsResourcePacks);
+}
+
 function renderAccounts(accounts = []) {
   elements.accountList.replaceChildren();
   elements.accountEmpty.hidden = accounts.length > 0;
   for (const account of accounts) {
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'account';
-    button.setAttribute('role', 'listitem');
-    button.title = `Prepare a connection as ${account.username}`;
+    const row = document.createElement('div');
+    row.className = 'account';
+    row.setAttribute('role', 'listitem');
+
+    const connect = document.createElement('button');
+    connect.type = 'button';
+    connect.className = 'account__connect';
+    connect.title = `Connect as ${account.username}`;
 
     const image = document.createElement('img');
     image.src = playerHead(account.username);
@@ -61,13 +145,18 @@ function renderAccounts(accounts = []) {
     mode.className = 'account__mode';
     mode.textContent = account.authentication ? 'Microsoft' : 'Offline';
     details.append(name, mode);
-    button.append(image, details);
-    button.addEventListener('click', () => {
-      const auth = account.authentication ? 'microsoft' : 'offline';
-      terminal.set_command(`connect --username ${quote(account.username)} --auth ${auth} --host `);
-      terminal.focus(true);
-    });
-    elements.accountList.append(button);
+    connect.append(image, details);
+    connect.addEventListener('click', () => openConnection(account));
+
+    const edit = document.createElement('button');
+    edit.type = 'button';
+    edit.className = 'account__edit';
+    edit.title = `Edit ${account.username}`;
+    edit.setAttribute('aria-label', `Edit ${account.username}`);
+    edit.textContent = '···';
+    edit.addEventListener('click', () => openProfile(account));
+    row.append(connect, edit);
+    elements.accountList.append(row);
   }
 }
 
@@ -111,7 +200,8 @@ function renderState(nextState = {}) {
   renderEffects(state.effects);
 }
 
-function renderSnapshot(snapshot) {
+function renderSnapshot(nextSnapshot) {
+  snapshot = nextSnapshot;
   elements.version.textContent = `Version ${snapshot.version}`;
   renderAccounts(snapshot.accounts);
   renderState(snapshot.state);
@@ -135,6 +225,74 @@ function echoLog(event) {
   const colors = { error: '#ee7e86', warn: '#f0bd70', debug: '#758195', info: '#9ac7ad' };
   const color = colors[event.level];
   terminal.echo(color ? `[[;${color};]${safeMessage}]` : safeMessage);
+}
+
+async function submitProfile(event) {
+  event.preventDefault();
+  setError(elements.profileError);
+  try {
+    await window.mineprompt.saveProfile({
+      originalUsername: elements.profileOriginal.value,
+      username: elements.profileUsername.value,
+      authentication: elements.profileAuth.value
+    });
+    closeDialog(elements.profileDialog);
+  } catch (error) {
+    setError(elements.profileError, error);
+  }
+}
+
+async function removeProfile() {
+  if (elements.deleteProfile.dataset.confirming !== 'true') {
+    elements.deleteProfile.dataset.confirming = 'true';
+    elements.deleteProfile.textContent = 'Confirm delete';
+    return;
+  }
+  setError(elements.profileError);
+  try {
+    await window.mineprompt.removeProfile(elements.profileOriginal.value);
+    closeDialog(elements.profileDialog);
+  } catch (error) {
+    setError(elements.profileError, error);
+  }
+}
+
+async function submitConnection(event) {
+  event.preventDefault();
+  setError(elements.connectError);
+  const command = [
+    'connect',
+    '--username', quote(elements.connectUsername.value.trim()),
+    '--auth', elements.connectAuth.value,
+    '--host', quote(elements.connectHost.value.trim()),
+    '--port', elements.connectPort.value
+  ];
+  if (elements.connectVersion.value.trim()) command.push('--version', quote(elements.connectVersion.value.trim()));
+  if (elements.connectFakeHost.value.trim()) command.push('--fake-host', quote(elements.connectFakeHost.value.trim()));
+  try {
+    const result = await window.mineprompt.execute(command.join(' '));
+    if (!result?.ok) throw new Error(result?.error || 'The connection could not be started.');
+    closeDialog(elements.connectDialog);
+  } catch (error) {
+    setError(elements.connectError, error);
+  }
+}
+
+async function submitPreferences(event) {
+  event.preventDefault();
+  setError(elements.settingsError);
+  const remoteCommandPlayers = elements.settingsRemotePlayers.value.split(/[\s,]+/u).filter(Boolean);
+  try {
+    await window.mineprompt.savePreferences({
+      resourcePackPolicy: elements.settingsResourcePacks.value,
+      externalPlayerHeadsEnabled: elements.settingsExternalHeads.checked,
+      remoteCommandsEnabled: elements.settingsRemoteEnabled.checked,
+      remoteCommandPlayers
+    });
+    closeDialog(elements.settingsDialog);
+  } catch (error) {
+    setError(elements.settingsError, error);
+  }
 }
 
 async function initialize() {
@@ -165,19 +323,26 @@ async function initialize() {
     requestAnimationFrame(() => document.body.classList.add('attention'));
   });
 
+  elements.addAccount.addEventListener('click', () => openProfile());
+  elements.openSettings.addEventListener('click', openPreferences);
+  elements.quickConnect.addEventListener('click', () => openConnection());
+  elements.profileForm.addEventListener('submit', submitProfile);
+  elements.deleteProfile.addEventListener('click', removeProfile);
+  elements.connectForm.addEventListener('submit', submitConnection);
+  elements.settingsForm.addEventListener('submit', submitPreferences);
+  document.querySelectorAll('[data-close]').forEach((button) => {
+    button.addEventListener('click', () => closeDialog(document.querySelector(`#${button.dataset.close}`)));
+  });
+
   try {
-    const snapshot = await window.mineprompt.getSnapshot();
-    renderSnapshot(snapshot);
-    terminal.echo(`[[b;#6ed899;]MinePrompt ${snapshot.version}]`);
+    const initialSnapshot = await window.mineprompt.getSnapshot();
+    renderSnapshot(initialSnapshot);
+    terminal.echo(`[[b;#6ed899;]MinePrompt ${initialSnapshot.version}]`);
     terminal.echo('Type "help" to explore commands, or choose a saved profile.');
   } catch (error) {
     terminal.error(`MinePrompt could not initialize: ${error.message}`);
   }
 
-  elements.addAccount.addEventListener('click', () => {
-    terminal.set_command('account add ');
-    terminal.focus(true);
-  });
   setInterval(updateRuntime, 1000);
   updateRuntime();
 }

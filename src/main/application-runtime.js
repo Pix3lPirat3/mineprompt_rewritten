@@ -73,11 +73,57 @@ class ApplicationRuntime {
     return { ok: true };
   }
 
+  preferences() {
+    const settings = this.store.snapshot().settings;
+    return {
+      resourcePackPolicy: settings.resourcePackPolicy === 'accept' ? 'accept' : 'deny',
+      externalPlayerHeadsEnabled: settings.externalPlayerHeadsEnabled === true,
+      remoteCommandsEnabled: settings.remoteCommandsEnabled === true,
+      remoteCommandPlayers: Array.isArray(settings.remoteCommandPlayers) ? settings.remoteCommandPlayers : []
+    };
+  }
+
+  async saveProfile(profile) {
+    const authentication = profile?.authentication;
+    if (![true, false, 'microsoft', 'offline'].includes(authentication)) throw new Error('Select a valid authentication mode.');
+    const saved = await this.store.saveAccount({
+      originalUsername: profile?.originalUsername,
+      username: profile?.username,
+      authentication: authentication === true || authentication === 'microsoft'
+    });
+    return { ok: true, profile: saved };
+  }
+
+  async removeProfile(username) {
+    const removed = await this.store.removeAccount(username);
+    if (!removed) throw new Error('The profile no longer exists.');
+    return { ok: true };
+  }
+
+  async savePreferences(preferences) {
+    const resourcePackPolicy = preferences?.resourcePackPolicy;
+    if (!['accept', 'deny'].includes(resourcePackPolicy)) throw new Error('Invalid resource-pack policy.');
+    const players = Array.isArray(preferences?.remoteCommandPlayers) ? preferences.remoteCommandPlayers : [];
+    const remoteCommandPlayers = players.map((name) => String(name).trim()).filter(Boolean).filter((name, index, values) =>
+      values.findIndex((candidate) => candidate.toLowerCase() === name.toLowerCase()) === index);
+    if (remoteCommandPlayers.some((name) => !/^[A-Za-z0-9_]{1,16}$/u.test(name))) {
+      throw new Error('Remote player names may contain only letters, numbers, and underscores.');
+    }
+    await this.store.setSettings({
+      resourcePackPolicy,
+      externalPlayerHeadsEnabled: preferences.externalPlayerHeadsEnabled === true,
+      remoteCommandsEnabled: preferences.remoteCommandsEnabled === true,
+      remoteCommandPlayers
+    });
+    return { ok: true, preferences: this.preferences() };
+  }
+
   snapshot() {
     return {
       version: packageJson.version,
       state: this.interface.snapshot(),
       accounts: this.store.snapshot().accounts,
+      preferences: this.preferences(),
       commands: this.commands.commands_array.map((command) => ({
         command: command.command,
         aliases: command.aliases || [],

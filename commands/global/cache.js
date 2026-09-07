@@ -2,9 +2,9 @@
 
 const fs = require('node:fs/promises');
 const path = require('node:path');
-const minecraftFolderPath = require('minecraft-folder-path');
+const { authenticationCachePath } = require('../../src/main/data-paths');
 
-const cacheRoot = path.resolve(minecraftFolderPath, 'mineprompt-cache');
+const cacheRoot = authenticationCachePath();
 
 async function getDirectories() {
   try {
@@ -18,7 +18,7 @@ async function getDirectories() {
 
 module.exports = {
   command: 'cache',
-  usage: 'cache <list|delete> [username]',
+  usage: 'cache <list|delete> [cache-folder]',
   description: 'List or remove cached Microsoft authentication data.',
   requires: { console: true },
   autocomplete: getDirectories,
@@ -31,8 +31,9 @@ module.exports = {
     }
     if (action !== 'delete' || !args[1]) return sender.reply(`[Cache] Usage: ${this.usage}`);
 
-    const targetName = args[1].toUpperCase();
-    if (!folders.includes(targetName)) return sender.reply(`[Cache] No cache exists for ${targetName}.`);
+    const requested = args[1];
+    const targetName = folders.find((folder) => folder.toLowerCase() === requested.toLowerCase());
+    if (!targetName) return sender.reply(`[Cache] No cache exists for ${requested}.`);
     const targetPath = path.resolve(cacheRoot, targetName);
     if (path.dirname(targetPath) !== cacheRoot) throw new Error('Refusing to remove a path outside the account cache.');
     await fs.rm(targetPath, { recursive: true, force: true });

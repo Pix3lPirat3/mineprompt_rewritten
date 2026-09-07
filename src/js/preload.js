@@ -9,6 +9,9 @@ contextBridge.exposeInMainWorld('mineprompt', Object.freeze({
   execute: (input) => ipcRenderer.invoke('mineprompt:execute', input),
   complete: (input) => ipcRenderer.invoke('mineprompt:complete', input),
   reloadCommands: () => ipcRenderer.invoke('mineprompt:reload-commands'),
+  saveProfile: (profile) => ipcRenderer.invoke('mineprompt:save-profile', profile),
+  removeProfile: (username) => ipcRenderer.invoke('mineprompt:remove-profile', username),
+  savePreferences: (preferences) => ipcRenderer.invoke('mineprompt:save-preferences', preferences),
   on: (channel, callback) => {
     if (!eventChannels.has(channel) || typeof callback !== 'function') return () => {};
     const listener = (_event, payload) => callback(payload);

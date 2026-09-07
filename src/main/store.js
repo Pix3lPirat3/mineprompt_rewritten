@@ -94,6 +94,34 @@ class Store {
     return true;
   }
 
+  async saveAccount({ originalUsername, username, authentication }) {
+    const cleanUsername = String(username ?? '').trim();
+    const hasControlCharacters = [...cleanUsername].some((character) => {
+      const code = character.codePointAt(0);
+      return code < 32 || code === 127;
+    });
+    if (!cleanUsername || cleanUsername.length > 254 || hasControlCharacters) {
+      throw new Error('Enter a valid account name or Microsoft email address.');
+    }
+    const original = String(originalUsername ?? '').trim().toLowerCase();
+    const duplicate = this.data.accounts.find((account) =>
+      account.username.toLowerCase() === cleanUsername.toLowerCase() && account.username.toLowerCase() !== original);
+    if (duplicate) throw new Error(`${cleanUsername} is already saved.`);
+    const account = original
+      ? this.data.accounts.find((entry) => entry.username.toLowerCase() === original)
+      : null;
+    if (original && !account) throw new Error('The profile no longer exists.');
+    if (account) {
+      account.username = cleanUsername;
+      account.authentication = Boolean(authentication);
+    } else {
+      this.data.accounts.push({ username: cleanUsername, authentication: Boolean(authentication) });
+    }
+    this.data.accounts.sort((a, b) => a.username.localeCompare(b.username));
+    await this.changed();
+    return { username: cleanUsername, authentication: Boolean(authentication) };
+  }
+
   async removeAccount(username) {
     const target = String(username ?? '').toLowerCase();
     const previousLength = this.data.accounts.length;
@@ -106,7 +134,14 @@ class Store {
   async renameAccount(from, to) {
     const account = await this.getAccount(from);
     if (!account || !to || account.username === to) return false;
-    account.username = to;
+    const target = await this.getAccount(to);
+    if (target && target !== account) {
+      target.authentication ||= account.authentication;
+      this.data.accounts = this.data.accounts.filter((entry) => entry !== account);
+    } else {
+      account.username = to;
+    }
+    this.data.accounts.sort((left, right) => left.username.localeCompare(right.username));
     await this.changed();
     return true;
   }
@@ -126,6 +161,11 @@ class Store {
 
   async setSetting(setting, value) {
     this.data.settings[setting] = value;
+    await this.changed();
+  }
+
+  async setSettings(settings) {
+    Object.assign(this.data.settings, settings);
     await this.changed();
   }
 

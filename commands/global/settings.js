@@ -1,7 +1,7 @@
 'use strict';
 
 const path = require('node:path');
-const minecraftFolderPath = require('minecraft-folder-path');
+const { authenticationCachePath } = require('../../src/main/data-paths');
 
 function enabled(value) {
   if (value === 'enable' || value === 'enabled' || value === 'true') return true;
@@ -12,19 +12,22 @@ function enabled(value) {
 module.exports = {
   command: 'settings',
   aliases: ['config'],
-  usage: 'settings [paths | resource-packs accept|deny | remote-commands enable|disable | remote-player list|add|remove <name>]',
+  usage: 'settings [paths | resource-packs accept|deny | player-heads enable|disable | remote-commands enable|disable | remote-player list|add|remove <name>]',
   description: 'Review or change MinePrompt security preferences.',
   requires: { console: true },
-  autocomplete: () => ['paths', 'resource-packs', 'remote-commands', 'remote-player', 'accept', 'deny', 'enable', 'disable', 'list', 'add', 'remove'],
+  autocomplete: () => ['paths', 'resource-packs', 'player-heads', 'remote-commands', 'remote-player', 'accept', 'deny', 'enable', 'disable', 'list', 'add', 'remove'],
 
   async execute(sender, command, args) {
     const resourcePacks = await database.getSetting('resourcePackPolicy') || 'deny';
+    const playerHeads = await database.getSetting('externalPlayerHeadsEnabled') === true;
     const remoteCommands = await database.getSetting('remoteCommandsEnabled') === true;
-    const remotePlayers = await database.getSetting('remoteCommandPlayers') || [];
+    const savedRemotePlayers = await database.getSetting('remoteCommandPlayers');
+    const remotePlayers = Array.isArray(savedRemotePlayers) ? [...savedRemotePlayers] : [];
     if (!args.length) {
       return sender.reply([
         '[Settings]',
         `Resource packs: ${resourcePacks}`,
+        `Online player heads: ${playerHeads ? 'enabled' : 'disabled'}`,
         `Remote commands: ${remoteCommands ? 'enabled' : 'disabled'}`,
         `Allowed remote players: ${remotePlayers.length ? remotePlayers.join(', ') : 'none'}`
       ].join('\n'));
@@ -37,7 +40,7 @@ module.exports = {
         '[Paths]',
         `Application data: ${applicationData}`,
         `Private commands: ${path.join(applicationData, 'commands')}`,
-        `Authentication cache: ${path.join(minecraftFolderPath, 'mineprompt-cache')}`
+        `Authentication cache: ${authenticationCachePath()}`
       ].join('\n'));
     }
 
@@ -58,11 +61,22 @@ module.exports = {
       }
     }
 
+    if (section === 'player-heads') {
+      try {
+        const value = enabled(args[1]?.toLowerCase());
+        await database.setSetting('externalPlayerHeadsEnabled', value);
+        return sender.reply(`[Settings] Online player heads ${value ? 'enabled' : 'disabled'}.`);
+      } catch (error) {
+        return sender.reply(`[Settings] ${error.message}`);
+      }
+    }
+
     if (section === 'remote-player') {
       const action = args[1]?.toLowerCase() || 'list';
       if (action === 'list') return sender.reply(`[Settings] Allowed remote players: ${remotePlayers.length ? remotePlayers.join(', ') : 'none'}.`);
       const username = args[2]?.trim();
       if (!username) return sender.reply('[Settings] A player name is required.');
+      if (!/^[A-Za-z0-9_]{1,16}$/u.test(username)) return sender.reply('[Settings] Enter a valid Java player name.');
       if (action === 'add') {
         if (!remotePlayers.some((name) => name.toLowerCase() === username.toLowerCase())) remotePlayers.push(username);
       } else if (action === 'remove') {

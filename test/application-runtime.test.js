@@ -27,3 +27,39 @@ test('runs global commands through the application runtime', async (context) => 
   assert.equal(await runtime.store.getSetting('resourcePackPolicy'), 'accept');
   assert.equal(events.some((event) => event.type === 'snapshot'), true);
 });
+
+test('validates profile and security preference updates', async (context) => {
+  const userDataPath = await fs.mkdtemp(path.join(os.tmpdir(), 'mineprompt-preferences-'));
+  const runtime = await new ApplicationRuntime({
+    rootPath: path.resolve(__dirname, '..'),
+    userDataPath,
+    emit: () => {}
+  }).init();
+  context.after(async () => {
+    await runtime.close();
+    await fs.rm(userDataPath, { recursive: true, force: true });
+  });
+
+  await runtime.saveProfile({ username: 'ExamplePlayer', authentication: 'microsoft' });
+  assert.deepEqual(runtime.snapshot().accounts, [{ username: 'ExamplePlayer', authentication: true }]);
+  const result = await runtime.savePreferences({
+    resourcePackPolicy: 'accept',
+    externalPlayerHeadsEnabled: true,
+    remoteCommandsEnabled: true,
+    remoteCommandPlayers: ['Builder_1', 'builder_1', 'Helper2']
+  });
+  assert.deepEqual(result.preferences, {
+    resourcePackPolicy: 'accept',
+    externalPlayerHeadsEnabled: true,
+    remoteCommandsEnabled: true,
+    remoteCommandPlayers: ['Builder_1', 'Helper2']
+  });
+  await assert.rejects(runtime.savePreferences({ resourcePackPolicy: 'ask' }), /Invalid resource-pack/u);
+  await assert.rejects(runtime.saveProfile({ username: 'Another', authentication: 'password' }), /authentication mode/u);
+  await assert.rejects(runtime.savePreferences({
+    resourcePackPolicy: 'deny',
+    remoteCommandPlayers: ['invalid player']
+  }), /letters, numbers/u);
+  await runtime.removeProfile('ExamplePlayer');
+  assert.deepEqual(runtime.snapshot().accounts, []);
+});

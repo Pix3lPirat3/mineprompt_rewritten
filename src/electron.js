@@ -1,6 +1,7 @@
 'use strict';
 
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const { app, BrowserWindow, ipcMain, powerSaveBlocker, shell } = require('electron');
 const packageJson = require('../package.json');
 const { ApplicationRuntime } = require('./main/application-runtime');
@@ -8,6 +9,7 @@ const { ApplicationRuntime } = require('./main/application-runtime');
 if (require('electron-squirrel-startup')) app.quit();
 
 const ALLOWED_EXTERNAL_PROTOCOLS = new Set(['https:']);
+const APPLICATION_URL = pathToFileURL(path.join(__dirname, 'index.html')).href;
 let mainWindow = null;
 let runtime = null;
 let powerSaveBlockerId = null;
@@ -29,11 +31,12 @@ function updatePowerSaveBlocker(needed) {
 }
 
 function isTrustedSender(event) {
-  try {
-    return new URL(event.senderFrame.url).protocol === 'file:';
-  } catch {
-    return false;
-  }
+  return Boolean(
+    mainWindow &&
+    event.sender === mainWindow.webContents &&
+    event.senderFrame === mainWindow.webContents.mainFrame &&
+    event.senderFrame.url === APPLICATION_URL
+  );
 }
 
 function registerIpc() {
@@ -45,6 +48,9 @@ function registerIpc() {
   ipcMain.handle('mineprompt:execute', guard((input) => runtime.execute(input)));
   ipcMain.handle('mineprompt:complete', guard((input) => runtime.complete(input)));
   ipcMain.handle('mineprompt:reload-commands', guard(() => runtime.reloadCommands()));
+  ipcMain.handle('mineprompt:save-profile', guard((profile) => runtime.saveProfile(profile)));
+  ipcMain.handle('mineprompt:remove-profile', guard((username) => runtime.removeProfile(username)));
+  ipcMain.handle('mineprompt:save-preferences', guard((preferences) => runtime.savePreferences(preferences)));
 }
 
 async function openExternal(url) {
@@ -71,7 +77,7 @@ function createWindow() {
       preload: path.join(__dirname, 'js', 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      sandbox: false,
+      sandbox: true,
       webSecurity: true,
       allowRunningInsecureContent: false,
       backgroundThrottling: false
