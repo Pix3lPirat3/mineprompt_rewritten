@@ -1,56 +1,37 @@
-let v = require('vec3')
-let { GoalLookAtBlock } = require('mineflayer-pathfinder').goals;
+'use strict';
 
-const allowedWindowTypes = ['generic', 'chest', 'dispenser', 'ender_chest', 'shulker_box', 'hopper', 'container', 'dropper', 'trapped_chest', 'barrel', 'white_shulker_box', 'orange_shulker_box', 'magenta_shulker_box', 'light_blue_shulker_box', 'yellow_shulker_box', 'lime_shulker_box', 'pink_shulker_box', 'gray_shulker_box', 'light_gray_shulker_box', 'cyan_shulker_box', 'purple_shulker_box', 'blue_shulker_box', 'brown_shulker_box', 'green_shulker_box', 'red_shulker_box', 'black_shulker_box']
+const { Vec3 } = require('vec3');
+const { GoalLookAtBlock } = require('mineflayer-pathfinder').goals;
 
-// Pass a Block -> Returns Boolean
 function isContainer(block) {
-  return allowedWindowTypes.includes(block?.name);
+  return Boolean(block && /(chest|shulker_box|barrel|hopper|dispenser|dropper|container)$/u.test(block.name));
 }
 
 module.exports = {
   command: 'opencontainer',
+  aliases: ['open'],
   usage: 'opencontainer [x y z]',
-  description: 'Open a container at cursor, or at coordinates.',
-  requires: {
-    entity: true
-  },
-  author: 'Pix3lPirat3',
-  execute: async function(sender, command, args) {
+  description: 'Open a container under the cursor or at coordinates.',
+  requires: { entity: true },
 
-    // If no args are specified open the container at the bot's cursor
-    if(args.length === 0) {
-      let block = bot.blockAtCursor(3.5);
-      if(!isContainer(block)) return sender.reply('[openContainer] The target block is not a container.');
-      return await bot.openContainer(block);
-    }
-
-    if(args.length === 3) {
-      let [x, y, z] = args;
-      let errors = parseVec(x, y, z);
-      if(errors.length) return sender.reply(`[openContainer] There was an error parsing values: ${errors.join(', ')}`)
-
-      let targetVec = v(x, y, z);
-      if(!isContainer(bot.blockAt(targetVec))) return sender.reply(`[openContainer] The block at "${Object.values(targetVec).join(', ')}" is not a container.`)
-      if(bot.entity.position.distanceTo(targetVec) < 4) {
-        await bot.lookAt(targetVec);
-        return await bot.openContainer(bot.blockAt(targetVec))
+  async execute(sender, command, args) {
+    let block;
+    if (!args.length) {
+      block = bot.blockAtCursor(4.5);
+    } else if (args.length === 3) {
+      const coordinates = args.map(Number);
+      if (coordinates.some((value) => !Number.isFinite(value))) return sender.reply('[OpenContainer] Coordinates must be numbers.');
+      const position = new Vec3(...coordinates.map(Math.trunc));
+      block = bot.blockAt(position);
+      if (block && bot.entity.position.distanceTo(position) >= 4) {
+        await bot.pathfinder.goto(new GoalLookAtBlock(position, bot.world));
+        block = bot.blockAt(position);
       }
-
-      // The chest is a distance away, go to it
-      await bot.pathfinder.goto(new GoalLookAtBlock(targetVec, bot.world));
-      await bot.openContainer(bot.blockAt(targetVec))
-
+    } else {
+      return sender.reply(`[OpenContainer] Usage: ${this.usage}`);
     }
-
-    function parseVec(x, y, z) {
-      let pos = v(x, y, z);
-      let errors = [];
-      if(isNaN(x)) errors.push(`"X: ${x}"`);
-      if(isNaN(y)) errors.push(`"Y: ${y}"`);
-      if(isNaN(z)) errors.push(`"Z: ${z}"`);
-      return errors;
-    }
-
+    if (!isContainer(block)) return sender.reply('[OpenContainer] The target block is not a supported container.');
+    await bot.openContainer(block);
+    return sender.reply(`[OpenContainer] Opened ${block.displayName || block.name}.`);
   }
-}
+};

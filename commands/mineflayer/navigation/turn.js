@@ -13,7 +13,8 @@ module.exports = {
     const degrees_to_radians = deg => (deg * Math.PI) / 180.0;
 
     let target = args[0].toLowerCase();
-    let force = args[1] || false;
+    if (args[1] !== undefined && !['true', 'false'].includes(args[1].toLowerCase())) return sender.reply('[Turn] Force must be true or false.');
+    const force = args[1]?.toLowerCase() === 'true';
 
     let cardinal_to_degree = [{
       terms: ['n', 'north'],

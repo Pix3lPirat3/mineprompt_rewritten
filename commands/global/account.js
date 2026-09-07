@@ -1,47 +1,39 @@
-let stringTable = require('string-table')
+'use strict';
 
 module.exports = {
   command: 'account',
-  usage: 'account <add/remove> [username] [authentication (true/false)]',
-  description: 'Add an account',
-  author: 'Pix3lPirat3',
-  requires: {
-    console: true
-  },
-  execute: async function(sender, command, args) {
+  aliases: ['accounts'],
+  usage: 'account <add|remove|list> [username] [microsoft|offline]',
+  description: 'Manage saved account profiles.',
+  requires: { console: true },
 
-    if(!args.length) return console.log(`[Account] Invalid Usage: ${this.usage}`);
+  async execute(sender, command, args) {
+    const action = args[0]?.toLowerCase();
+    if (!action) return sender.reply(`[Account] Usage: ${this.usage}`);
 
-    let username = args[1];
-
-    if(args[0] === 'add') {
-      if(args.length < 3) return console.log(`[Account] You must specify a [[bu;indianred;]username] and [[bu;indianred;]authentication]`);
-
-      // You'd think that converting a string bool to a bool bool would be easier
-      const a = args[2];
-	    let authentication = "bad option";
-	    if (a === "true") authentication = true;
-	    if (a === "false") authentication = false;
-      
-      if(typeof authentication !== 'boolean') return console.log(`[Account] Type of authentication must be [[bu;indianred;]true] or [[bu;indianred;]false]`);
-
-      // Check if the account already exists
-      let accountExists = await database.getAccount(username);
-      if(accountExists) return console.log(`[Account] Unable to create account, account "${username}" already exists.`)
-
-      // Add Account
-      console.log('authentication:', authentication)
-      return database.addAccount(username, authentication)
+    if (action === 'list') {
+      const accounts = await database.getAccounts();
+      if (!accounts.length) return sender.reply('[Account] No profiles are saved.');
+      return sender.reply(accounts.map((account) => `• ${account.username} (${account.authentication ? 'microsoft' : 'offline'})`).join('\n'));
     }
 
-    if(args[0] === 'remove') {
-      if(args.length === 1) return console.log(`[Account] You must specify an account to remove.`);
-      let accountExists = await database.getAccount(username);
-      if(!accountExists) return console.log(`[Account] Unable to delete account, account "${username}" does not exist.`);
-      console.log(`[Account] Deleted the account "${username}"`)
-      return database.removeAccount(username);
+    const username = args[1]?.trim();
+    if (!username) return sender.reply(`[Account] A username is required. Usage: ${this.usage}`);
+
+    if (action === 'add') {
+      const mode = args[2]?.toLowerCase();
+      if (!['microsoft', 'offline', 'true', 'false'].includes(mode)) {
+        return sender.reply('[Account] Authentication must be "microsoft" or "offline".');
+      }
+      const added = await database.addAccount(username, mode === 'microsoft' || mode === 'true');
+      return sender.reply(added ? `[Account] Saved ${username}.` : `[Account] ${username} is already saved.`);
     }
 
-    return console.log(`[${this.command}] ${this.usage}`)
+    if (action === 'remove') {
+      const removed = await database.removeAccount(username);
+      return sender.reply(removed ? `[Account] Removed ${username}.` : `[Account] ${username} was not found.`);
+    }
+
+    return sender.reply(`[Account] Unknown action "${action}". Usage: ${this.usage}`);
   }
-}
+};

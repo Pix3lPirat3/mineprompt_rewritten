@@ -1,13 +1,14 @@
+'use strict';
+
 module.exports = {
   command: 'disconnect',
+  aliases: ['quit'],
   usage: 'disconnect',
-  description: 'Gracefully disconnect from the server.',
-  requires: {
-    entity: true
-  },
-  execute: function(sender, command, args) {
-    sender.reply('[Quit] Now exiting the server..')
-    bot.end();
-    bot = null; // If the bot crashes then I can't wait for the end event..
+  description: 'Gracefully disconnect from the current server.',
+  requires: { entity: true },
+
+  async execute(sender) {
+    sender.reply('[Connection] Disconnecting…');
+    await mineflayer.disconnect();
   }
-}
+};

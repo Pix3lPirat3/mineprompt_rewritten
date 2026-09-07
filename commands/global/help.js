@@ -1,37 +1,35 @@
-let stringTable = require('string-table')
+'use strict';
+
+const { createTextTable } = require('../../src/main/text-table');
 
 module.exports = {
   command: 'help',
   usage: 'help [command]',
-  description: 'Shows the help menu.',
-  author: 'Pix3lPirat3',
-  requires: {
-    console: true
-  },
-  autocomplete: function(command, args) {
-    // Return an Array of commands and aliases
-    return Object.values(commander.commands).map(c => [c.command, c.aliases]).flat(2).filter(e => e !== undefined);
-  },
-  execute: function(sender, command, args) {
-    if(sender.type === 'player') return sender.reply(i18n.__('commands.help.console_only'));
-    let targetCommand = args[0]?.toLowerCase();
-    // Show specific command info
-    if (targetCommand) {
-      let command = commander.commands_array.find(cmd => cmd.command === targetCommand || cmd?.aliases?.includes(targetCommand));
-      if (!command) return sender.reply(i18n.__('commands.help.unknown_command'))
-      return sender.reply(i18n.__('commands.help.command', { command: command }))
+  description: 'Show available commands or details for one command.',
+  requires: { console: true },
+  autocomplete: () => commander.commands_array.flatMap((entry) => [entry.command, ...(entry.aliases || [])]),
+
+  execute(sender, command, args) {
+    const requested = args[0];
+    if (requested) {
+      const target = commander.getCommand(requested);
+      if (!target) return sender.reply(`[Help] No command matches "${requested}".`);
+      return sender.reply([
+        `${target.command}${target.aliases?.length ? ` (${target.aliases.join(', ')})` : ''}`,
+        target.description || 'No description available.',
+        `Usage: ${target.usage || target.command}`,
+        `Connection required: ${target.requires?.entity ? 'yes' : 'no'}`,
+        `Terminal only: ${target.requires?.console ? 'yes' : 'no'}`
+      ].join('\n'));
     }
 
-    // System/Console Commands, Player Commands
-
-    let max_usage_length = 60;
-
-    let system_commands = commander.commands_array.filter(cmd => !cmd.requires?.entity).map(cmd => ({ command: cmd.command, usage: cmd.usage?.substring(0, max_usage_length), description: cmd.description || 'This command does not have a description..' })).sort((a, b) => a.command.localeCompare(b.command))
-    sender.reply(i18n.__('commands.help.system_commands', { table: stringTable.create(system_commands) }))
-    
-    let player_commands = commander.commands_array.filter(cmd => cmd.requires?.entity).map(cmd => ({ command: cmd.command, usage: cmd.usage?.substring(0, max_usage_length), description: cmd.description || 'This command does not have a description..' })).sort((a, b) => a.command.localeCompare(b.command))
-    sender.reply(i18n.__('commands.help.player_commands', { table: stringTable.create(player_commands) }))
-
-    sender.reply(`> Get a specific command's details by running "help <command>"`)
+    const rows = commander.commands_array
+      .map((entry) => ({
+        command: entry.command,
+        usage: entry.usage || entry.command,
+        description: entry.description || ''
+      }))
+      .sort((a, b) => a.command.localeCompare(b.command));
+    sender.reply(`${createTextTable(rows)}\n\nUse "help <command>" for details.`);
   }
-}
+};

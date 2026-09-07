@@ -8,9 +8,9 @@ module.exports = {
   author: 'Pix3lPirat3',
   autocomplete: () => Object.keys(bot.players),
   execute: function(sender, command, args) {
-    if(!args[0]) return sender.reply(`[Ping] Your ping is ${bot.players[bot.username].ping}`);
-    let target = bot.players[args[0]];
-    if(!target) return sender.reply(`[Ping] The player ${args[0]} is not online.`);
-    return sender.reply(`[Ping] ${target.username}'s ping is ${target.ping}`)
+    const requested = args[0] || bot.username;
+    const target = Object.values(bot.players).find((player) => player.username?.toLowerCase() === requested.toLowerCase());
+    if (!target) return sender.reply(`[Ping] ${requested} is not in the tab list.`);
+    return sender.reply(`[Ping] ${target.username}: ${target.ping} ms.`)
   }
 }

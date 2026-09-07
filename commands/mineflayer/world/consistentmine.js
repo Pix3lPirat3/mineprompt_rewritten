@@ -1,65 +1,59 @@
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+'use strict';
+
+const state = { running: false, timer: null };
+
+function stop() {
+  state.running = false;
+  if (state.timer) clearTimeout(state.timer);
+  state.timer = null;
+}
+
+function remainingDurability(item) {
+  const maximum = bot.registry.itemsByName[item.name]?.maxDurability;
+  if (!maximum) return Number.POSITIVE_INFINITY;
+  const damage = bot.registry.version['<']('1.13')
+    ? item.metadata || 0
+    : item.nbt?.value?.Damage?.value || 0;
+  return maximum - damage;
+}
 
 module.exports = {
   command: 'consistentmine',
-  usage: 'consistentmine <start/stop>',
-  description: 'Consistently mine in one location.',
-  requires: {
-    entity: true
-  },
-  reload: {
-    isDigging: false,
-    pre: function() {
-      this.isDigging = false;
-    }
-  },
+  usage: 'consistentmine <start|stop>',
+  description: 'Repeatedly mine the block under the cursor while preserving tools.',
+  requires: { entity: true },
   autocomplete: () => ['start', 'stop'],
-  author: 'Pix3lPirat3',
-  execute: function(sender, command, args) {
+  reload: { pre: stop },
 
-    function getRemainingDurability(item) {
-      let durabilityMax = bot.registry.itemsByName[item.name].maxDurability
-
-      // 1.12 and below does not have nbt.Damage, use bot.heldItem.metadata
-      let durabilityUsed = bot.registry.version['<']('1.13') ? bot.heldItem.metadata : item.nbt.value.Damage.value;
-      return durabilityMax - durabilityUsed;
+  execute(sender, command, args) {
+    const action = args[0]?.toLowerCase();
+    if (action === 'stop') {
+      stop();
+      return sender.reply('[ConsistentMine] Stopped.');
     }
+    if (action !== 'start') return sender.reply(`[ConsistentMine] Usage: ${this.usage}`);
+    if (state.running) return sender.reply('[ConsistentMine] Already running.');
 
-    // TODO: Flag to not break tool - to switch tools before/after breaking - for whitelist/blacklist
-
-    let reloader = this.reload;
-    if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`);
-
-    if(args[0] === 'start') {
-      if(reloader.isDigging) return sender.reply(`[${this.command}] You must first stop the miner.`);
-      sender.reply(`[${this.command}] Now running a consistentminer`)
-      reloader.isDigging = true;
-      dig();
-    }
-
-    if(args[0] === 'stop') return reloader.isDigging = false;
-
-    async function dig() {
-        if (!reloader.isDigging) return
+    state.running = true;
+    sender.reply('[ConsistentMine] Started. Tools with 10 or fewer durability points will not be used.');
+    const tick = async () => {
+      if (!state.running || !bot?.entity) return stop();
+      try {
         const block = bot.blockAtCursor(4);
-        if (!block) {
-            await sleep(100);
-        } else {
-
-          var safePickaxes = bot.inventory.items().filter(i => i.name.includes('pickaxe') && getRemainingDurability(i) > 10);
-          if(!safePickaxes.length) return; // Stop the process, there are no more SAFE pickaxes
-
-          if(!safePickaxes.includes(bot.heldItem)) {
-            await bot.equip(safePickaxes[0])
+        if (block) {
+          const pickaxe = bot.inventory.items().find((item) => item.name.includes('pickaxe') && remainingDurability(item) > 10);
+          if (!pickaxe) {
+            stop();
+            return sender.reply('[ConsistentMine] Stopped because no safe pickaxe is available.');
           }
-
-          await bot.dig(block, "ignore", "raycast");
+          if (bot.heldItem?.slot !== pickaxe.slot) await bot.equip(pickaxe, 'hand');
+          await bot.dig(block, 'ignore', 'raycast');
         }
-        
-        dig()
-    }
-
-
-
+      } catch (error) {
+        console.warn(`[ConsistentMine] ${error.message}`);
+      }
+      if (state.running) state.timer = setTimeout(tick, 100);
+    };
+    state.timer = setTimeout(tick, 0);
   }
-}
+};

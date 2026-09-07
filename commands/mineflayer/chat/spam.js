@@ -1,80 +1,55 @@
+'use strict';
+
+const timers = new Map();
+let nextId = 1;
+
+function clearAll() {
+  for (const timer of timers.values()) clearInterval(timer.handle);
+  timers.clear();
+}
+
 module.exports = {
   command: 'spam',
-  usage: 'spam list || start <interval {2500ms}> <message> || stop [id {all}]',
   aliases: ['repeat'],
-  description: 'Send a message or a command to the server.',
-  requires: {
-    entity: true
-  },
-  reload: {
-    timers: [],
-    pre: function() {
-      if(this.timers.length) console.log(`[Reload] [Spam] Unloading the spam timers (${this.timers})`)
-      for (const timer of this.timers) {
-        console.log(timer)
-        clearInterval(timer.timer)
+  usage: 'spam list | spam start <interval-ms> <message> | spam stop [id|all]',
+  description: 'Repeat a chat message at a controlled interval.',
+  requires: { entity: true, console: true },
+  autocomplete: () => ['list', 'start', 'stop', 'all'],
+  reload: { pre: clearAll },
+
+  execute(sender, command, args) {
+    const action = args[0]?.toLowerCase();
+    if (!action) return sender.reply(`[Spam] Usage: ${this.usage}`);
+    if (action === 'list') {
+      if (!timers.size) return sender.reply('[Spam] No repeaters are running.');
+      return sender.reply([...timers.entries()].map(([id, timer]) => `${id}. every ${timer.delay} ms — ${timer.message}`).join('\n'));
+    }
+    if (action === 'start') {
+      const delay = Number(args[1]);
+      const message = args.slice(2).join(' ').trim();
+      if (!Number.isInteger(delay) || delay < 1000 || delay > 3600000) return sender.reply('[Spam] Interval must be an integer from 1000 to 3600000 ms.');
+      if (!message || message.length > 256) return sender.reply('[Spam] Message must contain 1 to 256 characters.');
+      const id = nextId++;
+      const handle = setInterval(() => {
+        if (!bot?.entity) return clearAll();
+        bot.chat(message);
+      }, delay);
+      timers.set(id, { handle, delay, message });
+      return sender.reply(`[Spam] Started repeater ${id}.`);
+    }
+    if (action === 'stop') {
+      const target = args[1]?.toLowerCase() || 'all';
+      if (target === 'all') {
+        clearAll();
+        return sender.reply('[Spam] Stopped all repeaters.');
       }
-      this.timers = []
-    },
-    post: function() {
-
+      const id = Number(target);
+      const timer = timers.get(id);
+      if (!timer) return sender.reply(`[Spam] Repeater ${target} was not found.`);
+      clearInterval(timer.handle);
+      timers.delete(id);
+      return sender.reply(`[Spam] Stopped repeater ${id}.`);
     }
-  },
-  author: 'Pix3lPirat3',
-  execute: function(sender, command, args) {
-    if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`)
-
-    if (!this.reload.timers) {
-      this.reload.timers = []
-    }
-
-    if (args[0] === 'list') {
-      for (const timer of this.reload.timers) {
-        console.log(`[Timer] ID: ${timer.timer} Delay: ${timer.delay} Message: ${timer.message}`)
-      }
-    }
-
-    if (args[0] === 'start') {
-      if(args.length < 2) return sender.reply(`[${this.command}] ${this.usage}`)
-      const delay = parseInt(args[1]) || 2500
-      const message = args.slice(2).join(' ')
-      if (message.length > 256) return sender.reply(`[Send] Your message was bigger than 256 characters.`)
-      const timer = startTimer(delay, message)
-      this.reload.timers.push(timer)
-      console.log(`[Timer] Created new timer with ID ${timer.timer}`)
-    }
-
-    if (args[0] === 'stop') {
-      if (!args[1]) {
-        for (const timer of this.reload.timers) {
-          clearInterval(timer.timer)
-        }
-        console.log('[Timer] Cleared all timers')
-      } else {
-        for (const i in this.reload.timers) {
-          if ((this.reload.timers[i].timer.toString()) == args[1]) {
-            clearInterval(this.reload.timers[i].timer)
-            this.reload.timers.splice(i, 1)
-            console.log(`[Timer] Cleared timer with ID ${args[1]}`)
-            return
-          }
-        }
-        console.log(`[Timer] No timer found with ID ${args[1]}`)
-        return
-      }
-    }
-
-    function startTimer (delay, message) {
-      const timer = setInterval(function() {
-        bot.chat(message)
-      }, delay)
-
-      const data = {
-        timer: timer,
-        delay: delay,
-        message: message
-      }
-      return data
-    }
+    return sender.reply(`[Spam] Usage: ${this.usage}`);
   }
-}
+};

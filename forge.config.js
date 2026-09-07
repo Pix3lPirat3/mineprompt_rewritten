@@ -1,19 +1,36 @@
 module.exports = {
   packagerConfig: {
     asar: true,
-    icon: "src/icons/win/computer",
-    ignore: ["^/cache/", "/mineprompt", "/generate-embed.js", ".tmp", ".todo", "/commands/mineflayer/customs", "/forge.config.js"],
-  },
-  rebuildConfig: {
-    mode: 'parallel' // If this even works in Windows
+    executableName: 'MinePrompt',
+    icon: 'src/icons/win/computer',
+    ignore: [
+      '^/\\.git/',
+      '^/test/',
+      '^/commands/mineflayer/(customs|incomplete)/',
+      '\\.todo$'
+    ]
   },
   rebuildConfig: {},
-  makers: [{
-    name: '@electron-forge/maker-squirrel',
-    config: {
-      loadingGif: 'src/gif/dolphin.gif', // a gif installer file
-      // The ICO file to use as the icon for the generated Setup.exe
-      //setupIcon: '/src/icons/win/computer.ico',
+  makers: [
+    {
+      name: '@electron-forge/maker-squirrel',
+      config: {
+        name: 'MinePrompt',
+        setupIcon: 'src/icons/win/computer.ico',
+        loadingGif: 'src/gif/dolphin.gif'
+      }
+    },
+    {
+      name: '@electron-forge/maker-zip',
+      platforms: ['darwin', 'win32']
+    },
+    {
+      name: '@electron-forge/maker-deb',
+      config: {}
+    },
+    {
+      name: '@electron-forge/maker-rpm',
+      config: {}
     }
-  }]
+  ]
 };
