@@ -1,5 +1,8 @@
 'use strict';
 
+const path = require('node:path');
+const minecraftFolderPath = require('minecraft-folder-path');
+
 function enabled(value) {
   if (value === 'enable' || value === 'enabled' || value === 'true') return true;
   if (value === 'disable' || value === 'disabled' || value === 'false') return false;
@@ -9,10 +12,10 @@ function enabled(value) {
 module.exports = {
   command: 'settings',
   aliases: ['config'],
-  usage: 'settings [resource-packs accept|deny | remote-commands enable|disable | remote-player list|add|remove <name>]',
+  usage: 'settings [paths | resource-packs accept|deny | remote-commands enable|disable | remote-player list|add|remove <name>]',
   description: 'Review or change MinePrompt security preferences.',
   requires: { console: true },
-  autocomplete: () => ['resource-packs', 'remote-commands', 'remote-player', 'accept', 'deny', 'enable', 'disable', 'list', 'add', 'remove'],
+  autocomplete: () => ['paths', 'resource-packs', 'remote-commands', 'remote-player', 'accept', 'deny', 'enable', 'disable', 'list', 'add', 'remove'],
 
   async execute(sender, command, args) {
     const resourcePacks = await database.getSetting('resourcePackPolicy') || 'deny';
@@ -28,6 +31,16 @@ module.exports = {
     }
 
     const section = args[0].toLowerCase();
+    if (section === 'paths') {
+      const applicationData = path.dirname(database.filePath);
+      return sender.reply([
+        '[Paths]',
+        `Application data: ${applicationData}`,
+        `Private commands: ${path.join(applicationData, 'commands')}`,
+        `Authentication cache: ${path.join(minecraftFolderPath, 'mineprompt-cache')}`
+      ].join('\n'));
+    }
+
     if (section === 'resource-packs') {
       const policy = args[1]?.toLowerCase();
       if (!['accept', 'deny'].includes(policy)) return sender.reply('[Settings] Resource packs must be "accept" or "deny".');

@@ -23,6 +23,7 @@ class ApplicationRuntime {
     });
     this.commands = new CommandRegistry({
       rootPath,
+      privateCommandsPath: path.join(userDataPath, 'commands'),
       logger: this.logger,
       getBot: () => this.client.bot,
       getClient: () => this.client

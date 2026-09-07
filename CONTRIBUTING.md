@@ -38,6 +38,8 @@ Existing commands can access the compatibility globals `bot`, `database`, `minef
 
 Commands must validate numeric bounds and enums before calling mineflayer. Any repeating task must expose a `reload.pre` function that clears its timers or stops its work.
 
+Server-specific commands and test credentials do not belong in the repository. Keep private command modules in the per-user application-data `commands` directory and keep connection details in local environment configuration.
+
 ## Commit style
 
 Prefer small, descriptive commits written in the imperative mood, such as `Harden external link handling` or `Validate navigation coordinates`.

@@ -4,8 +4,6 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { parseCommandLine } = require('./command-line');
 
-const EXCLUDED_DIRECTORIES = new Set(['customs', 'incomplete']);
-
 function collectJavaScriptFiles(directory) {
   if (!fs.existsSync(directory)) return [];
   return fs.readdirSync(directory, { withFileTypes: true })
@@ -14,7 +12,7 @@ function collectJavaScriptFiles(directory) {
       if (entry.name.startsWith('.')) return [];
       const fullPath = path.join(directory, entry.name);
       if (entry.isDirectory()) {
-        return EXCLUDED_DIRECTORIES.has(entry.name) ? [] : collectJavaScriptFiles(fullPath);
+        return collectJavaScriptFiles(fullPath);
       }
       return entry.isFile() && entry.name.endsWith('.js') ? [fullPath] : [];
     });
@@ -37,8 +35,9 @@ function levenshtein(left, right) {
 }
 
 class CommandRegistry {
-  constructor({ rootPath, logger, getBot, getClient }) {
+  constructor({ rootPath, privateCommandsPath, logger, getBot, getClient }) {
     this.rootPath = rootPath;
+    this.privateCommandsPath = privateCommandsPath;
     this.logger = logger;
     this.getBot = getBot;
     this.getClient = getClient;
@@ -54,7 +53,9 @@ class CommandRegistry {
   setCommands(type = 'global') {
     this.type = type;
     const directories = [path.join(this.rootPath, 'commands', 'global')];
+    if (this.privateCommandsPath) directories.push(path.join(this.privateCommandsPath, 'global'));
     if (type !== 'global') directories.push(path.join(this.rootPath, 'commands', type));
+    if (type !== 'global' && this.privateCommandsPath) directories.push(path.join(this.privateCommandsPath, type));
     const files = directories.flatMap(collectJavaScriptFiles);
     const commands = Object.create(null);
     const aliases = new Set();

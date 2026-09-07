@@ -52,7 +52,7 @@ async function openExternal(url) {
     const target = new URL(url);
     if (ALLOWED_EXTERNAL_PROTOCOLS.has(target.protocol)) await shell.openExternal(target.href);
   } catch {
-    // Malformed and unsupported links are intentionally ignored.
+    return;
   }
 }
 

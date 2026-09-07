@@ -110,9 +110,11 @@ The store contains authentication mode, not account passwords. Login and registr
 
 ## Command extensions
 
-Commands are CommonJS modules inside `commands/global` or `commands/mineflayer`. Use `commands/mineflayer/template.js` as the starting point, then press <kbd>Ctrl</kbd>+<kbd>R</kbd> while the app is running to reload command modules.
+Public commands are CommonJS modules inside `commands/global` or `commands/mineflayer`. Use `commands/mineflayer/template.js` as the starting point, then press <kbd>Ctrl</kbd>+<kbd>R</kbd> while the app is running to reload command modules.
 
-The directories `commands/mineflayer/customs` and `commands/mineflayer/incomplete` are intentionally excluded from runtime and packaged builds.
+Private commands can live beside `mineprompt.json` in the application-data directory under `commands/global` or `commands/mineflayer`. They are loaded from the local machine at runtime and are never included in packaged builds or this repository. This is the appropriate location for server-specific diagnostics and private test commands.
+
+Run `settings paths` to print the exact private command and application-data locations for the current system.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the command contract and project checks.
 

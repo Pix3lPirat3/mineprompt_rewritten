@@ -6,7 +6,6 @@ module.exports = {
     ignore: [
       '^/\\.git/',
       '^/test/',
-      '^/commands/mineflayer/(customs|incomplete)/',
       '\\.todo$'
     ]
   },

@@ -10,7 +10,6 @@ module.exports = {
     if(!args.length) interface.anonymous.toggle();
 
     if(args.length === 1) {
-      // The string is not a boolean value
       interface.anonymous.enable(args[0]);
     }
 

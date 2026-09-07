@@ -42,7 +42,7 @@ module.exports = {
       degrees: -315
     }]
 
-    let cardinals = ['n', 'north', 'ne', 'northeast', 'e', 'east', 'se', 'southeast', 's', 'south', 'sw', 'southwest', 'w', 'west', 'nw', 'northwest']; // Programatically: cardinal_to_degree.map(obj => obj.terms).flat();
+    let cardinals = ['n', 'north', 'ne', 'northeast', 'e', 'east', 'se', 'southeast', 's', 'south', 'sw', 'southwest', 'w', 'west', 'nw', 'northwest'];
     if(!cardinals.includes(target)) return sender.reply(`[${this.command}] ${target} is not a cardinal direction (${cardinals.join(', ')})`);
 
     let target_degrees = degrees_to_radians(cardinal_to_degree.find(deg => deg.terms.includes(target)).degrees);
