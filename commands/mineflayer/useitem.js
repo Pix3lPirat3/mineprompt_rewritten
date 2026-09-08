@@ -3,17 +3,16 @@
 module.exports = {
   command: 'useitem',
   aliases: ['activateitem'],
-  usage: 'useitem [mainhand|offhand]',
-  description: 'Use the item in the selected hand.',
+  usage: 'useitem [item|slot|mainhand|offhand]',
+  description: 'Use a held or carried item. This is a shortcut for inventory use.',
   requires: { entity: true },
-  autocomplete: () => ['mainhand', 'offhand'],
+  autocomplete: (command, args, { inventory }) => ['mainhand', 'offhand', ...inventory.selectors('inventory')],
 
-  execute(sender, command, args, { bot }) {
-    if (args.length > 1 || (args[0] && !['mainhand', 'offhand'].includes(args[0].toLowerCase()))) {
-      return sender.reply(`[UseItem] Usage: ${this.usage}`);
-    }
-    const offhand = args[0]?.toLowerCase() === 'offhand';
-    bot.activateItem(offhand);
-    return sender.reply(`[UseItem] Activated the ${offhand ? 'off hand' : 'main hand'}.`);
+  async execute(sender, command, args, { inventory }) {
+    if (args.length > 1) return sender.reply(`[UseItem] Usage: ${this.usage}`);
+    const hand = ['mainhand', 'offhand'].includes(args[0]?.toLowerCase()) ? args[0] : 'mainhand';
+    const target = hand === args[0]?.toLowerCase() ? undefined : args[0];
+    const result = await inventory.execute({ scope: 'inventory', action: 'use', target, hand });
+    return sender.reply(result.message);
   }
 };

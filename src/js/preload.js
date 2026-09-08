@@ -11,6 +11,7 @@ contextBridge.exposeInMainWorld('mineprompt', Object.freeze({
   disconnect: () => ipcRenderer.invoke('mineprompt:disconnect'),
   complete: (input) => ipcRenderer.invoke('mineprompt:complete', input),
   reloadCommands: () => ipcRenderer.invoke('mineprompt:reload-commands'),
+  inventoryAction: (request) => ipcRenderer.invoke('mineprompt:inventory-action', request),
   saveProfile: (profile) => ipcRenderer.invoke('mineprompt:save-profile', profile),
   removeProfile: (username) => ipcRenderer.invoke('mineprompt:remove-profile', username),
   saveServer: (profile) => ipcRenderer.invoke('mineprompt:save-server', profile),

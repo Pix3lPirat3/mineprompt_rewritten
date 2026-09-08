@@ -203,7 +203,10 @@ class CommandRegistry {
       const command = this.getCommand(name);
       const context = this.getContext();
       if (!command?.autocomplete || (command.requires?.entity && !context.bot?.entity)) return [];
-      const values = await command.autocomplete(name, args, context);
+      const values = await command.autocomplete(name, args, context, {
+        input: raw,
+        trailingSpace: /\s$/u.test(raw)
+      });
       return Array.isArray(values) ? [...new Set(values.map(String))].slice(0, 250) : [];
     } catch {
       return [];

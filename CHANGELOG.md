@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Added shared terminal and context-menu inventory controls.
 - Fixed clean installs with npm 10 and refreshed CI actions.
 - Added saved server profiles, a command library, and live session panels.
 - Added automatic reconnect controls and clearer connection states.

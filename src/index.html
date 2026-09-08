@@ -85,7 +85,10 @@
               <p id="inventory-empty" class="inspector__empty">Inventory is empty.</p>
             </section>
             <section class="inspector__section">
-              <h2>Open container</h2>
+              <div class="inspector__heading">
+                <h2>Open container</h2>
+                <button id="container-actions" class="inspector__menu-button" type="button" hidden>Actions</button>
+              </div>
               <div id="session-container" class="inspector__list"></div>
               <p id="container-empty" class="inspector__empty">No container is open.</p>
             </section>
@@ -111,6 +114,8 @@
         </footer>
       </section>
     </main>
+
+    <div id="item-context-menu" class="context-menu" role="menu" aria-label="Item actions" hidden></div>
 
     <dialog id="profile-dialog" class="dialog">
       <form id="profile-form" class="dialog__form">
@@ -337,6 +342,22 @@
         <div id="command-list" class="command-list"></div>
         <p id="command-empty" class="inspector__empty">No commands match this search.</p>
       </div>
+    </dialog>
+
+    <dialog id="action-confirm-dialog" class="dialog confirm-dialog">
+      <form method="dialog" class="dialog__form">
+        <header class="dialog__header">
+          <div>
+            <span class="dialog__eyebrow">Confirm action</span>
+            <h2>Continue?</h2>
+          </div>
+        </header>
+        <p id="action-confirm-message" class="confirm-dialog__message"></p>
+        <footer class="dialog__actions">
+          <button class="secondary-button" type="submit" value="cancel">Cancel</button>
+          <button class="danger-button" type="submit" value="confirm">Confirm</button>
+        </footer>
+      </form>
     </dialog>
 
     <script src="../node_modules/jquery/dist/jquery.min.js"></script>
