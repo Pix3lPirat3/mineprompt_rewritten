@@ -8,7 +8,7 @@ module.exports = {
   requires: { entity: true },
   autocomplete: () => ['left', 'right'],
 
-  execute(sender, command, args) {
+  execute(sender, command, args, { bot }) {
     const hand = args[0]?.toLowerCase();
     if (!['left', 'right'].includes(hand) || args.length !== 1) return sender.reply(`[Animation] Usage: ${this.usage}`);
     bot.swingArm(hand, true);

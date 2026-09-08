@@ -6,7 +6,7 @@ module.exports = {
   description: 'Jump once.',
   requires: { entity: true },
 
-  async execute(sender, command, args) {
+  async execute(sender, command, args, { bot }) {
     if (args.length) return sender.reply(`[Jump] Usage: ${this.usage}`);
     bot.setControlState('jump', true);
     try {

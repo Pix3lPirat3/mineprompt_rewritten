@@ -7,24 +7,24 @@ module.exports = {
   requires: { console: true },
   autocomplete: () => ['on', 'off', 'toggle'],
 
-  execute(sender, command, args) {
+  execute(sender, command, args, { interfaceState }) {
     const action = args[0]?.toLowerCase() || 'toggle';
     if (action === 'toggle') {
       if (args.length > 1) return sender.reply(`[Privacy] Usage: ${this.usage}`);
-      globalThis.interface.anonymous.toggle();
+      interfaceState.anonymous.toggle();
       return;
     }
     if (action === 'on' || action === 'enable') {
-      globalThis.interface.anonymous.enable(args.slice(1).join(' ') || undefined);
+      interfaceState.anonymous.enable(args.slice(1).join(' ') || undefined);
       return;
     }
     if (action === 'off' || action === 'disable') {
       if (args.length > 1) return sender.reply(`[Privacy] Usage: ${this.usage}`);
-      globalThis.interface.anonymous.disable();
+      interfaceState.anonymous.disable();
       return;
     }
     if (args.length === 1) {
-      globalThis.interface.anonymous.enable(args[0]);
+      interfaceState.anonymous.enable(args[0]);
       return;
     }
     return sender.reply(`[Privacy] Usage: ${this.usage}`);

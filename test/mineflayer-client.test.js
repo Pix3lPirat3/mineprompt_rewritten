@@ -31,6 +31,7 @@ function fixture(settings = {}) {
       origin.reply('completed');
     }
   };
+  const activities = { stopAll() {} };
   class FakeMovements {
     constructor(bot) {
       this.bot = bot;
@@ -84,6 +85,7 @@ function fixture(settings = {}) {
     interfaceState,
     store,
     getCommands: () => registry,
+    activities,
     createBotImpl: (options) => {
       bot = new FakeBot(options);
       return bot;

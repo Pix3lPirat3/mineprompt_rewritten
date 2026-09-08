@@ -38,6 +38,7 @@ const elements = {
   settingsExternalHeads: document.querySelector('#settings-external-heads'),
   settingsRemoteEnabled: document.querySelector('#settings-remote-enabled'),
   settingsRemotePlayers: document.querySelector('#settings-remote-players'),
+  clearHistory: document.querySelector('#clear-history'),
   settingsError: document.querySelector('#settings-error')
 };
 
@@ -58,11 +59,6 @@ function playerHead(username) {
   return username && snapshot.preferences?.externalPlayerHeadsEnabled
     ? `https://mc-heads.net/head/${encodeURIComponent(username)}/nohelm`
     : assetPath('heads', 'wood_question.png');
-}
-
-function quote(value) {
-  const text = String(value);
-  return /^[\w.@:/-]+$/u.test(text) ? text : `"${text.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
 }
 
 function errorMessage(error) {
@@ -260,17 +256,15 @@ async function removeProfile() {
 async function submitConnection(event) {
   event.preventDefault();
   setError(elements.connectError);
-  const command = [
-    'connect',
-    '--username', quote(elements.connectUsername.value.trim()),
-    '--auth', elements.connectAuth.value,
-    '--host', quote(elements.connectHost.value.trim()),
-    '--port', elements.connectPort.value
-  ];
-  if (elements.connectVersion.value.trim()) command.push('--version', quote(elements.connectVersion.value.trim()));
-  if (elements.connectFakeHost.value.trim()) command.push('--fake-host', quote(elements.connectFakeHost.value.trim()));
   try {
-    const result = await window.mineprompt.execute(command.join(' '));
+    const result = await window.mineprompt.connect({
+      username: elements.connectUsername.value,
+      auth: elements.connectAuth.value,
+      host: elements.connectHost.value,
+      port: elements.connectPort.value,
+      version: elements.connectVersion.value,
+      fakeHost: elements.connectFakeHost.value
+    });
     if (!result?.ok) throw new Error(result?.error || 'The connection could not be started.');
     closeDialog(elements.connectDialog);
   } catch (error) {
@@ -303,6 +297,7 @@ async function initialize() {
     prompt: 'mineprompt > ',
     greetings: false,
     historySize: 500,
+    historyFilter: globalThis.minepromptTerminalPolicy.shouldStoreCommand,
     outputLimit: 1000,
     scrollOnEcho: true,
     checkArity: false,
@@ -319,6 +314,8 @@ async function initialize() {
     }
   });
 
+  terminal.history().set(terminal.history().data().filter(globalThis.minepromptTerminalPolicy.shouldStoreCommand));
+
   window.mineprompt.on('log', echoLog);
   window.mineprompt.on('state', renderState);
   window.mineprompt.on('snapshot', renderSnapshot);
@@ -334,6 +331,10 @@ async function initialize() {
   elements.deleteProfile.addEventListener('click', removeProfile);
   elements.connectForm.addEventListener('submit', submitConnection);
   elements.settingsForm.addEventListener('submit', submitPreferences);
+  elements.clearHistory.addEventListener('click', () => {
+    terminal.purge();
+    elements.clearHistory.textContent = 'History cleared';
+  });
   document.querySelectorAll('[data-close]').forEach((button) => {
     button.addEventListener('click', () => closeDialog(document.querySelector(`#${button.dataset.close}`)));
   });

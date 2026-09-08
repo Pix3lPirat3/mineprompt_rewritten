@@ -80,21 +80,6 @@ module.exports = [
     }
   },
   {
-    files: ['commands/**/*.js'],
-    languageOptions: {
-      globals: {
-        bot: 'readonly',
-        ChatMessage: 'readonly',
-        commander: 'readonly',
-        console: 'readonly',
-        database: 'readonly',
-        interface: 'readonly',
-        mineflayer: 'readonly',
-        term: 'readonly'
-      }
-    }
-  },
-  {
     files: ['src/js/renderer.js'],
     languageOptions: {
       sourceType: 'script',

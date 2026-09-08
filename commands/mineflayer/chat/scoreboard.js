@@ -6,7 +6,7 @@ module.exports = {
   description: 'Print all visible scoreboard lines.',
   requires: { entity: true, console: true },
 
-  execute(sender) {
+  execute(sender, command, args, { bot }) {
     const lines = Object.values(bot.scoreboard || {})
       .filter(Boolean)
       .flatMap((scoreboard) => scoreboard.items || [])

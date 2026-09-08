@@ -14,7 +14,7 @@ module.exports = {
   requires: { entity: true },
   autocomplete: () => ['on', 'off', 'toggle'],
 
-  execute(sender, command, args) {
+  execute(sender, command, args, { bot }) {
     if (args.length > 1) return sender.reply(`[Sneak] Usage: ${this.usage}`);
     try {
       const enabled = desiredState(args[0]?.toLowerCase(), bot.getControlState('sneak'));

@@ -10,7 +10,7 @@ module.exports = {
   description: 'Find and sleep in a nearby bed, or wake up.',
   requires: { entity: true },
 
-  async execute(sender, command, args) {
+  async execute(sender, command, args, { bot }) {
     if (bot.isSleeping || args[0]?.toLowerCase() === 'leave') {
       try {
         await bot.wake();

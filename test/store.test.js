@@ -22,14 +22,16 @@ test('persists accounts, settings, and bounded connection history', async (conte
   assert.equal(await store.addAccount('Alex', true), true);
   assert.equal(await store.addAccount('alex', false), false);
   await store.setSetting('resourcePackPolicy', 'deny');
-  for (let index = 0; index < 25; index += 1) await store.addConnection(`-u Alex -h server-${index}.test`);
+  for (let index = 0; index < 25; index += 1) {
+    await store.addConnection({ username: 'Alex', auth: 'offline', host: `server-${index}.test`, port: 25565, version: '', fakeHost: '' });
+  }
   await store.close();
 
   const restored = await new Store(file).init();
   assert.equal((await restored.getAccounts()).length, 1);
   assert.equal(await restored.getSetting('resourcePackPolicy'), 'deny');
   assert.equal(restored.snapshot().connections.length, 20);
-  assert.match(await restored.getConnection(), /server-24/);
+  assert.equal((await restored.getConnection()).host, 'server-24.test');
 });
 
 test('backs up malformed data instead of failing startup', async (context) => {

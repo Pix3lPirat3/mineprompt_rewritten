@@ -7,12 +7,12 @@ module.exports = {
   usage: 'help [command]',
   description: 'Show available commands or details for one command.',
   requires: { console: true },
-  autocomplete: () => commander.commands_array.flatMap((entry) => [entry.command, ...(entry.aliases || [])]),
+  autocomplete: (command, args, { commands }) => commands.commands_array.flatMap((entry) => [entry.command, ...(entry.aliases || [])]),
 
-  execute(sender, command, args) {
+  execute(sender, command, args, { commands }) {
     const requested = args[0];
     if (requested) {
-      const target = commander.getCommand(requested);
+      const target = commands.getCommand(requested);
       if (!target) return sender.reply(`[Help] No command matches "${requested}".`);
       return sender.reply([
         `${target.command}${target.aliases?.length ? ` (${target.aliases.join(', ')})` : ''}`,
@@ -23,7 +23,7 @@ module.exports = {
       ].join('\n'));
     }
 
-    const rows = commander.commands_array
+    const rows = commands.commands_array
       .map((entry) => ({
         command: entry.command,
         usage: entry.usage || entry.command,

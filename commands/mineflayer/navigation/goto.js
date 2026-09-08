@@ -13,9 +13,9 @@ module.exports = {
   usage: 'goto <player> [range] | goto <x> <y> <z> [range]',
   description: 'Navigate to a visible player or coordinates.',
   requires: { entity: true },
-  autocomplete: () => Object.keys(bot.players),
+  autocomplete: (command, args, { bot }) => Object.keys(bot.players),
 
-  async execute(sender, command, args) {
+  async execute(sender, command, args, { bot }) {
     if (args.length === 0) return sender.reply(`[Goto] Usage: ${this.usage}`);
 
     if (args.length <= 2) {

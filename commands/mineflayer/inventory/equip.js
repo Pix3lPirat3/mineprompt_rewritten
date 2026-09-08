@@ -9,9 +9,9 @@ module.exports = {
   usage: 'equip <item> [hand|head|torso|legs|feet|off-hand]',
   description: 'Equip an inventory item in the requested slot.',
   requires: { entity: true },
-  autocomplete: () => [...DESTINATIONS, ...new Set(bot.inventory.items().map((item) => item.name))],
+  autocomplete: (command, args, { bot }) => [...DESTINATIONS, ...new Set(bot.inventory.items().map((item) => item.name))],
 
-  async execute(sender, command, args) {
+  async execute(sender, command, args, { bot }) {
     if (!args[0]) return sender.reply(`[Equip] Usage: ${this.usage}`);
     const requested = args[0].toLowerCase();
     const item = bot.inventory.items().find((entry) => entry.name.toLowerCase() === requested);

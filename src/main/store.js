@@ -24,7 +24,7 @@ function cleanData(value) {
       ? source.settings
       : {},
     connections: Array.isArray(source.connections)
-      ? source.connections.filter((entry) => typeof entry === 'string').slice(-20)
+      ? source.connections.filter((entry) => entry && typeof entry === 'object' && typeof entry.host === 'string').slice(-20)
       : []
   };
 }
@@ -71,15 +71,15 @@ class Store {
     this.onChange(this.snapshot());
   }
 
-  async addConnection(command) {
-    if (typeof command !== 'string' || !command.trim()) return;
-    this.data.connections.push(command.trim());
+  async addConnection(connection) {
+    if (!connection || typeof connection !== 'object') return;
+    this.data.connections.push(structuredClone(connection));
     this.data.connections = this.data.connections.slice(-20);
     await this.changed();
   }
 
   async getConnection() {
-    return this.data.connections.at(-1);
+    return structuredClone(this.data.connections.at(-1));
   }
 
   async addAccount(username, authentication) {

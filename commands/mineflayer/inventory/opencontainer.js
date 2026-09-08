@@ -14,7 +14,7 @@ module.exports = {
   description: 'Open a container under the cursor or at coordinates.',
   requires: { entity: true },
 
-  async execute(sender, command, args) {
+  async execute(sender, command, args, { bot }) {
     let block;
     if (!args.length) {
       block = bot.blockAtCursor(4.5);

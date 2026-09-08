@@ -20,7 +20,7 @@ test('runs global commands through the application runtime', async (context) => 
     await fs.rm(userDataPath, { recursive: true, force: true });
   });
 
-  assert.equal(runtime.snapshot().commands.length, 8);
+  assert.equal(runtime.snapshot().commands.length, 9);
   assert.equal((await runtime.execute('account add "Test Player" offline')).ok, true);
   assert.equal((await runtime.execute('settings resource-packs accept')).ok, true);
   assert.deepEqual(runtime.snapshot().accounts, [{ username: 'Test Player', authentication: false }]);

@@ -7,7 +7,7 @@ module.exports = {
   description: 'List players in the server tab list.',
   requires: { entity: true },
 
-  execute(sender, command, args) {
+  execute(sender, command, args, { bot }) {
     if (args.length) return sender.reply(`[Players] Usage: ${this.usage}`);
     const players = Object.values(bot.players)
       .map((player) => player.username)

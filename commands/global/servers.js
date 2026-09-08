@@ -19,7 +19,6 @@ module.exports = {
       if (!servers.length) return sender.reply('[Servers] No saved servers were found.');
       return sender.reply(servers.map((server, index) => `${index + 1}. ${server.name} - ${server.ip}`).join('\n'));
     } catch (error) {
-      console.debug(error);
       return sender.reply("[Servers] Minecraft's servers.dat file could not be read.");
     }
   }

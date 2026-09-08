@@ -7,6 +7,8 @@ const { RuntimeLogger } = require('./logger');
 const { InterfaceState } = require('./interface-state');
 const { CommandRegistry } = require('./command-registry');
 const { MineflayerClient } = require('./mineflayer-client');
+const { ActivityManager } = require('./activity-manager');
+const { ConnectionService } = require('./connection-service');
 
 class ApplicationRuntime {
   constructor({ rootPath, userDataPath, emit }) {
@@ -15,48 +17,44 @@ class ApplicationRuntime {
     this.logger = new RuntimeLogger(emit);
     this.interface = new InterfaceState(emit, this.logger);
     this.store = new Store(path.join(userDataPath, 'mineprompt.json'), () => this.publishSnapshot());
+    this.activities = new ActivityManager(() => this.publishSnapshot());
     this.client = new MineflayerClient({
       logger: this.logger,
       interfaceState: this.interface,
       store: this.store,
-      getCommands: () => this.commands
+      getCommands: () => this.commands,
+      activities: this.activities
     });
+    this.connections = new ConnectionService({ client: this.client, store: this.store, logger: this.logger });
     this.commands = new CommandRegistry({
       rootPath,
       privateCommandsPath: path.join(userDataPath, 'commands'),
       logger: this.logger,
-      getBot: () => this.client.bot,
-      getClient: () => this.client
+      getContext: () => this.commandContext()
     });
-    this.originalConsole = global.console;
   }
 
   async init() {
     await this.store.init();
-    this.installCommandEnvironment();
     this.commands.setCommands('global');
     this.logger.log(`MinePrompt ${packageJson.version} is ready. Type "help" to see available commands.`);
     this.publishSnapshot();
     return this;
   }
 
-  installCommandEnvironment() {
-    const define = (name, getter, setter) => Object.defineProperty(global, name, {
-      configurable: true,
-      enumerable: false,
-      get: getter,
-      set: setter
+  commandContext() {
+    return Object.freeze({
+      activities: this.activities,
+      bot: this.client.bot,
+      chatMessageClass: this.client.chatMessageClass,
+      client: this.client,
+      commands: this.commands,
+      connections: this.connections,
+      interfaceState: this.interface,
+      logger: this.logger,
+      store: this.store,
+      execute: (input, origin) => this.commands.execute(input, origin)
     });
-
-    global.console = this.logger.facade();
-    global.appRoot = this.rootPath;
-    define('bot', () => this.client.bot, (value) => { this.client.bot = value; });
-    define('ChatMessage', () => this.client.chatMessageClass);
-    define('database', () => this.store);
-    define('interface', () => this.interface);
-    define('mineflayer', () => this.client);
-    define('commander', () => this.commands);
-    define('term', () => ({ exec: (input) => this.execute(input) }));
   }
 
   async execute(input) {
@@ -65,6 +63,11 @@ class ApplicationRuntime {
 
   async complete(input) {
     return this.commands.complete(input);
+  }
+
+  async connect(options) {
+    await this.connections.connect(options);
+    return { ok: true };
   }
 
   async reloadCommands() {
@@ -124,6 +127,7 @@ class ApplicationRuntime {
       state: this.interface.snapshot(),
       accounts: this.store.snapshot().accounts,
       preferences: this.preferences(),
+      activities: this.activities.snapshot(),
       commands: this.commands.commands_array.map((command) => ({
         command: command.command,
         aliases: command.aliases || [],
@@ -139,9 +143,9 @@ class ApplicationRuntime {
   }
 
   async close() {
+    this.activities.stopAll();
     await this.client.close();
     await this.store.close();
-    global.console = this.originalConsole;
   }
 }
 

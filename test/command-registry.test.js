@@ -31,7 +31,8 @@ test('loads, resolves, completes, and executes commands', async (context) => {
 
   const messages = [];
   const logger = { log: (message) => messages.push(message), info() {}, warn: (message) => messages.push(message), error: (message) => messages.push(message), debug() {} };
-  const registry = new CommandRegistry({ rootPath: root, privateCommandsPath: privateCommands, logger, getBot: () => null, getClient: () => null });
+  const runtimeContext = { bot: null, activities: { stopAll() {} }, client: { reload() {} } };
+  const registry = new CommandRegistry({ rootPath: root, privateCommandsPath: privateCommands, logger, getContext: () => runtimeContext });
   registry.setCommands('global');
 
   assert.equal(registry.getCommand('HI').command, 'hello');

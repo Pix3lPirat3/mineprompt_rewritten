@@ -46,6 +46,7 @@ function registerIpc() {
   };
   ipcMain.handle('mineprompt:get-snapshot', guard(() => runtime.snapshot()));
   ipcMain.handle('mineprompt:execute', guard((input) => runtime.execute(input)));
+  ipcMain.handle('mineprompt:connect', guard((options) => runtime.connect(options)));
   ipcMain.handle('mineprompt:complete', guard((input) => runtime.complete(input)));
   ipcMain.handle('mineprompt:reload-commands', guard(() => runtime.reloadCommands()));
   ipcMain.handle('mineprompt:save-profile', guard((profile) => runtime.saveProfile(profile)));

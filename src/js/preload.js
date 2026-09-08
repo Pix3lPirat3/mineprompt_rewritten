@@ -7,6 +7,7 @@ const eventChannels = new Set(['log', 'state', 'snapshot', 'attention']);
 contextBridge.exposeInMainWorld('mineprompt', Object.freeze({
   getSnapshot: () => ipcRenderer.invoke('mineprompt:get-snapshot'),
   execute: (input) => ipcRenderer.invoke('mineprompt:execute', input),
+  connect: (options) => ipcRenderer.invoke('mineprompt:connect', options),
   complete: (input) => ipcRenderer.invoke('mineprompt:complete', input),
   reloadCommands: () => ipcRenderer.invoke('mineprompt:reload-commands'),
   saveProfile: (profile) => ipcRenderer.invoke('mineprompt:save-profile', profile),

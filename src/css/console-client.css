@@ -558,6 +558,22 @@ kbd {
   gap: 7px;
 }
 
+.settings-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.settings-action span {
+  display: grid;
+  gap: 4px;
+}
+
+.settings-action small {
+  color: var(--muted);
+}
+
 .field {
   min-width: 0;
   flex-direction: column;

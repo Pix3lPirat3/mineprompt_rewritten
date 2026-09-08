@@ -35,18 +35,17 @@ function levenshtein(left, right) {
 }
 
 class CommandRegistry {
-  constructor({ rootPath, privateCommandsPath, logger, getBot, getClient }) {
+  constructor({ rootPath, privateCommandsPath, logger, getContext }) {
     this.rootPath = rootPath;
     this.privateCommandsPath = privateCommandsPath;
     this.logger = logger;
-    this.getBot = getBot;
-    this.getClient = getClient;
+    this.getContext = getContext;
     this.commands = Object.create(null);
     this.commands_array = [];
     this.type = 'global';
     this.reply = {
       toTerminal: (message) => this.logger.log(message),
-      toPlayer: (message) => this.getBot()?.chat(String(message))
+      toPlayer: (message) => this.getContext().bot?.chat(String(message))
     };
   }
 
@@ -130,7 +129,8 @@ class CommandRegistry {
       return { ok: false, error: message };
     }
 
-    const bot = this.getBot();
+    const context = this.getContext();
+    const { bot } = context;
     if (command.requires?.entity && !bot?.entity) {
       const message = `[${command.command}] This command requires an active connection.`;
       this.logger.warn(message);
@@ -146,7 +146,7 @@ class CommandRegistry {
       reply: origin.reply || this.reply.toTerminal
     };
     try {
-      await command.execute.call(command, sender, parsed.name, parsed.args);
+      await command.execute.call(command, sender, parsed.name, parsed.args, context);
       return { ok: true };
     } catch (error) {
       this.logger.error(`[${command.command}] ${error.message}`);
@@ -169,8 +169,9 @@ class CommandRegistry {
     try {
       const { name, args } = parseCommandLine(raw);
       const command = this.getCommand(name);
-      if (!command?.autocomplete || (command.requires?.entity && !this.getBot()?.entity)) return [];
-      const values = await command.autocomplete(name, args);
+      const context = this.getContext();
+      if (!command?.autocomplete || (command.requires?.entity && !context.bot?.entity)) return [];
+      const values = await command.autocomplete(name, args, context);
       return Array.isArray(values) ? values.map(String).slice(0, 250) : [];
     } catch {
       return [];
@@ -179,13 +180,15 @@ class CommandRegistry {
 
   reload() {
     const current = [...this.commands_array];
+    const context = this.getContext();
     for (const command of current) {
-      try { command.reload?.pre?.call(command.reload); } catch (error) { this.logger.warn(error.message); }
+      try { command.reload?.pre?.call(command.reload, context); } catch (error) { this.logger.warn(error.message); }
     }
-    this.getClient()?.reload();
+    context.activities.stopAll();
+    context.client.reload();
     this.setCommands(this.type);
     for (const command of this.commands_array) {
-      try { command.reload?.post?.call(command.reload); } catch (error) { this.logger.warn(error.message); }
+      try { command.reload?.post?.call(command.reload, this.getContext()); } catch (error) { this.logger.warn(error.message); }
     }
   }
 }

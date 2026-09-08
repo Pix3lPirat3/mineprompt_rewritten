@@ -183,6 +183,13 @@
           <span>Allowed player names</span>
           <textarea id="settings-remote-players" rows="4" placeholder="One Java username per line" spellcheck="false"></textarea>
         </label>
+        <div class="settings-action">
+          <span>
+            <strong>Terminal history</strong>
+            <small>Remove locally saved commands from this device.</small>
+          </span>
+          <button id="clear-history" class="secondary-button" type="button">Clear history</button>
+        </div>
         <p id="settings-error" class="dialog__error" role="alert"></p>
         <footer class="dialog__actions">
           <button class="secondary-button" type="button" data-close="settings-dialog">Cancel</button>
@@ -193,6 +200,7 @@
 
     <script src="../node_modules/jquery/dist/jquery.min.js"></script>
     <script src="../node_modules/jquery.terminal/js/jquery.terminal.min.js"></script>
+    <script src="js/terminal-policy.js"></script>
     <script src="js/renderer.js"></script>
   </body>
 </html>

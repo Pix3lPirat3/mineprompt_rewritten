@@ -9,7 +9,7 @@ module.exports = {
   description: 'Inspect the block under the cursor or at coordinates.',
   requires: { entity: true, console: true },
 
-  execute(sender, command, args) {
+  execute(sender, command, args, { bot }) {
     let block;
     if (args.length === 0 || args[0]?.toLowerCase() === 'cursor') {
       block = bot.blockAtCursor();

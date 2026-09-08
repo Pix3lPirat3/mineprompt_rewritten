@@ -9,7 +9,7 @@ module.exports = {
   description: 'Show the contents of the open container.',
   requires: { entity: true, console: true },
 
-  execute(sender) {
+  execute(sender, command, args, { bot }) {
     if (!bot.currentWindow) return sender.reply('[Window] No container is open.');
     const rows = bot.currentWindow.containerItems().map((item) => ({
       slot: item.slot,

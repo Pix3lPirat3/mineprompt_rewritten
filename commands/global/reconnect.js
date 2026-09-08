@@ -6,9 +6,11 @@ module.exports = {
   description: 'Repeat the most recent connection command.',
   requires: { console: true },
 
-  async execute(sender) {
-    const lastConnection = await database.getConnection();
-    if (!lastConnection) return sender.reply('[Reconnect] No previous connection is available.');
-    return term.exec(`connect ${lastConnection}`);
+  async execute(sender, command, args, { connections }) {
+    try {
+      return await connections.reconnect(sender.reply);
+    } catch (error) {
+      return sender.reply(`[Reconnect] ${error.message}`);
+    }
   }
 };

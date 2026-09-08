@@ -8,7 +8,7 @@ module.exports = {
   description: 'List nearby loaded entities.',
   requires: { entity: true, console: true },
 
-  execute(sender, command, args) {
+  execute(sender, command, args, { bot }) {
     const maximumDistance = args[0] === undefined ? Number.POSITIVE_INFINITY : Number(args[0]);
     if (!Number.isFinite(maximumDistance) && args[0] !== undefined || maximumDistance < 0) {
       return sender.reply('[Entities] Maximum distance must be a non-negative number.');

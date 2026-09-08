@@ -15,6 +15,7 @@ class MineflayerClient {
     interfaceState,
     store,
     getCommands,
+    activities,
     createBotImpl = createBot,
     pathfinderPlugin = pathfinder,
     MovementsClass = Movements,
@@ -24,6 +25,7 @@ class MineflayerClient {
     this.interface = interfaceState;
     this.store = store;
     this.getCommands = getCommands;
+    this.activities = activities;
     this.createBot = createBotImpl;
     this.pathfinderPlugin = pathfinderPlugin;
     this.Movements = MovementsClass;
@@ -179,6 +181,7 @@ class MineflayerClient {
     if (!bot) return;
     this.bot = null;
     this.connectionAttempt += 1;
+    this.activities.stopAll();
     try {
       bot.quit(reason);
     } catch {
