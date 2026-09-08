@@ -8,13 +8,19 @@ The current 2.0 beta replaces the original renderer-owned runtime with a securit
 
 - Microsoft and offline-mode connections
 - Graphical profile, connection, and security settings
+- Saved server profiles and structured reconnect history
+- Searchable command library and live session inspector
+- Automatic reconnect with bounded attempts
+- Centralized background task controls
 - 40+ built-in commands with aliases and autocomplete
 - Live health, hunger, position, effects, and session time
 - Robust quoted command-line arguments
 - Atomic JSON storage in Electron's application-data directory
 - Context-isolated renderer with no Node.js integration
 - Remote player commands disabled by default and restricted by an allowlist
+- Separate permissions for remote status, chat, movement, inventory, combat, and world commands
 - Server resource packs declined by default
+- Manual GitHub release checks with no automatic downloads
 
 ## Requirements
 
@@ -100,6 +106,8 @@ settings remote-player add PlayerName
 settings remote-commands enable
 ```
 
+Choose remote command permissions in the graphical security settings. A player must be listed and the command's permission group must be enabled.
+
 Disable access or remove a player at any time:
 
 ```text
@@ -119,7 +127,7 @@ The store contains authentication mode, not account passwords. Login and registr
 
 Public commands are CommonJS modules inside `commands/global` or `commands/mineflayer`. Use `commands/mineflayer/template.js` as the starting point, then press <kbd>Ctrl</kbd>+<kbd>R</kbd> while the app is running to reload command modules.
 
-Private commands can live beside `mineprompt.json` in the application-data directory under `commands/global` or `commands/mineflayer`. They are loaded from the local machine at runtime and are never included in packaged builds or this repository. This is the appropriate location for server-specific diagnostics and private test commands.
+Private commands can live beside `mineprompt.json` in the application-data directory under `commands/global` or `commands/mineflayer`. They are loaded from the local machine at runtime and are never included in packaged builds or this repository. Commands receive an explicit runtime context instead of application globals. This is the appropriate location for server-specific diagnostics and private test commands.
 
 Run `settings paths` to print the exact private command and application-data locations for the current system.
 

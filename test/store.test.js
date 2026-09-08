@@ -22,14 +22,28 @@ test('persists accounts, settings, and bounded connection history', async (conte
   assert.equal(await store.addAccount('Alex', true), true);
   assert.equal(await store.addAccount('alex', false), false);
   await store.setSetting('resourcePackPolicy', 'deny');
-  for (let index = 0; index < 25; index += 1) await store.addConnection(`-u Alex -h server-${index}.test`);
+  for (let index = 0; index < 25; index += 1) {
+    await store.addConnection({ username: 'Alex', auth: 'offline', host: `server-${index}.test`, port: 25565, version: '', fakeHost: '' });
+  }
   await store.close();
 
   const restored = await new Store(file).init();
   assert.equal((await restored.getAccounts()).length, 1);
   assert.equal(await restored.getSetting('resourcePackPolicy'), 'deny');
   assert.equal(restored.snapshot().connections.length, 20);
-  assert.match(await restored.getConnection(), /server-24/);
+  assert.equal((await restored.getConnection()).host, 'server-24.test');
+});
+
+test('creates and edits server profiles without duplicates', async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mineprompt-servers-'));
+  context.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const store = await new Store(path.join(directory, 'data.json')).init();
+  await store.saveServer({ name: 'Main', host: 'one.test', port: 25565, version: '', fakeHost: '' });
+  await store.saveServer({ originalName: 'Main', name: 'Primary', host: 'two.test', port: 25566, version: '1.21.11', fakeHost: '' });
+  assert.deepEqual(await store.getServers(), [{ name: 'Primary', host: 'two.test', port: 25566, version: '1.21.11', fakeHost: '' }]);
+  await assert.rejects(store.saveServer({ name: 'primary', host: 'three.test', port: 25565 }), /already saved/u);
+  assert.equal(await store.removeServer('PRIMARY'), true);
+  assert.deepEqual(await store.getServers(), []);
 });
 
 test('backs up malformed data instead of failing startup', async (context) => {

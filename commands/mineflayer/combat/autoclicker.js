@@ -1,23 +1,22 @@
 'use strict';
 
-const state = { timer: null, interval: 1000 };
+let interval = 1000;
 
-function stop() {
-  if (state.timer) clearInterval(state.timer);
-  state.timer = null;
-}
-
-function start() {
-  stop();
-  state.timer = setInterval(() => {
-    if (!bot?.entity) return stop();
+function start(bot, activities) {
+  const handle = setInterval(() => {
+    if (!bot.entity) return activities.stop('autoclicker');
     const entity = bot.entityAtCursor();
     if (entity && !['experience_orb', 'item'].includes(entity.name)) {
       void bot.attack(entity, true);
     } else {
       bot.swingArm();
     }
-  }, state.interval);
+  }, interval);
+  activities.register('autoclicker', {
+    label: 'Autoclicker',
+    detail: `Every ${interval} ms`,
+    stop: () => clearInterval(handle)
+  });
 }
 
 module.exports = {
@@ -27,28 +26,26 @@ module.exports = {
   description: 'Repeatedly swing or attack the entity under the cursor.',
   requires: { entity: true },
   autocomplete: () => ['start', 'stop', 'speed'],
-  reload: { pre: stop },
 
-  execute(sender, command, args) {
+  execute(sender, command, args, { activities, bot }) {
     const action = args[0]?.toLowerCase();
     if (!action) return sender.reply(`[Autoclicker] Usage: ${this.usage}`);
     if (action === 'stop') {
-      if (!state.timer) return sender.reply('[Autoclicker] Already stopped.');
-      stop();
-      return sender.reply('[Autoclicker] Stopped.');
+      return sender.reply(activities.stop('autoclicker') ? '[Autoclicker] Stopped.' : '[Autoclicker] Already stopped.');
     }
     if (action === 'speed') {
-      if (args[1] === undefined) return sender.reply(`[Autoclicker] Interval: ${state.interval} ms.`);
-      const interval = Number(args[1]);
-      if (!Number.isInteger(interval) || interval < 50 || interval > 60000) return sender.reply('[Autoclicker] Interval must be an integer from 50 to 60000 ms.');
-      state.interval = interval;
-      if (state.timer) start();
+      if (args[1] === undefined) return sender.reply(`[Autoclicker] Interval: ${interval} ms.`);
+      const nextInterval = Number(args[1]);
+      if (!Number.isInteger(nextInterval) || nextInterval < 50 || nextInterval > 60000) return sender.reply('[Autoclicker] Interval must be an integer from 50 to 60000 ms.');
+      const running = activities.stop('autoclicker');
+      interval = nextInterval;
+      if (running) start(bot, activities);
       return sender.reply(`[Autoclicker] Interval changed to ${interval} ms.`);
     }
     if (action === 'start') {
-      if (state.timer) return sender.reply('[Autoclicker] Already running.');
-      start();
-      return sender.reply(`[Autoclicker] Started at ${state.interval} ms.`);
+      if (activities.has('autoclicker')) return sender.reply('[Autoclicker] Already running.');
+      start(bot, activities);
+      return sender.reply(`[Autoclicker] Started at ${interval} ms.`);
     }
     return sender.reply(`[Autoclicker] Usage: ${this.usage}`);
   }

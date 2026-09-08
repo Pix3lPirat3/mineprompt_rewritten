@@ -7,7 +7,7 @@ module.exports = {
   description: 'Click a slot in the currently open window.',
   requires: { entity: true, console: true },
 
-  async execute(sender, command, args) {
+  async execute(sender, command, args, { bot }) {
     if (!bot.currentWindow) return sender.reply('[Window] No container is open.');
     const slot = Number(args[0]);
     const button = args[1]?.toLowerCase() || 'left';

@@ -17,11 +17,11 @@ module.exports = {
   requires: { console: true },
   autocomplete: () => ['paths', 'resource-packs', 'player-heads', 'remote-commands', 'remote-player', 'accept', 'deny', 'enable', 'disable', 'list', 'add', 'remove'],
 
-  async execute(sender, command, args) {
-    const resourcePacks = await database.getSetting('resourcePackPolicy') || 'deny';
-    const playerHeads = await database.getSetting('externalPlayerHeadsEnabled') === true;
-    const remoteCommands = await database.getSetting('remoteCommandsEnabled') === true;
-    const savedRemotePlayers = await database.getSetting('remoteCommandPlayers');
+  async execute(sender, command, args, { store }) {
+    const resourcePacks = await store.getSetting('resourcePackPolicy') || 'deny';
+    const playerHeads = await store.getSetting('externalPlayerHeadsEnabled') === true;
+    const remoteCommands = await store.getSetting('remoteCommandsEnabled') === true;
+    const savedRemotePlayers = await store.getSetting('remoteCommandPlayers');
     const remotePlayers = Array.isArray(savedRemotePlayers) ? [...savedRemotePlayers] : [];
     if (!args.length) {
       return sender.reply([
@@ -35,7 +35,7 @@ module.exports = {
 
     const section = args[0].toLowerCase();
     if (section === 'paths') {
-      const applicationData = path.dirname(database.filePath);
+      const applicationData = path.dirname(store.filePath);
       return sender.reply([
         '[Paths]',
         `Application data: ${applicationData}`,
@@ -47,14 +47,14 @@ module.exports = {
     if (section === 'resource-packs') {
       const policy = args[1]?.toLowerCase();
       if (!['accept', 'deny'].includes(policy)) return sender.reply('[Settings] Resource packs must be "accept" or "deny".');
-      await database.setSetting('resourcePackPolicy', policy);
+      await store.setSetting('resourcePackPolicy', policy);
       return sender.reply(`[Settings] Resource packs will be ${policy === 'accept' ? 'accepted' : 'declined'}.`);
     }
 
     if (section === 'remote-commands') {
       try {
         const value = enabled(args[1]?.toLowerCase());
-        await database.setSetting('remoteCommandsEnabled', value);
+        await store.setSetting('remoteCommandsEnabled', value);
         return sender.reply(`[Settings] Remote commands ${value ? 'enabled' : 'disabled'}.`);
       } catch (error) {
         return sender.reply(`[Settings] ${error.message}`);
@@ -64,7 +64,7 @@ module.exports = {
     if (section === 'player-heads') {
       try {
         const value = enabled(args[1]?.toLowerCase());
-        await database.setSetting('externalPlayerHeadsEnabled', value);
+        await store.setSetting('externalPlayerHeadsEnabled', value);
         return sender.reply(`[Settings] Online player heads ${value ? 'enabled' : 'disabled'}.`);
       } catch (error) {
         return sender.reply(`[Settings] ${error.message}`);
@@ -85,7 +85,7 @@ module.exports = {
       } else {
         return sender.reply('[Settings] Use "list", "add", or "remove".');
       }
-      await database.setSetting('remoteCommandPlayers', remotePlayers);
+      await store.setSetting('remoteCommandPlayers', remotePlayers);
       return sender.reply(`[Settings] Allowed remote players: ${remotePlayers.length ? remotePlayers.join(', ') : 'none'}.`);
     }
 

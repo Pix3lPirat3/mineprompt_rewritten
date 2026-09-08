@@ -8,7 +8,7 @@ module.exports = {
   requires: { entity: true },
   autocomplete: () => ['mainhand', 'offhand'],
 
-  execute(sender, command, args) {
+  execute(sender, command, args, { bot }) {
     if (args.length > 1 || (args[0] && !['mainhand', 'offhand'].includes(args[0].toLowerCase()))) {
       return sender.reply(`[UseItem] Usage: ${this.usage}`);
     }

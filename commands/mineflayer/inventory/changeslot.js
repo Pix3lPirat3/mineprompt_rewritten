@@ -8,7 +8,7 @@ module.exports = {
   requires: { entity: true },
   autocomplete: () => ['0', '1', '2', '3', '4', '5', '6', '7', '8'],
 
-  execute(sender, command, args) {
+  execute(sender, command, args, { bot }) {
     if (args.length !== 1) return sender.reply(`[ChangeSlot] Usage: ${this.usage}`);
 
     const slot = Number(args[0]);

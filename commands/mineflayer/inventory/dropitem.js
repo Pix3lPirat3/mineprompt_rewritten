@@ -8,9 +8,9 @@ module.exports = {
   usage: 'dropitem <item|inventory>',
   description: 'Drop every stack of an item, or the full inventory.',
   requires: { entity: true },
-  autocomplete: () => ['inventory', ...new Set(bot.inventory.items().map((item) => item.name))],
+  autocomplete: (command, args, { bot }) => ['inventory', ...new Set(bot.inventory.items().map((item) => item.name))],
 
-  async execute(sender, command, args) {
+  async execute(sender, command, args, { bot }) {
     const requested = args[0]?.toLowerCase();
     if (!requested) return sender.reply(`[Drop] Usage: ${this.usage}`);
 

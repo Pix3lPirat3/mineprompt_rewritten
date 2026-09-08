@@ -17,7 +17,9 @@ module.exports = [
       globals: {
         __dirname: 'readonly',
         Buffer: 'readonly',
+        AbortSignal: 'readonly',
         console: 'readonly',
+        fetch: 'readonly',
         module: 'readonly',
         process: 'readonly',
         require: 'readonly',
@@ -80,22 +82,7 @@ module.exports = [
     }
   },
   {
-    files: ['commands/**/*.js'],
-    languageOptions: {
-      globals: {
-        bot: 'readonly',
-        ChatMessage: 'readonly',
-        commander: 'readonly',
-        console: 'readonly',
-        database: 'readonly',
-        interface: 'readonly',
-        mineflayer: 'readonly',
-        term: 'readonly'
-      }
-    }
-  },
-  {
-    files: ['src/js/renderer.js'],
+    files: ['src/js/renderer.js', 'src/js/workspace-view.js'],
     languageOptions: {
       sourceType: 'script',
       globals: {

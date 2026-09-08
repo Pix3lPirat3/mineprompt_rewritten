@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://mc-heads.net; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://mc-heads.net; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
     <title>MinePrompt</title>
     <link rel="stylesheet" href="../node_modules/jquery.terminal/css/jquery.terminal.min.css">
     <link rel="stylesheet" href="css/reset.css">
@@ -20,7 +20,7 @@
           </div>
         </header>
 
-        <section class="account-section">
+        <section class="account-section profile-section">
           <div class="section-heading">
             <h2>Profiles</h2>
             <div class="section-actions">
@@ -30,6 +30,15 @@
           </div>
           <div id="account-list" class="account-list" role="list"></div>
           <p id="account-empty" class="empty-state">No saved profiles yet.</p>
+        </section>
+
+        <section class="server-section profile-section">
+          <div class="section-heading">
+            <h2>Servers</h2>
+            <button id="add-server" class="section-button" type="button">Add</button>
+          </div>
+          <div id="server-list" class="server-list" role="list"></div>
+          <p id="server-empty" class="empty-state">No saved servers yet.</p>
         </section>
 
         <footer class="sidebar__footer">
@@ -51,7 +60,10 @@
             </div>
           </div>
 
-          <button id="quick-connect" class="secondary-button" type="button">Connect</button>
+          <div class="session-actions">
+            <button id="open-commands" class="secondary-button" type="button">Commands</button>
+            <button id="quick-connect" class="secondary-button" type="button">Connect</button>
+          </div>
 
           <div class="vitals" aria-label="Player vitals">
             <div id="health" class="vital-row" title="Health"></div>
@@ -59,7 +71,36 @@
           </div>
         </header>
 
-        <div id="terminal" class="terminal" aria-label="MinePrompt terminal"></div>
+        <div class="workspace-body">
+          <div id="terminal" class="terminal" aria-label="MinePrompt terminal"></div>
+          <aside class="inspector" aria-label="Session inspector">
+            <section class="inspector__section">
+              <h2>Players</h2>
+              <div id="session-players" class="inspector__list"></div>
+              <p id="players-empty" class="inspector__empty">Connect to view players.</p>
+            </section>
+            <section class="inspector__section">
+              <h2>Inventory</h2>
+              <div id="session-inventory" class="inspector__list"></div>
+              <p id="inventory-empty" class="inspector__empty">Inventory is empty.</p>
+            </section>
+            <section class="inspector__section">
+              <h2>Open container</h2>
+              <div id="session-container" class="inspector__list"></div>
+              <p id="container-empty" class="inspector__empty">No container is open.</p>
+            </section>
+            <section class="inspector__section">
+              <h2>Tasks</h2>
+              <div id="session-tasks" class="inspector__list"></div>
+              <p id="tasks-empty" class="inspector__empty">Nothing running.</p>
+            </section>
+            <section class="inspector__section">
+              <h2>Events</h2>
+              <div id="session-events" class="inspector__list"></div>
+              <p id="events-empty" class="inspector__empty">No session events yet.</p>
+            </section>
+          </aside>
+        </div>
 
         <footer class="session-footer">
           <div id="effects" class="effects" aria-label="Active effects"></div>
@@ -98,6 +139,49 @@
           <div>
             <button class="secondary-button" type="button" data-close="profile-dialog">Cancel</button>
             <button class="primary-button" type="submit">Save profile</button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="server-dialog" class="dialog">
+      <form id="server-form" class="dialog__form">
+        <header class="dialog__header">
+          <div>
+            <span class="dialog__eyebrow">Server profile</span>
+            <h2 id="server-title">Add server</h2>
+          </div>
+          <button class="dialog__close" type="button" data-close="server-dialog">Close</button>
+        </header>
+        <input id="server-original" type="hidden">
+        <div class="field-grid">
+          <label class="field field--wide">
+            <span>Name</span>
+            <input id="server-name" required maxlength="64" placeholder="Main server">
+          </label>
+          <label class="field field--wide">
+            <span>Server address</span>
+            <input id="server-host" required placeholder="play.example.net" spellcheck="false">
+          </label>
+          <label class="field">
+            <span>Port</span>
+            <input id="server-port" type="number" min="1" max="65535" value="25565" required>
+          </label>
+          <label class="field">
+            <span>Version</span>
+            <input id="server-version" placeholder="Automatic" spellcheck="false">
+          </label>
+          <label class="field field--wide">
+            <span>Handshake address</span>
+            <input id="server-fake-host" placeholder="Optional proxy hostname" spellcheck="false">
+          </label>
+        </div>
+        <p id="server-error" class="dialog__error" role="alert"></p>
+        <footer class="dialog__actions dialog__actions--split">
+          <button id="delete-server" class="danger-button" type="button">Delete</button>
+          <div>
+            <button class="secondary-button" type="button" data-close="server-dialog">Cancel</button>
+            <button class="primary-button" type="submit">Save server</button>
           </div>
         </footer>
       </form>
@@ -167,6 +251,28 @@
         </label>
         <label class="toggle-field">
           <span>
+            <strong>Automatic reconnect</strong>
+            <small>Retry unexpected disconnects with a short increasing delay.</small>
+          </span>
+          <input id="settings-auto-reconnect" type="checkbox">
+        </label>
+        <label class="field">
+          <span>Maximum reconnect attempts</span>
+          <input id="settings-reconnect-attempts" type="number" min="1" max="10" value="3">
+        </label>
+        <fieldset class="permission-field">
+          <legend>Remote permissions</legend>
+          <div class="permission-grid">
+            <label><input type="checkbox" name="remote-capability" value="status">Status</label>
+            <label><input type="checkbox" name="remote-capability" value="chat">Chat</label>
+            <label><input type="checkbox" name="remote-capability" value="movement">Movement</label>
+            <label><input type="checkbox" name="remote-capability" value="inventory">Inventory</label>
+            <label><input type="checkbox" name="remote-capability" value="combat">Combat</label>
+            <label><input type="checkbox" name="remote-capability" value="world">World</label>
+          </div>
+        </fieldset>
+        <label class="toggle-field">
+          <span>
             <strong>Online player heads</strong>
             <small>Fetch profile images from mc-heads.net. Enabling this shares player names with that service.</small>
           </span>
@@ -183,6 +289,30 @@
           <span>Allowed player names</span>
           <textarea id="settings-remote-players" rows="4" placeholder="One Java username per line" spellcheck="false"></textarea>
         </label>
+        <div class="settings-action">
+          <span>
+            <strong>Terminal history</strong>
+            <small>Remove locally saved commands from this device.</small>
+          </span>
+          <button id="clear-history" class="secondary-button" type="button">Clear history</button>
+        </div>
+        <div class="settings-action">
+          <span>
+            <strong>Application updates</strong>
+            <small id="update-status">Check GitHub Releases manually.</small>
+          </span>
+          <div class="settings-buttons">
+            <button id="check-update" class="secondary-button" type="button">Check now</button>
+            <button id="open-releases" class="secondary-button" type="button" hidden>Open releases</button>
+          </div>
+        </div>
+        <div class="settings-action">
+          <span>
+            <strong>Diagnostics</strong>
+            <small>Export a redacted support file when troubleshooting.</small>
+          </span>
+          <button id="export-diagnostics" class="secondary-button" type="button">Export</button>
+        </div>
         <p id="settings-error" class="dialog__error" role="alert"></p>
         <footer class="dialog__actions">
           <button class="secondary-button" type="button" data-close="settings-dialog">Cancel</button>
@@ -191,8 +321,28 @@
       </form>
     </dialog>
 
+    <dialog id="commands-dialog" class="dialog command-dialog">
+      <div class="dialog__form">
+        <header class="dialog__header">
+          <div>
+            <span class="dialog__eyebrow">Command library</span>
+            <h2>Explore commands</h2>
+          </div>
+          <button class="dialog__close" type="button" data-close="commands-dialog">Close</button>
+        </header>
+        <label class="field">
+          <span>Search</span>
+          <input id="command-search" type="search" placeholder="Name, category, or description" autocomplete="off">
+        </label>
+        <div id="command-list" class="command-list"></div>
+        <p id="command-empty" class="inspector__empty">No commands match this search.</p>
+      </div>
+    </dialog>
+
     <script src="../node_modules/jquery/dist/jquery.min.js"></script>
     <script src="../node_modules/jquery.terminal/js/jquery.terminal.min.js"></script>
+    <script src="js/terminal-policy.js"></script>
+    <script src="js/workspace-view.js"></script>
     <script src="js/renderer.js"></script>
   </body>
 </html>

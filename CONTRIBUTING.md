@@ -19,14 +19,17 @@ module.exports = {
   aliases: ['ex'],
   usage: 'example <value>',
   description: 'Explain what the command does.',
+  category: 'custom',
+  capability: 'status',
   requires: {
     entity: true,
     console: true
   },
-  autocomplete(command, args) {
+  autocomplete(command, args, context) {
     return ['first', 'second'];
   },
-  async execute(sender, command, args) {
+  async execute(sender, command, args, context) {
+    const { bot, store } = context;
     sender.reply(`Received ${args.length} values.`);
   }
 };
@@ -34,9 +37,11 @@ module.exports = {
 
 `requires.entity` blocks the command until the bot has spawned. `requires.console` prevents execution through Minecraft chat. `sender.reply` is the correct response path for both terminal and permitted remote callers.
 
-Existing commands can access the compatibility globals `bot`, `database`, `mineflayer`, `commander`, and `interface`. New shared behavior belongs in a module under `src/main` rather than in another global.
+`capability` controls remote access and must be one of `status`, `chat`, `movement`, `inventory`, `combat`, or `world`. Omit it when a private command should never run through Minecraft chat.
 
-Commands must validate numeric bounds and enums before calling mineflayer. Any repeating task must expose a `reload.pre` function that clears its timers or stops its work.
+Commands receive an explicit context containing `bot`, `store`, `client`, `commands`, `connections`, `interfaceState`, `activities`, and `logger`. Shared behavior belongs in a module under `src/main`.
+
+Commands must validate numeric bounds and enums before calling mineflayer. Repeating work must register its cleanup function with `context.activities` so disconnects and reloads stop it automatically.
 
 Server-specific commands and test credentials do not belong in the repository. Keep private command modules in the per-user application-data `commands` directory and keep connection details in local environment configuration.
 

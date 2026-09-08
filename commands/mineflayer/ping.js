@@ -5,9 +5,9 @@ module.exports = {
   usage: 'ping [player]',
   description: 'Show a player latency from the server tab list.',
   requires: { entity: true },
-  autocomplete: () => Object.keys(bot.players),
+  autocomplete: (command, args, { bot }) => Object.keys(bot.players),
 
-  execute(sender, command, args) {
+  execute(sender, command, args, { bot }) {
     if (args.length > 1) return sender.reply(`[Ping] Usage: ${this.usage}`);
     const requested = args[0] || bot.username;
     const target = Object.values(bot.players).find((player) => player.username?.toLowerCase() === requested.toLowerCase());

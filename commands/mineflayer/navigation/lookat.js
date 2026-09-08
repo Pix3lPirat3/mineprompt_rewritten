@@ -13,9 +13,9 @@ module.exports = {
   usage: 'lookat <block> [force] | lookat <x> <y> <z> [force]',
   description: 'Look at the nearest matching block or a position.',
   requires: { entity: true },
-  autocomplete: () => Object.keys(bot.registry.blocksByName),
+  autocomplete: (command, args, { bot }) => Object.keys(bot.registry.blocksByName),
 
-  async execute(sender, command, args) {
+  async execute(sender, command, args, { bot }) {
     if (!args.length) return sender.reply(`[LookAt] Usage: ${this.usage}`);
     try {
       if (args.length <= 2) {

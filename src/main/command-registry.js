@@ -34,19 +34,40 @@ function levenshtein(left, right) {
   return rows[right.length];
 }
 
+function commandMetadata(file, rootPath, command) {
+  const relative = path.relative(path.join(rootPath, 'commands'), file).replaceAll('\\', '/');
+  const parts = relative.split('/');
+  const category = command.category || (parts[0] === 'global' ? 'application' : parts.length > 2 ? parts[1] : 'general');
+  const namedCapabilities = {
+    animation: 'movement',
+    bed: 'world',
+    blockinfo: 'status',
+    coinflip: 'status',
+    dig: 'world',
+    entities: 'status',
+    jump: 'movement',
+    list: 'status',
+    ping: 'status',
+    scoreboard: 'status',
+    sneak: 'movement',
+    useitem: 'inventory'
+  };
+  const categoryCapabilities = { chat: 'chat', combat: 'combat', inventory: 'inventory', navigation: 'movement', world: 'world' };
+  const capability = command.capability || namedCapabilities[command.command] || categoryCapabilities[category] || null;
+  return { category, capability };
+}
+
 class CommandRegistry {
-  constructor({ rootPath, privateCommandsPath, logger, getBot, getClient }) {
+  constructor({ rootPath, privateCommandsPath, logger, getContext }) {
     this.rootPath = rootPath;
     this.privateCommandsPath = privateCommandsPath;
     this.logger = logger;
-    this.getBot = getBot;
-    this.getClient = getClient;
+    this.getContext = getContext;
     this.commands = Object.create(null);
     this.commands_array = [];
     this.type = 'global';
     this.reply = {
-      toTerminal: (message) => this.logger.log(message),
-      toPlayer: (message) => this.getBot()?.chat(String(message))
+      toTerminal: (message) => this.logger.log(message)
     };
   }
 
@@ -66,6 +87,7 @@ class CommandRegistry {
         const command = require(file);
         if (command.command === 'template') continue;
         this.validate(command, file);
+        Object.assign(command, commandMetadata(file, this.rootPath, command));
         const key = command.command.toLowerCase();
         const commandAliases = (command.aliases || []).map((alias) => String(alias).toLowerCase());
         if (commands[key] || aliases.has(key) || commandAliases.some((alias) => commands[alias] || aliases.has(alias))) {
@@ -90,6 +112,11 @@ class CommandRegistry {
     if (!command || typeof command !== 'object') throw new TypeError('The module must export a command object.');
     if (!/^[a-z][a-z0-9-]*$/iu.test(command.command)) throw new TypeError(`Invalid command name in ${file}.`);
     if (typeof command.execute !== 'function') throw new TypeError(`Command ${command.command} has no execute function.`);
+    if (command.description !== undefined && typeof command.description !== 'string') throw new TypeError(`Command ${command.command} has an invalid description.`);
+    if (command.usage !== undefined && typeof command.usage !== 'string') throw new TypeError(`Command ${command.command} has invalid usage.`);
+    if (command.requires !== undefined && (!command.requires || typeof command.requires !== 'object' || Array.isArray(command.requires))) {
+      throw new TypeError(`Command ${command.command} has invalid requirements.`);
+    }
     if (command.aliases && (!Array.isArray(command.aliases) || command.aliases.some((alias) => typeof alias !== 'string'))) {
       throw new TypeError(`Command ${command.command} has invalid aliases.`);
     }
@@ -130,7 +157,8 @@ class CommandRegistry {
       return { ok: false, error: message };
     }
 
-    const bot = this.getBot();
+    const context = this.getContext();
+    const { bot } = context;
     if (command.requires?.entity && !bot?.entity) {
       const message = `[${command.command}] This command requires an active connection.`;
       this.logger.warn(message);
@@ -140,13 +168,17 @@ class CommandRegistry {
       origin.reply?.('This command can only be run from MinePrompt.');
       return { ok: false, error: 'Console-only command.' };
     }
+    if (origin.type !== 'terminal' && (!command.capability || !origin.capabilities?.includes(command.capability))) {
+      origin.reply?.(`The ${command.command} command is not allowed for your remote access.`);
+      return { ok: false, error: 'Remote capability denied.' };
+    }
 
     const sender = {
       ...origin,
       reply: origin.reply || this.reply.toTerminal
     };
     try {
-      await command.execute.call(command, sender, parsed.name, parsed.args);
+      await command.execute.call(command, sender, parsed.name, parsed.args, context);
       return { ok: true };
     } catch (error) {
       this.logger.error(`[${command.command}] ${error.message}`);
@@ -169,9 +201,10 @@ class CommandRegistry {
     try {
       const { name, args } = parseCommandLine(raw);
       const command = this.getCommand(name);
-      if (!command?.autocomplete || (command.requires?.entity && !this.getBot()?.entity)) return [];
-      const values = await command.autocomplete(name, args);
-      return Array.isArray(values) ? values.map(String).slice(0, 250) : [];
+      const context = this.getContext();
+      if (!command?.autocomplete || (command.requires?.entity && !context.bot?.entity)) return [];
+      const values = await command.autocomplete(name, args, context);
+      return Array.isArray(values) ? [...new Set(values.map(String))].slice(0, 250) : [];
     } catch {
       return [];
     }
@@ -179,15 +212,17 @@ class CommandRegistry {
 
   reload() {
     const current = [...this.commands_array];
+    const context = this.getContext();
     for (const command of current) {
-      try { command.reload?.pre?.call(command.reload); } catch (error) { this.logger.warn(error.message); }
+      try { command.reload?.pre?.call(command.reload, context); } catch (error) { this.logger.warn(error.message); }
     }
-    this.getClient()?.reload();
+    context.activities.stopAll();
+    context.client.reload();
     this.setCommands(this.type);
     for (const command of this.commands_array) {
-      try { command.reload?.post?.call(command.reload); } catch (error) { this.logger.warn(error.message); }
+      try { command.reload?.post?.call(command.reload, this.getContext()); } catch (error) { this.logger.warn(error.message); }
     }
   }
 }
 
-module.exports = { CommandRegistry, collectJavaScriptFiles, levenshtein };
+module.exports = { CommandRegistry, collectJavaScriptFiles, commandMetadata, levenshtein };

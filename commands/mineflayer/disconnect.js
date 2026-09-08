@@ -7,8 +7,8 @@ module.exports = {
   description: 'Gracefully disconnect from the current server.',
   requires: { entity: true },
 
-  async execute(sender) {
+  async execute(sender, command, args, { client }) {
     sender.reply('[Connection] Disconnecting...');
-    await mineflayer.disconnect();
+    await client.disconnect();
   }
 };

@@ -7,7 +7,7 @@ module.exports = {
   description: 'Close the active container.',
   requires: { entity: true },
 
-  execute(sender, command, args) {
+  execute(sender, command, args, { bot }) {
     if (args.length) return sender.reply(`[Window] Usage: ${this.usage}`);
     if (!bot.currentWindow) return sender.reply('[Window] No container is open.');
     bot.closeWindow(bot.currentWindow);

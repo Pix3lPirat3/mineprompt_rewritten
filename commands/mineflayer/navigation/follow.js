@@ -7,9 +7,9 @@ module.exports = {
   usage: 'follow <player|nearest|stop>',
   description: 'Continuously follow a visible player.',
   requires: { entity: true },
-  autocomplete: () => ['nearest', 'stop', ...Object.keys(bot.players)],
+  autocomplete: (command, args, { bot }) => ['nearest', 'stop', ...Object.keys(bot.players)],
 
-  execute(sender, command, args) {
+  execute(sender, command, args, { bot }) {
     let requested = args[0];
     if (!requested && sender.type === 'player') requested = sender.player;
     if (!requested) return sender.reply(`[Follow] Usage: ${this.usage}`);

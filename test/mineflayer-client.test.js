@@ -9,6 +9,8 @@ function fixture(settings = {}) {
   const log = [];
   const state = [];
   const commands = [];
+  const scheduled = [];
+  const runningActivities = new Map();
   const interfaceState = {
     setStatus: (value) => state.push(['status', value]),
     startSession: (value) => state.push(['session', value]),
@@ -29,6 +31,14 @@ function fixture(settings = {}) {
     execute: async (input, origin) => {
       commands.push(['execute', input, origin.player]);
       origin.reply('completed');
+    }
+  };
+  const activities = {
+    register: (id, activity) => runningActivities.set(id, activity),
+    finish: (id) => runningActivities.delete(id),
+    stopAll: () => {
+      for (const activity of runningActivities.values()) activity.stop();
+      runningActivities.clear();
     }
   };
   class FakeMovements {
@@ -84,15 +94,24 @@ function fixture(settings = {}) {
     interfaceState,
     store,
     getCommands: () => registry,
+    activities,
     createBotImpl: (options) => {
       bot = new FakeBot(options);
       return bot;
     },
     pathfinderPlugin: 'pathfinder-plugin',
     MovementsClass: FakeMovements,
-    chatFactory: () => class FakeChat {}
+    chatFactory: () => class FakeChat {},
+    schedule: (callback) => {
+      scheduled.push(callback);
+      return callback;
+    },
+    cancelSchedule: (callback) => {
+      const index = scheduled.indexOf(callback);
+      if (index >= 0) scheduled.splice(index, 1);
+    }
   });
-  return { client, get bot() { return bot; }, log, state, commands };
+  return { client, get bot() { return bot; }, log, state, commands, scheduled, runningActivities };
 }
 
 test('tracks a complete connection lifecycle', async () => {
@@ -154,4 +173,17 @@ test('disconnect invalidates late events and closes the bot', async () => {
 test('formats disconnect reasons defensively', () => {
   assert.equal(readableReason('Done'), 'Done');
   assert.equal(readableReason({ toString: () => 'Object reason' }), 'Object reason');
+});
+
+test('schedules bounded reconnect attempts after an unexpected end', async () => {
+  const context = fixture({ automaticReconnectEnabled: true, reconnectAttempts: 2 });
+  const bot = await context.client.startClient({ username: 'Alex', host: 'localhost', port: 25565 });
+  bot.emit('end', 'network lost');
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+  assert.equal(context.scheduled.length, 1);
+  assert.equal(context.runningActivities.has('reconnect'), true);
+  assert.equal(context.state.some((entry) => entry[0] === 'status' && entry[1] === 'reconnecting'), true);
+  context.scheduled[0]();
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+  assert.equal(context.commands.filter((entry) => entry[0] === 'set').length, 2);
 });

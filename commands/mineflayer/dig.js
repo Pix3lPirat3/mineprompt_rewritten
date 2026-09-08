@@ -9,7 +9,7 @@ module.exports = {
   description: 'Dig the targeted block or the block at specific coordinates.',
   requires: { entity: true },
 
-  async execute(sender, command, args) {
+  async execute(sender, command, args, { bot }) {
     if (bot.targetDigBlock) {
       await bot.stopDigging();
       return sender.reply('[Dig] Stopped the current dig.');

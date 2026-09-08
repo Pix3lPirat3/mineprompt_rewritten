@@ -26,7 +26,7 @@ module.exports = {
   requires: { entity: true },
   autocomplete: () => ['north', 'northeast', 'east', 'southeast', 'south', 'southwest', 'west', 'northwest'],
 
-  async execute(sender, command, args) {
+  async execute(sender, command, args, { bot }) {
     if (args.length < 1 || args.length > 2) return sender.reply(`[Turn] Usage: ${this.usage}`);
     const direction = args[0].toLowerCase();
     const yaw = DIRECTIONS.get(direction);

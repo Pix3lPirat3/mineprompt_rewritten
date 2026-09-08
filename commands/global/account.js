@@ -7,12 +7,12 @@ module.exports = {
   description: 'Manage saved account profiles.',
   requires: { console: true },
 
-  async execute(sender, command, args) {
+  async execute(sender, command, args, { store }) {
     const action = args[0]?.toLowerCase();
     if (!action) return sender.reply(`[Account] Usage: ${this.usage}`);
 
     if (action === 'list') {
-      const accounts = await database.getAccounts();
+      const accounts = await store.getAccounts();
       if (!accounts.length) return sender.reply('[Account] No profiles are saved.');
       return sender.reply(accounts.map((account) => `- ${account.username} (${account.authentication ? 'microsoft' : 'offline'})`).join('\n'));
     }
@@ -25,12 +25,12 @@ module.exports = {
       if (!['microsoft', 'offline', 'true', 'false'].includes(mode)) {
         return sender.reply('[Account] Authentication must be "microsoft" or "offline".');
       }
-      const added = await database.addAccount(username, mode === 'microsoft' || mode === 'true');
+      const added = await store.addAccount(username, mode === 'microsoft' || mode === 'true');
       return sender.reply(added ? `[Account] Saved ${username}.` : `[Account] ${username} is already saved.`);
     }
 
     if (action === 'remove') {
-      const removed = await database.removeAccount(username);
+      const removed = await store.removeAccount(username);
       return sender.reply(removed ? `[Account] Removed ${username}.` : `[Account] ${username} was not found.`);
     }
 
