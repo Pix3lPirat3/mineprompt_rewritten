@@ -19,6 +19,8 @@ module.exports = {
   aliases: ['ex'],
   usage: 'example <value>',
   description: 'Explain what the command does.',
+  category: 'custom',
+  capability: 'status',
   requires: {
     entity: true,
     console: true
@@ -34,6 +36,8 @@ module.exports = {
 ```
 
 `requires.entity` blocks the command until the bot has spawned. `requires.console` prevents execution through Minecraft chat. `sender.reply` is the correct response path for both terminal and permitted remote callers.
+
+`capability` controls remote access and must be one of `status`, `chat`, `movement`, `inventory`, `combat`, or `world`. Omit it when a private command should never run through Minecraft chat.
 
 Commands receive an explicit context containing `bot`, `store`, `client`, `commands`, `connections`, `interfaceState`, `activities`, and `logger`. Shared behavior belongs in a module under `src/main`.
 

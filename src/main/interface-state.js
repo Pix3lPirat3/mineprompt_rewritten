@@ -15,7 +15,8 @@ class InterfaceState {
       hunger: 0,
       effects: [],
       sessionStartedAt: null,
-      anonymous: false
+      anonymous: false,
+      lastError: null
     };
     this.anonymous = {
       enabled: false,
@@ -36,6 +37,13 @@ class InterfaceState {
 
   setStatus(status) {
     this.state.status = status;
+    if (['connecting', 'authenticating', 'joining', 'online'].includes(status)) this.state.lastError = null;
+    this.publish();
+  }
+
+  setFailure(message) {
+    this.state.status = 'failed';
+    this.state.lastError = String(message || 'The connection failed.');
     this.publish();
   }
 
@@ -83,15 +91,7 @@ class InterfaceState {
     this.publish();
   }
 
-  resetPotionEffects() { this.setPotionEffects([]); }
-  resetPosition() { this.state.position = null; this.publish(); }
-  resetHealth() { this.setHealth(0); }
-  resetHunger() { this.setHunger(0); }
-  resetRuntime() {}
-  startRuntime() {}
   stopRuntime() { this.emit('attention', {}); }
-  setHead() {}
-  resetHead() {}
 
   enableAnonymous(username) {
     if (this.anonymous.enabled) {

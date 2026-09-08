@@ -46,13 +46,19 @@ test('validates profile and security preference updates', async (context) => {
     resourcePackPolicy: 'accept',
     externalPlayerHeadsEnabled: true,
     remoteCommandsEnabled: true,
-    remoteCommandPlayers: ['Builder_1', 'builder_1', 'Helper2']
+    remoteCommandPlayers: ['Builder_1', 'builder_1', 'Helper2'],
+    remoteCommandCapabilities: ['status', 'movement'],
+    automaticReconnectEnabled: true,
+    reconnectAttempts: 4
   });
   assert.deepEqual(result.preferences, {
     resourcePackPolicy: 'accept',
     externalPlayerHeadsEnabled: true,
     remoteCommandsEnabled: true,
-    remoteCommandPlayers: ['Builder_1', 'Helper2']
+    remoteCommandPlayers: ['Builder_1', 'Helper2'],
+    remoteCommandCapabilities: ['status', 'movement'],
+    automaticReconnectEnabled: true,
+    reconnectAttempts: 4
   });
   await assert.rejects(runtime.savePreferences({ resourcePackPolicy: 'ask' }), /Invalid resource-pack/u);
   await assert.rejects(runtime.saveProfile({ username: 'Another', authentication: 'password' }), /authentication mode/u);
@@ -62,6 +68,11 @@ test('validates profile and security preference updates', async (context) => {
   }), /letters, numbers/u);
   await runtime.removeProfile('ExamplePlayer');
   assert.deepEqual(runtime.snapshot().accounts, []);
+
+  await runtime.saveServer({ name: 'Local', host: 'localhost', port: 25565, version: '', fakeHost: '' });
+  assert.deepEqual(runtime.snapshot().servers, [{ name: 'Local', host: 'localhost', port: 25565, version: '', fakeHost: '' }]);
+  await runtime.removeServer('Local');
+  assert.deepEqual(runtime.snapshot().servers, []);
 });
 
 test('completes connected commands from the full terminal input', async (context) => {
@@ -89,4 +100,24 @@ test('completes connected commands from the full terminal input', async (context
   const completions = await runtime.complete('follow P');
   assert.equal(completions.includes('PlayerOne'), true);
   assert.equal(completions.includes('PixelPirate'), true);
+});
+
+test('exports bounded diagnostics without saved identities or servers', async (context) => {
+  const userDataPath = await fs.mkdtemp(path.join(os.tmpdir(), 'mineprompt-diagnostics-'));
+  const runtime = await new ApplicationRuntime({
+    rootPath: path.resolve(__dirname, '..'),
+    userDataPath,
+    emit: () => {}
+  }).init();
+  context.after(async () => {
+    await runtime.close();
+    await fs.rm(userDataPath, { recursive: true, force: true });
+  });
+  await runtime.saveProfile({ username: 'private@example.test', authentication: 'microsoft' });
+  await runtime.saveServer({ name: 'Private Network', host: 'secret.example.test', port: 25565 });
+  runtime.logger.warn('private@example.test connected to secret.example.test');
+  const diagnostics = JSON.stringify(runtime.diagnostics());
+  assert.doesNotMatch(diagnostics, /private@example\.test/u);
+  assert.doesNotMatch(diagnostics, /secret\.example\.test/u);
+  assert.match(diagnostics, /\[redacted\]/u);
 });

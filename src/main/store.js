@@ -6,6 +6,7 @@ const path = require('node:path');
 const EMPTY_DATA = Object.freeze({
   version: 1,
   accounts: [],
+  servers: [],
   settings: {},
   connections: []
 });
@@ -18,6 +19,15 @@ function cleanData(value) {
       ? source.accounts.filter((account) => account && typeof account.username === 'string').map((account) => ({
           username: account.username,
           authentication: account.authentication === true || account.authentication === 'microsoft'
+        }))
+      : [],
+    servers: Array.isArray(source.servers)
+      ? source.servers.filter((server) => server && typeof server.name === 'string' && typeof server.host === 'string').map((server) => ({
+          name: server.name,
+          host: server.host,
+          port: Number(server.port) || 25565,
+          version: typeof server.version === 'string' ? server.version : '',
+          fakeHost: typeof server.fakeHost === 'string' ? server.fakeHost : ''
         }))
       : [],
     settings: source.settings && typeof source.settings === 'object' && !Array.isArray(source.settings)
@@ -153,6 +163,35 @@ class Store {
 
   async getAccounts() {
     return structuredClone(this.data.accounts);
+  }
+
+  async saveServer({ originalName, name, host, port, version, fakeHost }) {
+    const cleanName = String(name ?? '').trim();
+    if (!cleanName || cleanName.length > 64) throw new Error('Enter a server name with 1 to 64 characters.');
+    const original = String(originalName ?? '').trim().toLowerCase();
+    const duplicate = this.data.servers.find((server) => server.name.toLowerCase() === cleanName.toLowerCase() && server.name.toLowerCase() !== original);
+    if (duplicate) throw new Error(`${cleanName} is already saved.`);
+    const saved = { name: cleanName, host, port, version, fakeHost };
+    const index = original ? this.data.servers.findIndex((server) => server.name.toLowerCase() === original) : -1;
+    if (original && index < 0) throw new Error('The server profile no longer exists.');
+    if (index >= 0) this.data.servers[index] = saved;
+    else this.data.servers.push(saved);
+    this.data.servers.sort((left, right) => left.name.localeCompare(right.name));
+    await this.changed();
+    return structuredClone(saved);
+  }
+
+  async removeServer(name) {
+    const target = String(name ?? '').trim().toLowerCase();
+    const previousLength = this.data.servers.length;
+    this.data.servers = this.data.servers.filter((server) => server.name.toLowerCase() !== target);
+    if (this.data.servers.length === previousLength) return false;
+    await this.changed();
+    return true;
+  }
+
+  async getServers() {
+    return structuredClone(this.data.servers);
   }
 
   async getSetting(setting) {

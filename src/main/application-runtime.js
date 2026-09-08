@@ -8,7 +8,9 @@ const { InterfaceState } = require('./interface-state');
 const { CommandRegistry } = require('./command-registry');
 const { MineflayerClient } = require('./mineflayer-client');
 const { ActivityManager } = require('./activity-manager');
-const { ConnectionService } = require('./connection-service');
+const { ConnectionService, validateServer } = require('./connection-service');
+
+const REMOTE_CAPABILITIES = new Set(['status', 'chat', 'movement', 'inventory', 'combat', 'world']);
 
 class ApplicationRuntime {
   constructor({ rootPath, userDataPath, emit }) {
@@ -23,9 +25,10 @@ class ApplicationRuntime {
       interfaceState: this.interface,
       store: this.store,
       getCommands: () => this.commands,
-      activities: this.activities
+      activities: this.activities,
+      onSnapshot: () => this.publishSnapshot()
     });
-    this.connections = new ConnectionService({ client: this.client, store: this.store, logger: this.logger });
+    this.connections = new ConnectionService({ client: this.client, store: this.store, logger: this.logger, interfaceState: this.interface });
     this.commands = new CommandRegistry({
       rootPath,
       privateCommandsPath: path.join(userDataPath, 'commands'),
@@ -70,6 +73,11 @@ class ApplicationRuntime {
     return { ok: true };
   }
 
+  async disconnect() {
+    await this.client.disconnect();
+    return { ok: true };
+  }
+
   async reloadCommands() {
     this.commands.reload();
     this.publishSnapshot();
@@ -82,7 +90,12 @@ class ApplicationRuntime {
       resourcePackPolicy: settings.resourcePackPolicy === 'accept' ? 'accept' : 'deny',
       externalPlayerHeadsEnabled: settings.externalPlayerHeadsEnabled === true,
       remoteCommandsEnabled: settings.remoteCommandsEnabled === true,
-      remoteCommandPlayers: Array.isArray(settings.remoteCommandPlayers) ? settings.remoteCommandPlayers : []
+      remoteCommandPlayers: Array.isArray(settings.remoteCommandPlayers) ? settings.remoteCommandPlayers : [],
+      remoteCommandCapabilities: Array.isArray(settings.remoteCommandCapabilities)
+        ? settings.remoteCommandCapabilities.filter((value) => REMOTE_CAPABILITIES.has(value))
+        : [],
+      automaticReconnectEnabled: settings.automaticReconnectEnabled === true,
+      reconnectAttempts: Number.isInteger(settings.reconnectAttempts) ? settings.reconnectAttempts : 3
     };
   }
 
@@ -103,20 +116,43 @@ class ApplicationRuntime {
     return { ok: true };
   }
 
+  async saveServer(profile) {
+    const server = validateServer(profile);
+    const saved = await this.store.saveServer({
+      originalName: profile?.originalName,
+      name: profile?.name,
+      ...server
+    });
+    return { ok: true, server: saved };
+  }
+
+  async removeServer(name) {
+    const removed = await this.store.removeServer(name);
+    if (!removed) throw new Error('The server profile no longer exists.');
+    return { ok: true };
+  }
+
   async savePreferences(preferences) {
     const resourcePackPolicy = preferences?.resourcePackPolicy;
     if (!['accept', 'deny'].includes(resourcePackPolicy)) throw new Error('Invalid resource-pack policy.');
     const players = Array.isArray(preferences?.remoteCommandPlayers) ? preferences.remoteCommandPlayers : [];
+    const capabilities = Array.isArray(preferences?.remoteCommandCapabilities) ? preferences.remoteCommandCapabilities : [];
     const remoteCommandPlayers = players.map((name) => String(name).trim()).filter(Boolean).filter((name, index, values) =>
       values.findIndex((candidate) => candidate.toLowerCase() === name.toLowerCase()) === index);
     if (remoteCommandPlayers.some((name) => !/^[A-Za-z0-9_]{1,16}$/u.test(name))) {
       throw new Error('Remote player names may contain only letters, numbers, and underscores.');
     }
+    if (capabilities.some((value) => !REMOTE_CAPABILITIES.has(value))) throw new Error('A remote command permission is invalid.');
+    const reconnectAttempts = Number(preferences?.reconnectAttempts ?? 3);
+    if (!Number.isInteger(reconnectAttempts) || reconnectAttempts < 1 || reconnectAttempts > 10) throw new Error('Reconnect attempts must be an integer from 1 to 10.');
     await this.store.setSettings({
       resourcePackPolicy,
       externalPlayerHeadsEnabled: preferences.externalPlayerHeadsEnabled === true,
       remoteCommandsEnabled: preferences.remoteCommandsEnabled === true,
-      remoteCommandPlayers
+      remoteCommandPlayers,
+      remoteCommandCapabilities: [...new Set(capabilities)],
+      automaticReconnectEnabled: preferences.automaticReconnectEnabled === true,
+      reconnectAttempts
     });
     return { ok: true, preferences: this.preferences() };
   }
@@ -126,15 +162,37 @@ class ApplicationRuntime {
       version: packageJson.version,
       state: this.interface.snapshot(),
       accounts: this.store.snapshot().accounts,
+      servers: this.store.snapshot().servers,
       preferences: this.preferences(),
       activities: this.activities.snapshot(),
+      session: this.client.snapshot(),
       commands: this.commands.commands_array.map((command) => ({
         command: command.command,
         aliases: command.aliases || [],
+        category: command.category,
+        capability: command.capability,
         description: command.description || '',
         usage: command.usage || command.command,
         requiresConnection: Boolean(command.requires?.entity)
       }))
+    };
+  }
+
+  diagnostics() {
+    const data = this.store.snapshot();
+    const sensitive = [
+      ...data.accounts.map((account) => account.username),
+      ...data.servers.flatMap((server) => [server.name, server.host, server.fakeHost])
+    ].filter(Boolean).sort((left, right) => right.length - left.length);
+    const redact = (message) => sensitive.reduce((value, secret) => value.replaceAll(secret, '[redacted]'), String(message));
+    return {
+      application: { version: packageJson.version, platform: process.platform, architecture: process.arch },
+      state: {
+        status: this.interface.state.status,
+        lastError: redact(this.interface.state.lastError || '')
+      },
+      activities: this.activities.snapshot().map(({ id, label, startedAt }) => ({ id, label, startedAt })),
+      logs: this.logger.recent().filter((entry) => entry.level !== 'log').map((entry) => ({ ...entry, message: redact(entry.message) }))
     };
   }
 

@@ -10,27 +10,33 @@ function authenticationMode(value) {
   throw new Error('Authentication must be "microsoft" or "offline".');
 }
 
-function validateConnection(input) {
-  if (!input || typeof input !== 'object') throw new TypeError('Connection details are required.');
-  const username = String(input.username ?? '').trim();
+function validateServer(input) {
+  if (!input || typeof input !== 'object') throw new TypeError('Server details are required.');
   const host = String(input.host ?? '').trim();
   const port = Number(input.port ?? 25565);
-  const auth = authenticationMode(input.auth);
   const version = String(input.version ?? '').trim();
   const fakeHost = String(input.fakeHost ?? '').trim();
-  if (!username || username.length > 254) throw new Error('A valid account name or email address is required.');
   if (!host || /\s|\//u.test(host) || /^[^:]+:\d+$/u.test(host)) throw new Error('Enter a hostname or IP address without a protocol or port.');
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('Port must be an integer from 1 to 65535.');
   if (version.length > 32) throw new Error('The server version is too long.');
   if (fakeHost && (/\s|\//u.test(fakeHost) || fakeHost.length > 253)) throw new Error('Enter a valid handshake address.');
-  return { username, host, port, auth, version, fakeHost };
+  return { host, port, version, fakeHost };
+}
+
+function validateConnection(input) {
+  const server = validateServer(input);
+  const username = String(input.username ?? '').trim();
+  const auth = authenticationMode(input.auth);
+  if (!username || username.length > 254) throw new Error('A valid account name or email address is required.');
+  return { username, auth, ...server };
 }
 
 class ConnectionService {
-  constructor({ client, store, logger }) {
+  constructor({ client, store, logger, interfaceState }) {
     this.client = client;
     this.store = store;
     this.logger = logger;
+    this.interface = interfaceState;
   }
 
   async connect(input, reply = (message) => this.logger.log(message)) {
@@ -47,7 +53,8 @@ class ConnectionService {
       profilesFolder: path.join(authenticationCachePath(), `${cachePrefix}-${cacheHash}`),
       fakeHost: details.fakeHost || details.host,
       logErrors: false,
-      onMsaCode(data) {
+      onMsaCode: (data) => {
+        this.interface?.setStatus('authenticating');
         reply(`[Microsoft] Open ${data.verification_uri} and enter code ${data.user_code}.`);
       }
     };
@@ -65,4 +72,4 @@ class ConnectionService {
   }
 }
 
-module.exports = { ConnectionService, authenticationMode, validateConnection };
+module.exports = { ConnectionService, authenticationMode, validateConnection, validateServer };

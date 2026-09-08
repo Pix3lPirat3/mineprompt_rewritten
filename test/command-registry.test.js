@@ -21,7 +21,7 @@ test('loads, resolves, completes, and executes commands', async (context) => {
   await fs.mkdir(commandDirectory, { recursive: true });
   await fs.mkdir(privateGlobal, { recursive: true });
   await fs.writeFile(path.join(commandDirectory, 'hello.js'), `module.exports = {
-    command: 'hello', aliases: ['hi'], description: 'Test command',
+    command: 'hello', aliases: ['hi'], capability: 'status', description: 'Test command',
     execute(sender, command, args) { sender.reply(command + ':' + args.join(',')); }
   };`);
   await fs.writeFile(path.join(privateGlobal, 'local.js'), `module.exports = {
@@ -39,5 +39,7 @@ test('loads, resolves, completes, and executes commands', async (context) => {
   assert.equal(registry.getCommand('localcheck').command, 'localcheck');
   assert.deepEqual(await registry.complete('he'), ['hello']);
   assert.equal((await registry.execute('hi "there friend"')).ok, true);
-  assert.deepEqual(messages, ['hi:there friend']);
+  assert.equal((await registry.execute('hello remote', { type: 'player', player: 'Alex', capabilities: [], reply: (message) => messages.push(message) })).ok, false);
+  assert.equal((await registry.execute('hello remote', { type: 'player', player: 'Alex', capabilities: ['status'], reply: (message) => messages.push(message) })).ok, true);
+  assert.deepEqual(messages, ['hi:there friend', 'The hello command is not allowed for your remote access.', 'hello:remote']);
 });

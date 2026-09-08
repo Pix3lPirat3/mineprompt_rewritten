@@ -17,7 +17,9 @@ module.exports = [
       globals: {
         __dirname: 'readonly',
         Buffer: 'readonly',
+        AbortSignal: 'readonly',
         console: 'readonly',
+        fetch: 'readonly',
         module: 'readonly',
         process: 'readonly',
         require: 'readonly',
@@ -80,7 +82,7 @@ module.exports = [
     }
   },
   {
-    files: ['src/js/renderer.js'],
+    files: ['src/js/renderer.js', 'src/js/workspace-view.js'],
     languageOptions: {
       sourceType: 'script',
       globals: {
