@@ -306,7 +306,11 @@ async function initialize() {
     outputLimit: 1000,
     scrollOnEcho: true,
     checkArity: false,
-    completion: (input) => window.mineprompt.complete(input),
+    caseSensitiveAutocomplete: false,
+    completion() {
+      const input = this.get_command().slice(0, this.get_position());
+      return window.mineprompt.complete(input);
+    },
     keymap: {
       'CTRL+R': () => {
         void window.mineprompt.reloadCommands();

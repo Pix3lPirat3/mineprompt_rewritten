@@ -63,3 +63,30 @@ test('validates profile and security preference updates', async (context) => {
   await runtime.removeProfile('ExamplePlayer');
   assert.deepEqual(runtime.snapshot().accounts, []);
 });
+
+test('completes connected commands from the full terminal input', async (context) => {
+  const userDataPath = await fs.mkdtemp(path.join(os.tmpdir(), 'mineprompt-completion-'));
+  const runtime = await new ApplicationRuntime({
+    rootPath: path.resolve(__dirname, '..'),
+    userDataPath,
+    emit: () => {}
+  }).init();
+  context.after(async () => {
+    runtime.client.bot = null;
+    await runtime.close();
+    await fs.rm(userDataPath, { recursive: true, force: true });
+  });
+
+  runtime.client.bot = {
+    entity: {},
+    players: {
+      PlayerOne: { username: 'PlayerOne' },
+      PixelPirate: { username: 'PixelPirate' }
+    }
+  };
+  runtime.commands.setCommands('mineflayer');
+
+  const completions = await runtime.complete('follow P');
+  assert.equal(completions.includes('PlayerOne'), true);
+  assert.equal(completions.includes('PixelPirate'), true);
+});
