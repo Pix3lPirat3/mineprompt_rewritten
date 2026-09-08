@@ -1,93 +1,82 @@
-let { parseArgs } = require('node:util');
+'use strict';
 
-const path = require('path');
-const minecraftFolderPath = require('minecraft-folder-path');
+const path = require('node:path');
+const crypto = require('node:crypto');
+const { parseArgs } = require('node:util');
+const { authenticationCachePath } = require('../../src/main/data-paths');
+
+function parseAuthentication(value) {
+  if (value === undefined || value === 'true' || value === 'microsoft') return 'microsoft';
+  if (value === 'false' || value === 'offline') return 'offline';
+  throw new Error('Authentication must be "microsoft" or "offline".');
+}
 
 module.exports = {
-  version: '2.0.1',
-  description: 'Used to connect a bot to a server',
-  author: 'Pix3lPirat3',
-  repository: 'http://mineprompt.com',
-  usage: `Basic Usage:
-  connect -u <username> -h <hostname> -p [port {25565}] -v [version {auto}] 
-
-  Flags:
-  -u | --username | Sets player username
-  -h | --host | Server Hostname
-  -p | --port | Server Port (Default: 25565)
-  -v | --version | Server Version (Default: auto)
-  -a | --auth | Authentication (default: true - Set "false" for offline-mode)
-  --fakeHost | Fake Host (Used to bypass TCPShield "You cannot use the IP to connect")
-  `,
   command: 'connect',
   aliases: ['conn'],
-  execute: function(sender, command, args) {
+  description: 'Connect to a Minecraft Java server.',
+  usage: 'connect --username <name> --host <server> [--port 25565] [--version <version>] [--auth microsoft|offline] [--fake-host <host>]',
 
-    if (bot?.entity) {
-      return console.log(`\n[[;indianred;]Connection Interrupted:]\nYou are already connected to a server with "${bot.username}"\nYou can disconnect this session with the "[[;steelblue;]disconnect]" command.\n`)
+  async execute(sender, command, args) {
+    if (bot) {
+      return sender.reply(`[Connect] Already connected as ${bot.username || 'a client'}. Disconnect first.`);
     }
 
-    let opts = parseArgs({ args,
-      strict: false,
-      options: {
-        username: {
-          type: 'string',
-          short: 'u'
-        },
-        auth: {
-          type: 'string',
-          short: 'a'
-        },
-        host: {
-          type: 'string',
-          short: 'h'
-        },
-        port: {
-          type: 'string',
-          short: 'p'
-        },
-        version: {
-          type: 'string',
-          short: 'v'
-        },
-        fakeHost: {
-          type: 'string'
+    let values;
+    try {
+      ({ values } = parseArgs({
+        args,
+        strict: true,
+        allowPositionals: false,
+        options: {
+          username: { type: 'string', short: 'u' },
+          auth: { type: 'string', short: 'a' },
+          host: { type: 'string', short: 'h' },
+          port: { type: 'string', short: 'p' },
+          version: { type: 'string', short: 'v' },
+          'fake-host': { type: 'string' }
         }
-      }
-    }).values;
-
-    // NOTE : When using shorthand (-h) only one `-` is needed, when using longhand (--host) two are needed.
-    if (!opts.username) return console.log('You must specify a username with -u or --username')
-    if (!opts.host) return console.log('You must specify a host with -h or --host')
-    if (!opts.version) return console.log('You must specify a version with -v or --version'); // This is to prevent issues with auto-detect, doesn't like to load stuff right
-    if (!opts.port) opts.port = 25565;
-
-    let options = {
-      username: opts.username,
-      host: opts.host,
-      port: opts.port,
-      version: opts.version,
-      auth: (opts.auth == 'true') ? 'microsoft' : 'offline',
-      skipValidation: !opts.auth,
-      profilesFolder: path.join(minecraftFolderPath, 'mineprompt-cache', opts.username.toUpperCase()),
-      fakeHost: opts.fakeHost || opts.host, // Used on servers with TCPShield
-      onMsaCode: function(data) {
-        console.log(`
-          [[b;indianred;]Microsoft Authentication:]
-          Use the code "[[b;indianred;]${data.user_code}]" on [[b;indianred;]${data.verification_uri}] to authenticate your account.
-
-          If you want to join an [[b;indianred;]offline-mode] server add [[b;indianred;]-a false] to your prompt.
-          `.split('\n').map(line => line.trim()).join('\n'))
-      },
-      logErrors: false
+      }));
+    } catch (error) {
+      return sender.reply(`[Connect] ${error.message}\nUsage: ${this.usage}`);
     }
 
-    console.log(`[[b;#999999;]Mine][[b;steelblue;]Prompt] » Opening a connection to [[b;seagreen;]${opts.host}:${opts.port}]`)
-    console.debug(`[Connect] Player: ${opts.username}, Version: ${opts.version}, Auth: ${opts.auth}`)
+    const username = values.username?.trim();
+    const host = values.host?.trim();
+    const port = Number(values.port ?? 25565);
+    if (!username) return sender.reply('[Connect] A username is required (-u or --username).');
+    if (!host || /\s|\//u.test(host) || /^[^:]+:\d+$/u.test(host)) return sender.reply('[Connect] Enter a hostname or IP address without a protocol or port.');
+    if (!Number.isInteger(port) || port < 1 || port > 65535) return sender.reply('[Connect] Port must be an integer from 1 to 65535.');
 
-    database.addConnection(opts.username, args.join(' '))
+    let auth;
+    try {
+      auth = parseAuthentication(values.auth);
+    } catch (error) {
+      return sender.reply(`[Connect] ${error.message}`);
+    }
 
-    return mineflayer.startClient(options);
+    const cachePrefix = username.toUpperCase().replace(/[^A-Z0-9@._-]/gu, '_').slice(0, 64) || 'ACCOUNT';
+    const cacheHash = crypto.createHash('sha256').update(username.toLowerCase()).digest('hex').slice(0, 8);
+    const connectionOptions = {
+      username,
+      accountUsername: username,
+      host,
+      port,
+      auth,
+      profilesFolder: path.join(authenticationCachePath(), `${cachePrefix}-${cacheHash}`),
+      fakeHost: values['fake-host'] || host,
+      logErrors: false,
+      onMsaCode(data) {
+        sender.reply(`[Microsoft] Open ${data.verification_uri} and enter code ${data.user_code}.`);
+      }
+    };
+    if (values.version && values.version.toLowerCase() !== 'auto') connectionOptions.version = values.version;
 
+    const storedCommand = args.join(' ');
+    await database.addConnection(storedCommand);
+    sender.reply(`[Connect] Opening ${host}:${port} as ${username} (${auth}).`);
+    return mineflayer.startClient(connectionOptions);
   }
-}
+};
+
+module.exports.parseAuthentication = parseAuthentication;

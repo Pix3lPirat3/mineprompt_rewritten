@@ -1,45 +1,35 @@
+'use strict';
+
+const { Vec3 } = require('vec3');
+const { GoalNear } = require('mineflayer-pathfinder').goals;
+
 module.exports = {
   command: 'dig',
-  usage: 'dig [x y z]',
-  description: 'Dig a block at a specific coordinate.',
-  requires: {
-    entity: true
-  },
-  execute: async function(sender, command, args) {
-    // Dig block at cursor
+  usage: 'dig [cursor | x y z]',
+  description: 'Dig the targeted block or the block at specific coordinates.',
+  requires: { entity: true },
 
-    // If the bot is currently digging a block stop it
-    if(bot.targetDigBlock) return bot.stopDigging().catch(console.log);
-
-    if (args.length === 0 || args[0] == 'cursor') {
-      let blockAtCursor = bot.blockAtCursor(4.5); // 4.5 Survival | 5 Creative
-      if (!blockAtCursor) return console.log(`[Dig] There is no block at my cursor.`);
-      console.log(`[Dig] Digging ${blockAtCursor.name} at cursor.`)
-      await bot.dig(blockAtCursor);
-    }
-    // Dig block at specific coordinates
-    console.log(args, args.length)
-    if (args.length === 3) {
-      let [x, y, z] = args;
-
-      console.log(`[Dig] Digging block at ${x} ${y} ${z}`)
-
-      x = cleanInt(x);
-      if (isNaN(x)) return console.log(`[Dig] Unable to go to block, X: ${x} is invalid.`);
-      y = cleanInt(y);
-      if (isNaN(y)) return console.log(`[Dig] Unable to go to block, Y: ${y} is invalid.`);
-      z = cleanInt(z);
-      if (isNaN(y)) return console.log(`[Dig] Unable to go to block, Z: ${z} is invalid.`);
-
-      await bot.pathfinder.goto(new GoalNear(x, y, z, 2));
-      let blockAtPosition = bot.blockAt(v(x, y, z));
-      if (blockAtPosition === null || blockAtPosition.name == 'air') return console.log(`[Dig] The target block is ${blockAtPosition?.name}`);
-      await bot.dig(blockAtPosition).catch(console.log);
+  async execute(sender, command, args) {
+    if (bot.targetDigBlock) {
+      await bot.stopDigging();
+      return sender.reply('[Dig] Stopped the current dig.');
     }
 
-    function cleanInt(x) {
-      x = Number(x);
-      return x >= 0 ? Math.floor(x) : Math.ceil(x);
+    if (args.length === 0 || args[0].toLowerCase() === 'cursor') {
+      const block = bot.blockAtCursor(4.5);
+      if (!block) return sender.reply('[Dig] No block is within reach of the cursor.');
+      sender.reply(`[Dig] Digging ${block.displayName || block.name}.`);
+      return bot.dig(block);
     }
+
+    if (args.length !== 3) return sender.reply(`[Dig] Usage: ${this.usage}`);
+    const coordinates = args.map(Number);
+    if (coordinates.some((value) => !Number.isFinite(value))) return sender.reply('[Dig] Coordinates must be numbers.');
+    const position = new Vec3(...coordinates.map(Math.trunc));
+    await bot.pathfinder.goto(new GoalNear(position.x, position.y, position.z, 2));
+    const block = bot.blockAt(position);
+    if (!block || block.name === 'air') return sender.reply(`[Dig] No solid block exists at ${position}.`);
+    sender.reply(`[Dig] Digging ${block.displayName || block.name} at ${position}.`);
+    return bot.dig(block);
   }
-}
+};

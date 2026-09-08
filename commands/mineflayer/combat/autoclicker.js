@@ -1,56 +1,55 @@
-const autoClicker = {
-  running: undefined,
-  click_interval: 1000,
-  blacklist: ['experience_orb', 'item'],
-  start: () => {
-    if (autoClicker.running) return
-    autoClicker.running = setInterval(async function () {
-      if(!bot?.entity) clearInterval(autoClicker.running);
-      const entity = bot.entityAtCursor()
-      if (!entity || autoClicker.blacklist.includes(entity.name)) return bot.swingArm();
-      bot.attack(entity, true)
-    }, autoClicker.click_interval)
-  },
-  stop: () => {
-    autoClicker.running = clearInterval(autoClicker.running)
-  }
+'use strict';
+
+const state = { timer: null, interval: 1000 };
+
+function stop() {
+  if (state.timer) clearInterval(state.timer);
+  state.timer = null;
+}
+
+function start() {
+  stop();
+  state.timer = setInterval(() => {
+    if (!bot?.entity) return stop();
+    const entity = bot.entityAtCursor();
+    if (entity && !['experience_orb', 'item'].includes(entity.name)) {
+      void bot.attack(entity, true);
+    } else {
+      bot.swingArm();
+    }
+  }, state.interval);
 }
 
 module.exports = {
   command: 'autoclicker',
   aliases: ['clicker'],
-  usage: 'autoclicker <start/stop/speed> [interval {1000ms}]',
-  description: 'autoclicker quick-release (will be worked on more to add flags)',
-  requires: {
-    entity: true
-  },
+  usage: 'autoclicker <start|stop|speed> [milliseconds]',
+  description: 'Repeatedly swing or attack the entity under the cursor.',
+  requires: { entity: true },
   autocomplete: () => ['start', 'stop', 'speed'],
-  author: 'Pix3lPirat3',
-  execute: function(sender, command, args) {
-      if(!args.length) return sender.reply(`[${this.cmd}] ${this.usage}`);
+  reload: { pre: stop },
 
-      let interval = args[1] || 1000;
-
-      if(args[0] === 'start') {
-        if(autoClicker.running) return sender.reply('[Clicker] The autoclicker is already running.');
-        sender.reply(`[Clicker] Now swinging at ${autoClicker.click_interval}ms speed.`);
-        autoClicker.start();
-      }
-
-      if(args[0] === 'stop') {
-        if(!autoClicker.running) return sender.reply('[Clicker] The autoclicker is already off.');
-        autoClicker.stop();
-      }
-      if(args[0] === 'speed') {
-        if(args.length === 1) return sender.reply(`[Clicker] The clicker is running at: ${autoClicker.click_interval}`);
-        let new_speed = args[1];
-        autoClicker.click_interval = args[1];
-        if(autoClicker.running) {
-          autoClicker.stop();
-          sender.reply(`[Clicker] Now swinging at ${autoClicker.click_interval}ms speed.`);
-          autoClicker.start();
-        }
-      }
-
+  execute(sender, command, args) {
+    const action = args[0]?.toLowerCase();
+    if (!action) return sender.reply(`[Autoclicker] Usage: ${this.usage}`);
+    if (action === 'stop') {
+      if (!state.timer) return sender.reply('[Autoclicker] Already stopped.');
+      stop();
+      return sender.reply('[Autoclicker] Stopped.');
+    }
+    if (action === 'speed') {
+      if (args[1] === undefined) return sender.reply(`[Autoclicker] Interval: ${state.interval} ms.`);
+      const interval = Number(args[1]);
+      if (!Number.isInteger(interval) || interval < 50 || interval > 60000) return sender.reply('[Autoclicker] Interval must be an integer from 50 to 60000 ms.');
+      state.interval = interval;
+      if (state.timer) start();
+      return sender.reply(`[Autoclicker] Interval changed to ${interval} ms.`);
+    }
+    if (action === 'start') {
+      if (state.timer) return sender.reply('[Autoclicker] Already running.');
+      start();
+      return sender.reply(`[Autoclicker] Started at ${state.interval} ms.`);
+    }
+    return sender.reply(`[Autoclicker] Usage: ${this.usage}`);
   }
-}
+};

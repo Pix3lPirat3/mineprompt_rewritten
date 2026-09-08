@@ -1,17 +1,17 @@
+'use strict';
+
 module.exports = {
   command: 'scoreboard',
   usage: 'scoreboard',
-  description: 'Prints the scoreboard to the console.',
-  requires: {
-    entity: true
-  },
-  author: 'Pix3lPirat3',
-  execute: function(sender, command, args) {
-    Object.values(bot.scoreboard).filter(i => i !== undefined).forEach(function(scoreboard) {
-        scoreboard.items.forEach(function(line) {
-            console.terminal(line.displayName.toAnsi())
-            console.debug(line.displayName.toString())
-        });
-    });
+  description: 'Print all visible scoreboard lines.',
+  requires: { entity: true, console: true },
+
+  execute(sender) {
+    const lines = Object.values(bot.scoreboard || {})
+      .filter(Boolean)
+      .flatMap((scoreboard) => scoreboard.items || [])
+      .map((line) => line.displayName?.toString?.() || String(line.name || ''))
+      .filter(Boolean);
+    return sender.reply(lines.length ? lines.join('\n') : '[Scoreboard] No lines are visible.');
   }
-}
+};

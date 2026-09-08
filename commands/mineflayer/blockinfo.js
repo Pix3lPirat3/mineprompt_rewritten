@@ -1,42 +1,26 @@
-const util = require('util');
-var v = require('vec3');
+'use strict';
+
+const util = require('node:util');
+const { Vec3 } = require('vec3');
 
 module.exports = {
   command: 'blockinfo',
-  usage: 'blockinfo [\'cursor\' | x y z]',
-  description: 'Print the block data at the target.',
-  requires: {
-    entity: true
-  },
-  execute: function(sender, command, args) {
+  usage: 'blockinfo [cursor | x y z]',
+  description: 'Inspect the block under the cursor or at coordinates.',
+  requires: { entity: true, console: true },
 
-    // No Argument (or "cursor" argument) - Default to blockAtCursor
-    if (args.length === 0 || args[0] === 'cursor') {
-      let blockAtCursor = bot.blockAtCursor();
-      if (!blockAtCursor) return sender.reply(`[Blockinfo] There is no block at my cursor.`);
-
-      let distance = bot.entity.position.distanceTo(blockAtCursor.position).toFixed(2);
-
-      let blockInfo = util.inspect(blockAtCursor, { showHidden: false, depth: null, colors: true });
-      if(sender.type === 'player') sender.reply(`Block At Cursor: ${distance} blocks away (Check Console)`);
-      console.log('\n' + util.inspect(blockAtCursor, { showHidden: false, depth: null, colors: true }) + '\n')
+  execute(sender, command, args) {
+    let block;
+    if (args.length === 0 || args[0]?.toLowerCase() === 'cursor') {
+      block = bot.blockAtCursor();
+    } else if (args.length === 3) {
+      const coordinates = args.map(Number);
+      if (coordinates.some((value) => !Number.isFinite(value))) return sender.reply('[BlockInfo] Coordinates must be numbers.');
+      block = bot.blockAt(new Vec3(...coordinates.map(Math.trunc)));
+    } else {
+      return sender.reply(`[BlockInfo] Usage: ${this.usage}`);
     }
-
-    // blockinfo <x> <y> <z>
-    if (args.length === 3) {
-      let [x, y, z] = args;
-      x = cleanInt(x);
-      if (isNaN(x)) return sender.reply(`[BlockInfo] Unable to parse input, X: ${x} is invalid.`);
-      y = cleanInt(y);
-      if (isNaN(y)) return sender.reply(`[BlockInfo] Unable to parse input, Y: ${y} is invalid.`);
-      z = cleanInt(z);
-      if (isNaN(y)) return sender.reply(`[BlockInfo] Unable to parse input, Z: ${z} is invalid.`);
-      return console.log('\n' + util.inspect(bot.blockAt(v(x, y, z)), { showHidden: false, depth: null, colors: true }) + '\n'); // TODO: Get block at XYZ and print it
-    }
-
-    function cleanInt(x) {
-      x = Number(x);
-      return x >= 0 ? Math.floor(x) : Math.ceil(x);
-    }
+    if (!block) return sender.reply('[BlockInfo] No block was found.');
+    return sender.reply(util.inspect(block, { colors: false, depth: 4, maxArrayLength: 50, breakLength: 100 }));
   }
-}
+};

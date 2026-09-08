@@ -1,0 +1,92 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs/promises');
+const os = require('node:os');
+const path = require('node:path');
+const { ApplicationRuntime } = require('../src/main/application-runtime');
+
+test('runs global commands through the application runtime', async (context) => {
+  const userDataPath = await fs.mkdtemp(path.join(os.tmpdir(), 'mineprompt-runtime-'));
+  const events = [];
+  const runtime = await new ApplicationRuntime({
+    rootPath: path.resolve(__dirname, '..'),
+    userDataPath,
+    emit: (type, payload) => events.push({ type, payload })
+  }).init();
+  context.after(async () => {
+    await runtime.close();
+    await fs.rm(userDataPath, { recursive: true, force: true });
+  });
+
+  assert.equal(runtime.snapshot().commands.length, 8);
+  assert.equal((await runtime.execute('account add "Test Player" offline')).ok, true);
+  assert.equal((await runtime.execute('settings resource-packs accept')).ok, true);
+  assert.deepEqual(runtime.snapshot().accounts, [{ username: 'Test Player', authentication: false }]);
+  assert.equal(await runtime.store.getSetting('resourcePackPolicy'), 'accept');
+  assert.equal(events.some((event) => event.type === 'snapshot'), true);
+});
+
+test('validates profile and security preference updates', async (context) => {
+  const userDataPath = await fs.mkdtemp(path.join(os.tmpdir(), 'mineprompt-preferences-'));
+  const runtime = await new ApplicationRuntime({
+    rootPath: path.resolve(__dirname, '..'),
+    userDataPath,
+    emit: () => {}
+  }).init();
+  context.after(async () => {
+    await runtime.close();
+    await fs.rm(userDataPath, { recursive: true, force: true });
+  });
+
+  await runtime.saveProfile({ username: 'ExamplePlayer', authentication: 'microsoft' });
+  assert.deepEqual(runtime.snapshot().accounts, [{ username: 'ExamplePlayer', authentication: true }]);
+  const result = await runtime.savePreferences({
+    resourcePackPolicy: 'accept',
+    externalPlayerHeadsEnabled: true,
+    remoteCommandsEnabled: true,
+    remoteCommandPlayers: ['Builder_1', 'builder_1', 'Helper2']
+  });
+  assert.deepEqual(result.preferences, {
+    resourcePackPolicy: 'accept',
+    externalPlayerHeadsEnabled: true,
+    remoteCommandsEnabled: true,
+    remoteCommandPlayers: ['Builder_1', 'Helper2']
+  });
+  await assert.rejects(runtime.savePreferences({ resourcePackPolicy: 'ask' }), /Invalid resource-pack/u);
+  await assert.rejects(runtime.saveProfile({ username: 'Another', authentication: 'password' }), /authentication mode/u);
+  await assert.rejects(runtime.savePreferences({
+    resourcePackPolicy: 'deny',
+    remoteCommandPlayers: ['invalid player']
+  }), /letters, numbers/u);
+  await runtime.removeProfile('ExamplePlayer');
+  assert.deepEqual(runtime.snapshot().accounts, []);
+});
+
+test('completes connected commands from the full terminal input', async (context) => {
+  const userDataPath = await fs.mkdtemp(path.join(os.tmpdir(), 'mineprompt-completion-'));
+  const runtime = await new ApplicationRuntime({
+    rootPath: path.resolve(__dirname, '..'),
+    userDataPath,
+    emit: () => {}
+  }).init();
+  context.after(async () => {
+    runtime.client.bot = null;
+    await runtime.close();
+    await fs.rm(userDataPath, { recursive: true, force: true });
+  });
+
+  runtime.client.bot = {
+    entity: {},
+    players: {
+      PlayerOne: { username: 'PlayerOne' },
+      PixelPirate: { username: 'PixelPirate' }
+    }
+  };
+  runtime.commands.setCommands('mineflayer');
+
+  const completions = await runtime.complete('follow P');
+  assert.equal(completions.includes('PlayerOne'), true);
+  assert.equal(completions.includes('PixelPirate'), true);
+});

@@ -1,13 +1,19 @@
+'use strict';
+
 module.exports = {
   command: 'jump',
   usage: 'jump',
-  description: 'Have the bot jump.',
-  requires: {
-    entity: true
-  },
-  author: 'Pix3lPirat3',
-  execute: function(sender, command, args) {
+  description: 'Jump once.',
+  requires: { entity: true },
+
+  async execute(sender, command, args) {
+    if (args.length) return sender.reply(`[Jump] Usage: ${this.usage}`);
     bot.setControlState('jump', true);
-    bot.setControlState('jump', false);
+    try {
+      await bot.waitForTicks(1);
+    } finally {
+      bot.setControlState('jump', false);
+    }
+    return sender.reply('[Jump] Jumped.');
   }
-}
+};

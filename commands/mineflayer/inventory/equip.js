@@ -1,42 +1,28 @@
-var stringSimilarity = require("string-similarity");
+'use strict';
+
+const { closestMatches } = require('../../../src/main/suggestions');
+
+const DESTINATIONS = ['hand', 'head', 'torso', 'legs', 'feet', 'off-hand'];
 
 module.exports = {
   command: 'equip',
-  usage: 'equip <item | slot> <destination (hand, head, torso, legs, feet, off-hand)>',
-  description: 'Equip an item to the bot\'s hand or armor slot.',
-  requires: {
-    entity: true
-  },
-  autocomplete: () => bot.inventory.items().map(item => item.name),
-  execute: async function(sender, command, args) {
-    if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`);
+  usage: 'equip <item> [hand|head|torso|legs|feet|off-hand]',
+  description: 'Equip an inventory item in the requested slot.',
+  requires: { entity: true },
+  autocomplete: () => [...DESTINATIONS, ...new Set(bot.inventory.items().map((item) => item.name))],
 
-    let destinations = ['hand', 'head', 'torso', 'legs', 'feet', 'off-hand'];
-
-    let item = bot.inventory.findInventoryItem(args[0]);
-
-    if(!item) return sender.reply(`[Equip] There was no "${args[0]}" found in your inventory, did you mean: "${closestStringInArray(args[0], bot.inventory.items().map(item => item.name))}"`);
-
-    let destination;
-    if(args.length === 1) destination = 'hand';
-    if(args.length === 2) {
-      if(!destinations.includes(args[1])) return sender.reply(`[Equip] The desination "${args[1]}" is invalid. (${destinations.join(', ')})`);
-      destination = args[1];
+  async execute(sender, command, args) {
+    if (!args[0]) return sender.reply(`[Equip] Usage: ${this.usage}`);
+    const requested = args[0].toLowerCase();
+    const item = bot.inventory.items().find((entry) => entry.name.toLowerCase() === requested);
+    if (!item) {
+      const suggestions = closestMatches(requested, bot.inventory.items().map((entry) => entry.name));
+      return sender.reply(`[Equip] No ${requested} was found${suggestions.length ? `. Did you mean ${suggestions.join(', ')}?` : '.'}`);
     }
 
-    await bot.equip(item, destination)
-
-    function closestStringInArray(str, array) {
-
-      let removed_duplicates = array.filter((c, index) => {
-        return array.indexOf(c) === index;
-      });
-
-      let close_ratings = stringSimilarity.findBestMatch(args[0], removed_duplicates); // Match the closest match to `string` in `arr(ay)` (Returns Object)
-      let close_matches = close_ratings.ratings.sort((a, b) => b.rating - a.rating);
-      let option_show_matches_max = 3;
-      return close_matches.slice(0, option_show_matches_max).map(m => m.target).join(', ');
-    }
-
+    const destination = args[1]?.toLowerCase() || 'hand';
+    if (!DESTINATIONS.includes(destination)) return sender.reply(`[Equip] Destination must be ${DESTINATIONS.join(', ')}.`);
+    await bot.equip(item, destination);
+    return sender.reply(`[Equip] Equipped ${item.displayName || item.name} to ${destination}.`);
   }
-}
+};

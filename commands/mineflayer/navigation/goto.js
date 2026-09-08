@@ -1,31 +1,45 @@
-let { GoalNear } = require('mineflayer-pathfinder').goals;
+'use strict';
+
+const { GoalNear } = require('mineflayer-pathfinder').goals;
+
+function finiteNumber(value, label) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) throw new TypeError(`${label} must be a number.`);
+  return number;
+}
 
 module.exports = {
   command: 'goto',
-  usage: 'goto <player || x y z> [range]',
-  description: 'Go to a player or xyz coordinates.',
-  requires: {
-    entity: true
-  },
-  autocomplete: function() {
-    return Object.keys(bot.players);
-  },
-  author: 'Pix3lPirat3',
-  execute: async function(sender, command, args) {
-    let username = args[0];
-    if(target = Object.values(bot.players).find(e => e.username === username)?.entity) {
-      let range = args[1] || 2;
-      if(!target) sender.reply(`[Goto] I cannot see the player ${username}`);
-      let { x, y, z } = target.position;
-      sender.reply(`[Goto] Now navigating to ${target.username}`)
-      await bot.pathfinder.goto(new GoalNear(x, y, z, range))
+  usage: 'goto <player> [range] | goto <x> <y> <z> [range]',
+  description: 'Navigate to a visible player or coordinates.',
+  requires: { entity: true },
+  autocomplete: () => Object.keys(bot.players),
+
+  async execute(sender, command, args) {
+    if (args.length === 0) return sender.reply(`[Goto] Usage: ${this.usage}`);
+
+    if (args.length <= 2) {
+      const player = Object.values(bot.players).find((entry) => entry.username?.toLowerCase() === args[0].toLowerCase());
+      if (!player?.entity) return sender.reply(`[Goto] Could not see ${args[0]}.`);
+      const range = args[1] === undefined ? 2 : finiteNumber(args[1], 'Range');
+      if (range < 0) return sender.reply('[Goto] Range cannot be negative.');
+      const { x, y, z } = player.entity.position;
+      sender.reply(`[Goto] Navigating to ${player.username}.`);
+      return bot.pathfinder.goto(new GoalNear(x, y, z, range));
     }
-    if(args.length === 3) {
-      console.log(args)
-      let [ x, y, z ] = args;
-      let range = args[3] || 2;
-      sender.reply(`Going to ${x} ${y} ${z}`)
-      await bot.pathfinder.goto(new GoalNear(x, y, z, range));
+
+    if (args.length === 3 || args.length === 4) {
+      try {
+        const [x, y, z] = args.slice(0, 3).map((value, index) => finiteNumber(value, ['X', 'Y', 'Z'][index]));
+        const range = args[3] === undefined ? 2 : finiteNumber(args[3], 'Range');
+        if (range < 0) return sender.reply('[Goto] Range cannot be negative.');
+        sender.reply(`[Goto] Navigating to ${x}, ${y}, ${z}.`);
+        return await bot.pathfinder.goto(new GoalNear(x, y, z, range));
+      } catch (error) {
+        return sender.reply(`[Goto] ${error.message}`);
+      }
     }
+
+    return sender.reply(`[Goto] Usage: ${this.usage}`);
   }
-}
+};

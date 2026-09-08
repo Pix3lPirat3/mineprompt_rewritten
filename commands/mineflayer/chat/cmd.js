@@ -1,24 +1,21 @@
+'use strict';
+
 module.exports = {
   command: 'cmd',
-  usage: 'cmd <command>',
   aliases: ['command'],
-  description: 'Send a command to the server. (automatically prefixed by /)',
-  requires: {
-    entity: true
-  },
-  author: 'Pix3lPirat3',
-  autocomplete: function() {
-    return Object.keys(bot.players);
-  },
-  execute: function(sender, command, args) {
-    if (!args.length) return sender.reply(`[${this.command}] ${this.usage}`);
-    let msg = args.join(' ').trim();
-    if (msg.length > 256) return sender.reply(`[Cmd] Your command was bigger than 256 characters.`);
-    if(msg.match(/^login /)) {
-      console.log(`${i18n.__('console.prefix')} » Sending [[;red;]password] to the server`)
+  usage: 'cmd <server-command>',
+  description: 'Send a slash command to the server.',
+  requires: { entity: true },
+
+  execute(sender, command, args) {
+    if (!args.length) return sender.reply(`[Command] Usage: ${this.usage}`);
+    const message = args.join(' ').trim().replace(/^\//u, '');
+    if (!message || message.length > 255) return sender.reply('[Command] Server command must contain 1 to 255 characters.');
+    if (/^(?:login|register)\s/iu.test(message)) {
+      sender.reply('[Command] Sending a redacted authentication command to the server.');
     } else {
-      console.log(`${i18n.__('console.prefix')} » Sending "[[;#fff;]${msg}]" to the server.`)
+      sender.reply(`[Command] Sending /${message}`);
     }
-    bot.chat(`/${msg}`)
+    bot.chat(`/${message}`);
   }
-}
+};

@@ -1,16 +1,14 @@
+'use strict';
+
 module.exports = {
   command: 'reconnect',
   usage: 'reconnect',
-  description: 'Reconnect to the last attempted server.',
-  author: 'Pix3lPirat3',
-  requires: {
-    console: true
-  },
-  execute: async function(sender, command, args) {
+  description: 'Repeat the most recent connection command.',
+  requires: { console: true },
 
-    let last_connection = await database.getConnection();
-    if(!last_connection) return console.log(`[Reconnect] No connection stored, try connecting to a server first.`);
-
-    term.exec(`connect ${last_connection}`)
+  async execute(sender) {
+    const lastConnection = await database.getConnection();
+    if (!lastConnection) return sender.reply('[Reconnect] No previous connection is available.');
+    return term.exec(`connect ${lastConnection}`);
   }
-}
+};

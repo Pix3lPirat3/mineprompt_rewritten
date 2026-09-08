@@ -1,32 +1,26 @@
-let stringTable = require('string-table')
+'use strict';
+
+const fs = require('node:fs/promises');
+const path = require('node:path');
 const minecraftFolderPath = require('minecraft-folder-path');
 const nbt = require('prismarine-nbt');
-const path = require('path');
 
 module.exports = {
   command: 'servers',
   usage: 'servers',
-  description: 'Reads saved servers in Minecraft\'s servers.dat',
-  author: 'Pix3lPirat3',
-  requires: {
-    console: true
-  },
-  execute: async function(sender, command, args) {
-    let serversFile = path.join(minecraftFolderPath, 'servers.dat')
+  description: 'List servers saved by the Minecraft launcher.',
+  requires: { console: true },
 
+  async execute(sender) {
     try {
-      const buffer = await fs.readFileSync(serversFile);
+      const buffer = await fs.readFile(path.join(minecraftFolderPath, 'servers.dat'));
       const { parsed } = await nbt.parse(buffer);
-      let servers = await nbt.simplify(parsed).servers.map((srv, key) => ({
-        '#': key,
-        name: srv.name,
-        ip: srv.ip
-      }));
-      sender.reply(stringTable.create(servers))
-    } catch(e) {
-      sender.reply(`[Servers] The servers file could not be read. (.minecraft/servers.dat)`)
-      console.debug(e)
+      const servers = nbt.simplify(parsed).servers || [];
+      if (!servers.length) return sender.reply('[Servers] No saved servers were found.');
+      return sender.reply(servers.map((server, index) => `${index + 1}. ${server.name} - ${server.ip}`).join('\n'));
+    } catch (error) {
+      console.debug(error);
+      return sender.reply("[Servers] Minecraft's servers.dat file could not be read.");
     }
-
   }
-}
+};

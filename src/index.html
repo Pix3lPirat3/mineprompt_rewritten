@@ -1,200 +1,198 @@
-<!DOCTYPE html>
-<html style="overflow: hidden;">
+<!doctype html>
+<html lang="en">
   <head>
-    <meta charset="UTF-8" />
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <link rel="stylesheet" href="css/reset.css" />
-    <link rel="stylesheet" href="../node_modules/tippy.js/dist/tippy.css" />
-    <link rel="stylesheet" href="css/console-client.css" />
-    <link href="../node_modules/jquery.terminal/css/jquery.terminal.min.css" rel="stylesheet"/>
-    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto">
-    <script type="text/javascript" src="./js/i18n.config.js"></script>
-    <script>
-      // Page Load Time
-      var plt_start = Date.now();
-    </script>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: https://mc-heads.net; connect-src 'none'; object-src 'none'; frame-src 'none'; base-uri 'none'; form-action 'none'">
+    <title>MinePrompt</title>
+    <link rel="stylesheet" href="../node_modules/jquery.terminal/css/jquery.terminal.min.css">
+    <link rel="stylesheet" href="css/reset.css">
+    <link rel="stylesheet" href="css/console-client.css">
   </head>
   <body>
+    <main class="app-shell">
+      <aside class="sidebar" aria-label="Saved accounts">
+        <header class="brand">
+          <img class="brand__mark" src="img/heads/computer.png" alt="">
+          <div>
+            <h1>MinePrompt</h1>
+            <p id="app-version">Desktop client</p>
+          </div>
+        </header>
 
-    <div id="page-wrapper">
+        <section class="account-section">
+          <div class="section-heading">
+            <h2>Profiles</h2>
+            <div class="section-actions">
+              <button id="open-settings" class="section-button" type="button">Settings</button>
+              <button id="add-account" class="section-button" type="button">Add</button>
+            </div>
+          </div>
+          <div id="account-list" class="account-list" role="list"></div>
+          <p id="account-empty" class="empty-state">No saved profiles yet.</p>
+        </section>
 
-      <aside id="left-sidebar">
-        <div class="box-user">
-
-          <a id="sidebar-computer" class="box-img" style="margin-bottom: 5px;">
-            <img src="img/heads/computer.png">
-          </a>
-        </div>
-        <div id="sidebar-accounts">
-        </div>
+        <footer class="sidebar__footer">
+          <span class="shortcut"><kbd>Ctrl</kbd><kbd>R</kbd> reloads commands</span>
+          <a href="https://github.com/Pix3lPirat3/mineprompt_rewritten">Project repository</a>
+        </footer>
       </aside>
 
-      <div id="terminal-wrapper">
-
-        <div id="header">
-          <div id="player-stats">
-            <div style="float: left;">
-              <img id="active-account-head" src="img/heads/wood_question.png">
-              <div id="active-account-head-text">
-                <div><span data-replace="username"></span></div>
-                <div data-replace="position"></div>
+      <section class="workspace">
+        <header class="session-bar">
+          <div class="identity">
+            <img id="active-head" class="identity__head" src="img/heads/wood_question.png" alt="Current player head">
+            <div class="identity__copy">
+              <div class="identity__name-row">
+                <strong id="active-name">Not connected</strong>
+                <span id="connection-status" class="status status--disconnected">Offline</span>
               </div>
-            </div>
-            <div style="float: right; margin: 0 5px 0 auto;">
-              <div id="bot-health">
-                <img src="img/hearts/heart-empty.png">
-                <img src="img/hearts/heart-empty.png">
-                <img src="img/hearts/heart-empty.png">
-                <img src="img/hearts/heart-empty.png">
-                <img src="img/hearts/heart-empty.png">
-                <img src="img/hearts/heart-empty.png">
-                <img src="img/hearts/heart-empty.png">
-                <img src="img/hearts/heart-empty.png">
-                <img src="img/hearts/heart-empty.png">
-                <img src="img/hearts/heart-empty.png">
-              </div>
-
-              <div id="bot-hunger">
-                <img src="img/hunger/hunger-empty.webp">
-                <img src="img/hunger/hunger-empty.webp">
-                <img src="img/hunger/hunger-empty.webp">
-                <img src="img/hunger/hunger-empty.webp">
-                <img src="img/hunger/hunger-empty.webp">
-                <img src="img/hunger/hunger-empty.webp">
-                <img src="img/hunger/hunger-empty.webp">
-                <img src="img/hunger/hunger-empty.webp">
-                <img src="img/hunger/hunger-empty.webp">
-                <img src="img/hunger/hunger-empty.webp">
-              </div>
+              <span id="active-position" class="identity__meta">Connect to a Java server to begin</span>
             </div>
           </div>
 
-        </div>
+          <button id="quick-connect" class="secondary-button" type="button">Connect</button>
 
-        <div id="terminal">
-
-        </div>
-
-        <div id="footer">
-          <div id="bot-effects">
-            <!--
-            <div id="bot-effects" style="float: left; display: block; margin-left: auto; max-width: 100px; text-align: center;">
-              </div>
-            -->
+          <div class="vitals" aria-label="Player vitals">
+            <div id="health" class="vital-row" title="Health"></div>
+            <div id="hunger" class="vital-row" title="Hunger"></div>
           </div>
-          <div style="margin: 0 5px 0 auto;">
-            <span data-replace="runtime"></span>
+        </header>
+
+        <div id="terminal" class="terminal" aria-label="MinePrompt terminal"></div>
+
+        <footer class="session-footer">
+          <div id="effects" class="effects" aria-label="Active effects"></div>
+          <div class="session-time">
+            <span class="session-time__label">Session</span>
+            <span id="runtime">--</span>
           </div>
+        </footer>
+      </section>
+    </main>
+
+    <dialog id="profile-dialog" class="dialog">
+      <form id="profile-form" class="dialog__form">
+        <header class="dialog__header">
+          <div>
+            <span class="dialog__eyebrow">Profile</span>
+            <h2 id="profile-title">Add profile</h2>
+          </div>
+          <button class="dialog__close" type="button" data-close="profile-dialog">Close</button>
+        </header>
+        <input id="profile-original" type="hidden">
+        <label class="field">
+          <span>Account name or email</span>
+          <input id="profile-username" name="username" required maxlength="254" autocomplete="username">
+        </label>
+        <label class="field">
+          <span>Authentication</span>
+          <select id="profile-auth" name="authentication">
+            <option value="microsoft">Microsoft</option>
+            <option value="offline">Offline mode</option>
+          </select>
+        </label>
+        <p id="profile-error" class="dialog__error" role="alert"></p>
+        <footer class="dialog__actions dialog__actions--split">
+          <button id="delete-profile" class="danger-button" type="button">Delete</button>
+          <div>
+            <button class="secondary-button" type="button" data-close="profile-dialog">Cancel</button>
+            <button class="primary-button" type="submit">Save profile</button>
+          </div>
+        </footer>
+      </form>
+    </dialog>
+
+    <dialog id="connect-dialog" class="dialog">
+      <form id="connect-form" class="dialog__form">
+        <header class="dialog__header">
+          <div>
+            <span class="dialog__eyebrow">Java Edition</span>
+            <h2>Connect to a server</h2>
+          </div>
+          <button class="dialog__close" type="button" data-close="connect-dialog">Close</button>
+        </header>
+        <div class="field-grid">
+          <label class="field field--wide">
+            <span>Account name or email</span>
+            <input id="connect-username" required maxlength="254" autocomplete="username">
+          </label>
+          <label class="field">
+            <span>Authentication</span>
+            <select id="connect-auth">
+              <option value="microsoft">Microsoft</option>
+              <option value="offline">Offline mode</option>
+            </select>
+          </label>
+          <label class="field field--wide">
+            <span>Server address</span>
+            <input id="connect-host" required placeholder="play.example.net" spellcheck="false">
+          </label>
+          <label class="field">
+            <span>Port</span>
+            <input id="connect-port" type="number" min="1" max="65535" value="25565" required>
+          </label>
+          <label class="field">
+            <span>Version</span>
+            <input id="connect-version" placeholder="Automatic" spellcheck="false">
+          </label>
+          <label class="field field--wide">
+            <span>Handshake address</span>
+            <input id="connect-fake-host" placeholder="Optional proxy hostname" spellcheck="false">
+          </label>
         </div>
-      </div>
+        <p id="connect-error" class="dialog__error" role="alert"></p>
+        <footer class="dialog__actions">
+          <button class="secondary-button" type="button" data-close="connect-dialog">Cancel</button>
+          <button class="primary-button" type="submit">Connect</button>
+        </footer>
+      </form>
+    </dialog>
 
-    </div>
+    <dialog id="settings-dialog" class="dialog">
+      <form id="settings-form" class="dialog__form">
+        <header class="dialog__header">
+          <div>
+            <span class="dialog__eyebrow">MinePrompt</span>
+            <h2>Security settings</h2>
+          </div>
+          <button class="dialog__close" type="button" data-close="settings-dialog">Close</button>
+        </header>
+        <label class="field">
+          <span>Server resource packs</span>
+          <select id="settings-resource-packs">
+            <option value="deny">Decline by default</option>
+            <option value="accept">Accept automatically</option>
+          </select>
+        </label>
+        <label class="toggle-field">
+          <span>
+            <strong>Online player heads</strong>
+            <small>Fetch profile images from mc-heads.net. Enabling this shares player names with that service.</small>
+          </span>
+          <input id="settings-external-heads" type="checkbox">
+        </label>
+        <label class="toggle-field">
+          <span>
+            <strong>Remote chat commands</strong>
+            <small>Allow listed players to control the connected bot with !commands.</small>
+          </span>
+          <input id="settings-remote-enabled" type="checkbox">
+        </label>
+        <label class="field">
+          <span>Allowed player names</span>
+          <textarea id="settings-remote-players" rows="4" placeholder="One Java username per line" spellcheck="false"></textarea>
+        </label>
+        <p id="settings-error" class="dialog__error" role="alert"></p>
+        <footer class="dialog__actions">
+          <button class="secondary-button" type="button" data-close="settings-dialog">Cancel</button>
+          <button class="primary-button" type="submit">Save settings</button>
+        </footer>
+      </form>
+    </dialog>
 
-
-    <!--Creates the popup body-->
-    <div class="popup-overlay" style="display: none">
-    <!--Creates the popup content-->
-      <div class="popup-content">
-        <h2>Pop-Up</h2>
-        <p> This is an example pop-up that you can make using jQuery.</p>
-       <!--popup's close button-->
-        <button class="close">Close</button>    
-      </div>
-    </div>
-
-    <!-- Insert this line above script imports  -->
-    <script>if (typeof module === 'object') {window.module = module; module = undefined;}</script>
-
-    <!-- normal script imports etc  -->
-    <script src="../node_modules/@popperjs/core/dist/umd/popper.js"></script>
-    <script src="../node_modules/tippy.js/dist/tippy.umd.min.js"></script>
     <script src="../node_modules/jquery/dist/jquery.min.js"></script>
-
     <script src="../node_modules/jquery.terminal/js/jquery.terminal.min.js"></script>
-    <script src="../node_modules/jquery.terminal/js/autocomplete_menu.js"></script>
-    <script src="../node_modules/jquery.terminal/js/unix_formatting.js"></script>
-    <script>
-
-      tippy.delegate('#sidebar-accounts', {
-        target: '[data-tippy-content]',
-        placement: 'right',
-        allowHTML: true
-      });
-      tippy.delegate('#bot-effects', {
-        target: '[data-tippy-content]',
-        placement: 'top',
-        allowHTML: true
-      });
-    </script>
-
-    <link rel="stylesheet" href="../node_modules/jquery-contextmenu/dist/jquery.contextMenu.min.css">
-    <script src="../node_modules/jquery-contextmenu/dist/jquery.contextMenu.min.js"></script>
-    <script src="../node_modules/jquery-contextmenu/dist/jquery.ui.position.js"></script>
-
-    <script>
-      $.contextMenu({
-        selector: "#sidebar-accounts .box-user",
-        build: function(trigger) {
-          var options = {
-            callback: function(key, options) {
-              //var m = "clicked: " + key;
-              //window.console && console.log(m) || alert(m);
-            },
-            items: {
-              name: {
-                  name: "Username", 
-                  type: 'text', 
-                  value: $(trigger.currentTarget).data('username'),
-              },
-              select: {
-                  name: "Authentication", 
-                  type: 'select', 
-                  options: {1: 'microsoft', 2: 'offline'}, 
-                  selected: 2
-              }
-            },
-            events: {
-              show: function(opt) {
-                  // this is the trigger element
-                  var $this = this;
-                  // import states from data store 
-                  //$.contextMenu.setInputValues(opt, $this.data());
-                  // this basically fills the input commands from an object
-                  // like {name: "foo", yesno: true, radio: "3", &hellip;}
-              }, 
-              hide: function(opt) {
-                  // this is the trigger element
-                  var $this = $(this);
-                  // export states to data store
-                  let data = $.contextMenu.getInputValues(opt, $this.data());
-                  // this basically dumps the input commands' values to an object
-                  // like {name: "foo", yesno: true, radio: "3", &hellip;}
-              }
-          }
-          };
-          return options;
-        }
-      });
-    </script>
-
-    <script src="js/sidebar.js"></script>
-    <script src="js/terminal.js"></script>
-    <script src="js/ui-global.js"></script>
-    <script src="js/ui-mineflayer.js"></script>
-    <!-- <script src="js/discord.js"></script>  -->
-    <script src="./js/storage.js"></script>
-    <script>
-      
-    </script>
-    <script>
-      $(window).on('load', function() {
-        let plt_delay = Date.now() - plt_start;
-        console.debug(`[MinePrompt] The page took ${plt_delay}ms to load..`)
-      });
-    </script>
-    <script src="js/ui-bedrock.js"></script>
-    <!-- Insert this line after script imports -->
-    <script>if (window.module) module = window.module;</script>
-
+    <script src="js/renderer.js"></script>
   </body>
 </html>
