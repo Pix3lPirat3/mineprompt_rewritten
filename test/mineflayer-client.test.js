@@ -59,6 +59,14 @@ function fixture(settings = {}) {
         effects: { speed: { id: 1 } }
       };
       this.registry = { effects: { 1: { name: 'speed', displayName: 'Speed' } } };
+      const item = { slot: 36, name: 'diamond', displayName: 'Diamond', count: 2 };
+      this.inventory = {
+        slots: Array.from({ length: 46 }, (_, index) => index === 36 ? item : null),
+        inventoryStart: 9,
+        inventoryEnd: 46,
+        hotbarStart: 36,
+        items: () => [item]
+      };
       this.pathfinder = {
         setMovements: (movements) => { this.movements = movements; },
         isMoving: () => false
@@ -134,6 +142,13 @@ test('tracks a complete connection lifecycle', async () => {
   assert.equal(context.state.some((entry) => entry[0] === 'position' && entry[1] === '(1, 64, 2)'), true);
   assert.equal(context.state.some((entry) => entry[0] === 'health' && entry[1] === 18), true);
   assert.equal(context.state.some((entry) => entry[0] === 'effects' && entry[1][0].displayName === 'Speed'), true);
+  assert.deepEqual(context.client.snapshot().inventory[0], {
+    slot: 36,
+    name: 'diamond',
+    displayName: 'Diamond',
+    count: 2,
+    hotbarIndex: 0
+  });
 
   bot.emit('kicked', { toString: () => 'Maintenance' });
   assert.equal(context.log.some((entry) => entry[1] === '[Connection] Kicked: Maintenance'), true);

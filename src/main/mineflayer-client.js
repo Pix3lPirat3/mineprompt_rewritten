@@ -108,7 +108,8 @@ class MineflayerClient {
     });
 
     bot.on('windowOpen', (window) => {
-      const title = window?.title?.toString?.() || 'container';
+      let title = 'container';
+      try { title = typeof window?.title === 'string' ? window.title : new this.chatMessageClass(window?.title).toString(); } catch {}
       this.logger.info(`[Inventory] Opened ${title}.`);
       this.onSnapshot();
     });
@@ -233,20 +234,27 @@ class MineflayerClient {
 
   snapshot() {
     const bot = this.bot;
-    if (!bot?.entity) return { players: [], inventory: [], container: [], server: null };
+    if (!bot?.entity) return { connectionId: this.connectionAttempt, windowId: null, containerOpen: false, players: [], inventory: [], container: [], server: null };
+    const activeWindow = bot.currentWindow || bot.inventory;
     const items = (values) => values.map((item) => ({
       slot: item.slot,
       name: item.name,
       displayName: item.displayName || item.name,
-      count: item.count
+      count: item.count,
+      hotbarIndex: item.slot >= activeWindow.hotbarStart && item.slot < activeWindow.inventoryEnd
+        ? item.slot - activeWindow.hotbarStart
+        : null
     }));
     return {
+      connectionId: this.connectionAttempt,
+      windowId: bot.currentWindow?.id ?? null,
+      containerOpen: Boolean(bot.currentWindow),
       players: Object.values(bot.players || {}).filter((player) => player.username).map((player) => ({
         username: player.username,
         ping: Number.isFinite(player.ping) && player.ping >= 0 ? player.ping : null,
         visible: Boolean(player.entity)
       })).sort((left, right) => left.username.localeCompare(right.username)),
-      inventory: items(bot.inventory?.items?.() || []),
+      inventory: items(activeWindow?.items?.() || []),
       container: items(bot.currentWindow?.containerItems?.() || []),
       server: bot.lastOptions ? {
         host: bot.lastOptions.host,

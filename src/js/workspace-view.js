@@ -6,6 +6,15 @@ class WorkspaceView {
     this.handlers = handlers;
     this.terminal = null;
     this.events = [];
+    this.session = {};
+    this.elements.itemContextMenu.addEventListener('pointerdown', (event) => event.stopPropagation());
+    this.elements.itemContextMenu.addEventListener('keydown', (event) => this.navigateMenu(event));
+    this.elements.containerActions.addEventListener('click', (event) => this.openContainerMenu(event));
+    document.addEventListener('pointerdown', () => this.closeItemMenu());
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') this.closeItemMenu();
+    });
+    window.addEventListener('resize', () => this.closeItemMenu());
   }
 
   setTerminal(terminal) {
@@ -97,7 +106,144 @@ class WorkspaceView {
     return button;
   }
 
+  closeItemMenu() {
+    this.elements.itemContextMenu.hidden = true;
+    this.elements.itemContextMenu.replaceChildren();
+  }
+
+  navigateMenu(event) {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    const buttons = [...this.elements.itemContextMenu.querySelectorAll('button:not(:disabled)')];
+    if (!buttons.length) return;
+    event.preventDefault();
+    const current = buttons.indexOf(document.activeElement);
+    const indexes = {
+      ArrowDown: current < 0 ? 0 : (current + 1) % buttons.length,
+      ArrowUp: current < 0 ? buttons.length - 1 : (current - 1 + buttons.length) % buttons.length,
+      Home: 0,
+      End: buttons.length - 1
+    };
+    buttons[indexes[event.key]].focus();
+  }
+
+  async runMenuAction(entry) {
+    this.closeItemMenu();
+    if (entry.confirmation && !await this.handlers.confirmAction(entry.confirmation)) return;
+    await this.handlers.inventoryAction({ ...entry.request, confirmed: Boolean(entry.confirmation) });
+  }
+
+  showItemMenu(entries, event) {
+    event.preventDefault();
+    event.stopPropagation();
+    const menu = this.elements.itemContextMenu;
+    menu.replaceChildren(...entries.map((entry) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.role = 'menuitem';
+      button.textContent = entry.label;
+      if (entry.danger) button.dataset.danger = 'true';
+      button.addEventListener('click', () => this.runMenuAction(entry));
+      return button;
+    }));
+    menu.hidden = false;
+    const anchor = event.currentTarget.getBoundingClientRect();
+    const requestedX = event.clientX || anchor.right;
+    const requestedY = event.clientY || anchor.bottom;
+    menu.style.left = `${Math.max(8, Math.min(requestedX, window.innerWidth - menu.offsetWidth - 8))}px`;
+    menu.style.top = `${Math.max(8, Math.min(requestedY, window.innerHeight - menu.offsetHeight - 8))}px`;
+    menu.querySelector('button')?.focus();
+  }
+
+  request(scope, action, values = {}) {
+    return {
+      scope,
+      action,
+      connectionId: this.session.connectionId,
+      windowId: this.session.windowId,
+      ...values
+    };
+  }
+
+  itemActions(item, scope) {
+    const target = String(item.slot);
+    if (scope === 'container') {
+      return [
+        { label: 'Inspect', request: this.request(scope, 'inspect', { target }) },
+        { label: 'Take one', request: this.request(scope, 'take', { target, quantity: 'one' }) },
+        { label: 'Take stack', request: this.request(scope, 'take', { target, quantity: 'stack' }) },
+        { label: 'Take all matching', request: this.request(scope, 'take', { target, quantity: 'all' }) },
+        { label: 'Quick-move stack', request: this.request(scope, 'quick-move', { target }) },
+        { label: 'Deposit matching items', request: this.request(scope, 'deposit', { target: item.name, quantity: 'all' }) }
+      ];
+    }
+    const entries = [{ label: 'Inspect', request: this.request(scope, 'inspect', { target }) }];
+    if (this.session.containerOpen) {
+      entries.push(
+        { label: 'Deposit one', request: this.request('container', 'deposit', { target, quantity: 'one' }) },
+        { label: 'Deposit stack', request: this.request('container', 'deposit', { target, quantity: 'stack' }) },
+        { label: 'Deposit all matching', request: this.request('container', 'deposit', { target, quantity: 'all' }) }
+      );
+      return entries;
+    }
+    entries.push(
+      { label: 'Use item', request: this.request(scope, 'use', { target }) },
+      { label: 'Equip to hand', request: this.request(scope, 'equip', { target, destination: 'hand' }) },
+      { label: 'Equip to off hand', request: this.request(scope, 'equip', { target, destination: 'off-hand' }) },
+      { label: 'Equip to head', request: this.request(scope, 'equip', { target, destination: 'head' }) },
+      { label: 'Equip to torso', request: this.request(scope, 'equip', { target, destination: 'torso' }) },
+      { label: 'Equip to legs', request: this.request(scope, 'equip', { target, destination: 'legs' }) },
+      { label: 'Equip to feet', request: this.request(scope, 'equip', { target, destination: 'feet' }) }
+    );
+    if (item.hotbarIndex !== null) entries.push({ label: `Select hotbar slot ${item.hotbarIndex}`, request: this.request(scope, 'select', { target: item.hotbarIndex }) });
+    entries.push(
+      { label: 'Drop one', danger: true, request: this.request(scope, 'drop', { target, quantity: 'one' }) },
+      { label: 'Drop stack', danger: true, request: this.request(scope, 'drop', { target, quantity: 'stack' }) },
+      {
+        label: 'Drop all matching',
+        danger: true,
+        confirmation: `Drop every carried stack of ${item.displayName}?`,
+        request: this.request(scope, 'drop', { target, quantity: 'all' })
+      }
+    );
+    return entries;
+  }
+
+  inventoryEntry(item, scope) {
+    const row = document.createElement('div');
+    row.className = 'inventory-entry';
+    const inspect = document.createElement('button');
+    inspect.type = 'button';
+    inspect.className = 'inventory-entry__main';
+    inspect.textContent = `${item.slot}. ${item.displayName} x${item.count}`;
+    inspect.title = `Inspect ${item.displayName}`;
+    inspect.addEventListener('click', () => this.handlers.inventoryAction(this.request(scope, 'inspect', { target: String(item.slot) })));
+    inspect.addEventListener('contextmenu', (event) => this.showItemMenu(this.itemActions(item, scope), event));
+    inspect.addEventListener('keydown', (event) => {
+      if (event.key === 'F10' && event.shiftKey) this.showItemMenu(this.itemActions(item, scope), event);
+    });
+    const actions = document.createElement('button');
+    actions.type = 'button';
+    actions.className = 'inventory-entry__menu';
+    actions.textContent = 'Actions';
+    actions.setAttribute('aria-label', `Actions for ${item.displayName}`);
+    actions.addEventListener('click', (event) => this.showItemMenu(this.itemActions(item, scope), event));
+    row.append(inspect, actions);
+    return row;
+  }
+
+  openContainerMenu(event) {
+    this.showItemMenu([
+      {
+        label: 'Deposit inventory',
+        confirmation: 'Deposit every carried inventory stack into this container?',
+        request: this.request('container', 'deposit', { target: 'all', quantity: 'all' })
+      },
+      { label: 'Close container', request: this.request('container', 'close') }
+    ], event);
+  }
+
   renderSession(session = {}, activities = []) {
+    this.session = session;
     const players = session.players || [];
     this.elements.sessionPlayers.replaceChildren(...players.map((player) => {
       const row = document.createElement('div');
@@ -121,25 +267,14 @@ class WorkspaceView {
     this.elements.playersEmpty.hidden = players.length > 0;
 
     const inventory = session.inventory || [];
-    this.elements.sessionInventory.replaceChildren(...inventory.slice(0, 36).map((item) => {
-      const row = document.createElement('button');
-      row.type = 'button';
-      row.className = 'inventory-row';
-      row.textContent = `${item.slot}. ${item.displayName} x${item.count}`;
-      row.title = `Run inventory ${item.slot}`;
-      row.addEventListener('click', () => this.terminal.exec(`inventory ${item.slot}`));
-      return row;
-    }));
+    this.elements.sessionInventory.replaceChildren(...inventory.slice(0, 36).map((item) => this.inventoryEntry(item, 'inventory')));
     this.elements.inventoryEmpty.hidden = inventory.length > 0;
 
     const container = session.container || [];
-    this.elements.sessionContainer.replaceChildren(...container.map((item) => {
-      const row = document.createElement('div');
-      row.className = 'inventory-row inventory-row--readonly';
-      row.textContent = `${item.slot}. ${item.displayName} x${item.count}`;
-      return row;
-    }));
-    this.elements.containerEmpty.hidden = container.length > 0;
+    this.elements.sessionContainer.replaceChildren(...container.map((item) => this.inventoryEntry(item, 'container')));
+    this.elements.containerEmpty.hidden = session.containerOpen && container.length > 0;
+    this.elements.containerEmpty.textContent = session.containerOpen ? 'Container is empty.' : 'No container is open.';
+    this.elements.containerActions.hidden = !session.containerOpen;
 
     this.elements.sessionTasks.replaceChildren(...activities.map((activity) => {
       const row = document.createElement('div');

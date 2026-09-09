@@ -88,8 +88,16 @@ test('completes connected commands from the full terminal input', async (context
     await fs.rm(userDataPath, { recursive: true, force: true });
   });
 
+  const diamond = { slot: 36, name: 'diamond', displayName: 'Diamond', count: 2 };
   runtime.client.bot = {
     entity: {},
+    inventory: {
+      slots: Array.from({ length: 46 }, (_, index) => index === 36 ? diamond : null),
+      inventoryStart: 9,
+      inventoryEnd: 46,
+      hotbarStart: 36,
+      items: () => [diamond]
+    },
     players: {
       PlayerOne: { username: 'PlayerOne' },
       PixelPirate: { username: 'PixelPirate' }
@@ -100,6 +108,20 @@ test('completes connected commands from the full terminal input', async (context
   const completions = await runtime.complete('follow P');
   assert.equal(completions.includes('PlayerOne'), true);
   assert.equal(completions.includes('PixelPirate'), true);
+  assert.equal((await runtime.complete('inventory equip d')).includes('diamond'), true);
+  assert.equal((await runtime.complete('inventory equip diamond ')).includes('hand'), true);
+  const apple = { slot: 2, name: 'apple', displayName: 'Apple', count: 4 };
+  runtime.client.bot.currentWindow = {
+    id: 4,
+    slots: Array.from({ length: 46 }, (_, index) => index === 2 ? apple : index === 9 ? diamond : null),
+    inventoryStart: 9,
+    inventoryEnd: 46,
+    hotbarStart: 37,
+    items: () => [diamond],
+    containerItems: () => [apple]
+  };
+  assert.equal((await runtime.complete('container take a')).includes('apple'), true);
+  assert.equal((await runtime.complete('container take apple ')).includes('one'), true);
 });
 
 test('exports bounded diagnostics without saved identities or servers', async (context) => {

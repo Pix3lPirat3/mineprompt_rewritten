@@ -77,6 +77,26 @@ account remove Alex
 
 Profiles can also be created and edited from the sidebar. Selecting one opens a connection form without requiring terminal syntax.
 
+## Inventory and containers
+
+Select an item in the session inspector to view its details. Right-click it, press its Actions button, or use <kbd>Shift</kbd>+<kbd>F10</kbd> to open the same inventory actions available in the terminal.
+
+```text
+inventory list
+inventory inspect 36
+inventory equip diamond_pickaxe hand
+inventory use cooked_beef
+inventory drop cobblestone stack
+
+container list
+container take diamond one
+container deposit cobblestone all
+container quick-move 4
+container close
+```
+
+Bulk drops and full-inventory deposits require `confirm` at the end of the terminal command. Context-menu actions display a confirmation dialog instead. Existing commands such as `equip`, `dropitem`, `changeslot`, `useitem`, `window`, and `closecontainer` remain available as shortcuts.
+
 ## Security settings
 
 Review the active policy:

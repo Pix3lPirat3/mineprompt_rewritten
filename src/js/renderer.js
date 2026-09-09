@@ -71,10 +71,14 @@ const elements = {
   inventoryEmpty: document.querySelector('#inventory-empty'),
   sessionContainer: document.querySelector('#session-container'),
   containerEmpty: document.querySelector('#container-empty'),
+  containerActions: document.querySelector('#container-actions'),
   sessionTasks: document.querySelector('#session-tasks'),
   tasksEmpty: document.querySelector('#tasks-empty'),
   sessionEvents: document.querySelector('#session-events'),
-  eventsEmpty: document.querySelector('#events-empty')
+  eventsEmpty: document.querySelector('#events-empty'),
+  itemContextMenu: document.querySelector('#item-context-menu'),
+  actionConfirmDialog: document.querySelector('#action-confirm-dialog'),
+  actionConfirmMessage: document.querySelector('#action-confirm-message')
 };
 
 let terminal;
@@ -113,6 +117,24 @@ function showDialog(dialog, focusTarget) {
 
 function closeDialog(dialog) {
   if (dialog.open) dialog.close();
+}
+
+function confirmAction(message) {
+  elements.actionConfirmMessage.textContent = message;
+  elements.actionConfirmDialog.returnValue = 'cancel';
+  showDialog(elements.actionConfirmDialog);
+  return new Promise((resolve) => {
+    elements.actionConfirmDialog.addEventListener('close', () => resolve(elements.actionConfirmDialog.returnValue === 'confirm'), { once: true });
+  });
+}
+
+async function inventoryAction(request) {
+  try {
+    return await window.mineprompt.inventoryAction(request);
+  } catch (error) {
+    terminal.error(errorMessage(error));
+    return { ok: false, error: errorMessage(error) };
+  }
 }
 
 function openProfile(account = null) {
@@ -390,6 +412,8 @@ async function initialize() {
   terminal.history().set(terminal.history().data().filter(globalThis.minepromptTerminalPolicy.shouldStoreCommand));
   workspaceView = new globalThis.minepromptWorkspaceView.WorkspaceView(elements, {
     closeCommands: () => closeDialog(elements.commandsDialog),
+    confirmAction,
+    inventoryAction,
     openConnection,
     openProfile,
     openServer,

@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const inventory = require('../commands/mineflayer/inventory/inventory');
+const container = require('../commands/mineflayer/inventory/window');
 const goto = require('../commands/mineflayer/navigation/goto');
 const disconnect = require('../commands/mineflayer/disconnect');
 
@@ -11,29 +12,42 @@ function sender() {
   return { replies, value: { type: 'terminal', reply: (message) => replies.push(message) } };
 }
 
-test('lists and inspects inventory slots', () => {
+test('lists and inspects inventory slots', async () => {
   const item = { slot: 9, name: 'diamond', displayName: 'Diamond', count: 3 };
-  const bot = {
-    registry: { version: { '<': () => false } },
-    inventory: {
-      slots: Array.from({ length: 46 }, (_, index) => index === 9 ? item : null),
-      items: () => [item]
+  const service = {
+    items: () => [item],
+    execute: async (request) => {
+      if (request.target !== '9') throw new Error('No item was found.');
+      return { message: '[Inventory] Diamond\nName: diamond\nCount: 3\nSlot: 9' };
     }
   };
-  const ChatMessage = class {
-    toString() { return 'Custom item'; }
-  };
   const listing = sender();
-  inventory.execute(listing.value, 'inventory', [], { bot, chatMessageClass: ChatMessage });
+  await inventory.execute(listing.value, 'inventory', [], { inventory: service });
   assert.match(listing.replies[0], /diamond/u);
   assert.match(listing.replies[0], /3/u);
   const detail = sender();
-  inventory.execute(detail.value, 'inventory', ['9'], { bot, chatMessageClass: ChatMessage });
+  await inventory.execute(detail.value, 'inventory', ['9'], { inventory: service });
   assert.match(detail.replies[0], /Name: diamond/u);
   assert.match(detail.replies[0], /Slot: 9/u);
-  const invalid = sender();
-  inventory.execute(invalid.value, 'inventory', ['99'], { bot, chatMessageClass: ChatMessage });
-  assert.equal(invalid.replies[0], '[Inventory] Slot is out of range.');
+});
+
+test('maps terminal inventory actions to the shared service', async () => {
+  const requests = [];
+  const service = {
+    items: () => [],
+    execute: async (request) => {
+      requests.push(request);
+      return { message: 'Completed.' };
+    }
+  };
+  await inventory.execute(sender().value, 'inventory', ['drop', 'diamond', 'all', 'confirm'], { inventory: service });
+  await container.execute(sender().value, 'container', ['take', '4', 'one'], { inventory: service });
+  await container.execute(sender().value, 'container', ['deposit', 'all', 'confirm'], { inventory: service });
+  assert.deepEqual(requests, [
+    { scope: 'inventory', action: 'drop', target: 'diamond', quantity: 'all', confirmed: true },
+    { scope: 'container', action: 'take', target: '4', quantity: 'one' },
+    { scope: 'container', action: 'deposit', target: 'all', quantity: 'all', confirmed: true }
+  ]);
 });
 
 test('navigates to players and coordinates', async () => {

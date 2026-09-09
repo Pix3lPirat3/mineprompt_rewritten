@@ -9,6 +9,7 @@ const { CommandRegistry } = require('./command-registry');
 const { MineflayerClient } = require('./mineflayer-client');
 const { ActivityManager } = require('./activity-manager');
 const { ConnectionService, validateServer } = require('./connection-service');
+const { InventoryService } = require('./inventory-service');
 
 const REMOTE_CAPABILITIES = new Set(['status', 'chat', 'movement', 'inventory', 'combat', 'world']);
 
@@ -29,6 +30,7 @@ class ApplicationRuntime {
       onSnapshot: () => this.publishSnapshot()
     });
     this.connections = new ConnectionService({ client: this.client, store: this.store, logger: this.logger, interfaceState: this.interface });
+    this.inventory = new InventoryService({ getClient: () => this.client, onChange: () => this.publishSnapshot() });
     this.commands = new CommandRegistry({
       rootPath,
       privateCommandsPath: path.join(userDataPath, 'commands'),
@@ -54,6 +56,7 @@ class ApplicationRuntime {
       commands: this.commands,
       connections: this.connections,
       interfaceState: this.interface,
+      inventory: this.inventory,
       logger: this.logger,
       store: this.store,
       execute: (input, origin) => this.commands.execute(input, origin)
@@ -82,6 +85,13 @@ class ApplicationRuntime {
     this.commands.reload();
     this.publishSnapshot();
     return { ok: true };
+  }
+
+  async inventoryAction(request) {
+    if (!Number.isInteger(request?.connectionId) || !Object.hasOwn(request, 'windowId')) throw new Error('The inventory view is missing session details.');
+    const result = await this.inventory.execute(request);
+    this.logger.log(result.message);
+    return { ok: true, ...result };
   }
 
   preferences() {
