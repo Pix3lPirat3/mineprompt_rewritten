@@ -32,7 +32,7 @@ function filterEntity(entity: EntityTarget, filter: EntityFilter) {
 }
 
 function usesMiningPolicy(actionId: string) {
-  return actionId.startsWith('block.mine') || actionId === 'block.dig' || actionId === 'block.tree-fell';
+  return actionId.startsWith('block.mine') || actionId === 'block.dig' || actionId.startsWith('block.tree-fell');
 }
 
 export function TargetRibbon() {

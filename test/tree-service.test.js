@@ -185,3 +185,30 @@ test('routes around a rejected movement edge', () => {
   const blocked = new Set([movementKey({ x: 0, y: 64, z: 0 }, { x: 1, y: 64, z: 0 })]);
   assert.deepEqual(localCardinalStep(bot, { x: 1, y: 64, z: 0 }, policy, 4, blocked), { x: 0, y: 64, z: 1 });
 });
+
+test('runs collection and replanting after each completed tree', async () => {
+  const { bot, service } = fixture(4);
+  bot.inventory = { items: () => [] };
+  const phases = [];
+  service.fell = async () => { phases.push('fell'); };
+  service.collectDrops = async () => { phases.push('collect'); return { collected: 5, skipped: 1 }; };
+  service.replant = async () => { phases.push('replant'); return { planted: 1, skipped: 0 }; };
+  const tree = discoverTree(service.reader(bot), { x: 0, y: 64, z: 0 });
+  const state = {
+    running: true,
+    treesFound: 1,
+    treesFinished: 0,
+    logsMined: 0,
+    logsSkipped: 0,
+    itemsCollected: 0,
+    dropsSkipped: 0,
+    saplingsPlanted: 0,
+    replantSkipped: 0
+  };
+  await service.run([tree], normalizeTreePolicy({ replant: 'available' }), state);
+  assert.deepEqual(phases, ['fell', 'collect', 'replant']);
+  assert.equal(state.treesFinished, 1);
+  assert.equal(state.itemsCollected, 5);
+  assert.equal(state.dropsSkipped, 1);
+  assert.equal(state.saplingsPlanted, 1);
+});

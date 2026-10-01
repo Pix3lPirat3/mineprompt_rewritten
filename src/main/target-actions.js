@@ -22,7 +22,8 @@ const BLOCK_ACTIONS = Object.freeze([
   { id: 'block.mine-held', label: 'Repeat until held tool is low', detail: 'target block mine 1 --tool held --low stop', danger: true },
   { id: 'block.mine-depth', label: 'Repeat 4 deep', detail: 'target block mine 4', danger: true },
   { id: 'block.tree-inspect', label: 'Inspect tree plan', detail: 'tree inspect cursor', treesOnly: true },
-  { id: 'block.tree-fell', label: 'Fell this tree', detail: 'tree fell cursor', treesOnly: true, danger: true }
+  { id: 'block.tree-fell', label: 'Fell this tree', detail: 'tree fell cursor', treesOnly: true, danger: true },
+  { id: 'block.tree-fell-replant', label: 'Fell and replant', detail: 'tree fell cursor --replant available', treesOnly: true, danger: true }
 ]);
 
 const ENTITY_COMMAND_ACTIONS = Object.freeze({

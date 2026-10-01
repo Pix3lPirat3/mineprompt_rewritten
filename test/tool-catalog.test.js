@@ -83,7 +83,7 @@ test('validates agent input and executes dynamic command tools', async () => {
     to: { x: 3, y: 63, z: 3 },
     policy: { tool: 'auto', minimumDurability: 20 }
   }, { type: 'agent' });
-  await catalog.call('mineprompt_tree', { sessionId: 'primary', action: 'fell', target: 'nearest', policy: { leafSupport: 'safe', lowDurability: 'switch' } }, { type: 'agent' });
+  await catalog.call('mineprompt_tree', { sessionId: 'primary', action: 'fell', target: 'nearest', policy: { leafSupport: 'safe', lowDurability: 'switch', collectDrops: true, collectionRadius: 10, replant: 'available' } }, { type: 'agent' });
   assert.equal(calls.some((entry) => entry[0] === 'mining' && entry[1].policy.minimumDurability === 20), true);
   assert.equal(calls.some((entry) => entry[0] === 'tree' && entry[1].action === 'fell'), true);
   await catalog.call('mineprompt_stash', { sessionId: 'primary', action: 'nearby', collectionRadius: 12, containerRadius: 20 }, { type: 'agent' });

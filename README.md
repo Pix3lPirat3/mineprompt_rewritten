@@ -175,7 +175,7 @@ tree inspect cursor
 tree inspect nearest
 tree fell cursor
 tree fell nearest --leaf-support never
-tree farm --radius 32 --max-trees 12
+tree farm --radius 32 --max-trees 12 --replant available
 tree status
 tree stop
 ```
@@ -185,6 +185,8 @@ Tree farming accepts the ordinary mining flags plus:
 - `--leaf-support never|safe|always` controls whether routes may stand on leaves. Safe mode only trusts persistent leaves.
 - `--log-support never|stump` controls whether a bottom log may be preserved and climbed before it is removed.
 - `--radius N` and `--max-trees N` bound forest scanning.
+- `--collect`, `--no-collect`, and `--collection-radius N` control bounded tree-drop collection.
+- `--replant never|available|required` controls validated replanting at the original base cells.
 - `--allow-uncertain` permits structures that do not have strong natural-tree evidence.
 
 The cursor block menu exposes the same inspect and fell operations for supported logs and leaves. Headless and agent sessions use `mineprompt_tree`, which calls the same service rather than maintaining another implementation.

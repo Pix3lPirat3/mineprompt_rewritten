@@ -7,6 +7,8 @@ const { navigateGoal, cancelNavigation } = require('./navigation-service');
 const { computePath } = require('./path-cost-planner');
 const { candidateTreeStances, discoverTree, emptySpace, isTreeLeaf, isTreeLog, planForestRoute, planTreeRoute, solidSupport, treeSpecies } = require('./tree-planner');
 const { normalizeTreePolicy, treePolicyText } = require('./tree-policy');
+const { collectTreeDrops, replantTree } = require('./tree-lifecycle');
+const { inventoryCounts } = require('./stash-service');
 
 function vec(position) {
   return new Vec3(position.x, position.y, position.z);
@@ -260,13 +262,15 @@ function allowLeafAccess(bot, step, policy) {
 }
 
 class TreeService {
-  constructor({ getClient, activities, mining, logger, onChange = () => {}, now = Date.now }) {
+  constructor({ getClient, activities, mining, logger, onChange = () => {}, now = Date.now, collectDrops = collectTreeDrops, replant = replantTree }) {
     this.getClient = getClient;
     this.activities = activities;
     this.mining = mining;
     this.logger = logger;
     this.onChange = onChange;
     this.now = now;
+    this.collectDrops = collectDrops;
+    this.replant = replant;
     this.lastRun = null;
   }
 
@@ -365,6 +369,10 @@ class TreeService {
       treesFinished: 0,
       logsMined: 0,
       logsSkipped: 0,
+      itemsCollected: 0,
+      dropsSkipped: 0,
+      saplingsPlanted: 0,
+      replantSkipped: 0,
       failed: null,
       currentTree: null,
       replans: 0,
@@ -410,7 +418,18 @@ class TreeService {
       state.currentTree = { species: tree.species, origin: tree.origin, logs: tree.logs.length };
       state.phase = 'felling';
       this.report(state, true);
+      const inventoryBefore = inventoryCounts(this.bot);
       await this.fell(tree, policy, state);
+      if (!state.running) return;
+      state.phase = 'collecting';
+      const collection = await this.collectDrops(this.bot, tree, policy, inventoryBefore, (detail) => this.report(state, true, detail));
+      state.itemsCollected += collection.collected;
+      state.dropsSkipped += collection.skipped;
+      if (!state.running) return;
+      state.phase = 'replanting';
+      const replant = await this.replant(this.bot, tree, policy, (detail) => this.report(state, true, detail));
+      state.saplingsPlanted += replant.planted;
+      state.replantSkipped += replant.skipped;
       state.treesFinished += 1;
       this.report(state, true);
     }

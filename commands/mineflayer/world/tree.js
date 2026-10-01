@@ -3,7 +3,7 @@
 const { resolveMiningPolicy } = require('../../../src/main/mining-presets');
 const { parseTreeFlags, treePolicyText } = require('../../../src/main/tree-policy');
 
-const FLAGS = ['--preset', '--tool', '--low', '--min-durability', '--reach', '--max-blocks', '--leaf-support', '--log-support', '--radius', '--max-trees', '--allow-uncertain'];
+const FLAGS = ['--preset', '--tool', '--low', '--min-durability', '--reach', '--max-blocks', '--leaf-support', '--log-support', '--radius', '--max-trees', '--collect', '--no-collect', '--collection-radius', '--replant', '--allow-uncertain'];
 
 function coordinates(values) {
   const numbers = values.map(Number);
@@ -28,6 +28,9 @@ function resolvedPolicy(parsed, store) {
     logSupport: parsed.policy.logSupport,
     radius: parsed.policy.radius,
     maxTrees: parsed.policy.maxTrees,
+    collectDrops: parsed.policy.collectDrops,
+    collectionRadius: parsed.policy.collectionRadius,
+    replant: parsed.policy.replant,
     requireNatural: parsed.policy.requireNatural
   };
 }
@@ -43,6 +46,17 @@ module.exports = {
   approval: 'recommended',
 
   autocomplete(command, args, { store }, completion = {}) {
+    const values = new Map([
+      ['--leaf-support', ['never', 'safe', 'always']],
+      ['--log-support', ['never', 'stump']],
+      ['--replant', ['never', 'available', 'required']],
+      ['--low', ['switch', 'stop', 'skip']],
+      ['--tool', ['auto', 'held', 'hand']]
+    ]);
+    for (const [flag, choices] of values) {
+      const index = args.lastIndexOf(flag);
+      if (index >= 0 && (index === args.length - 1 && completion.trailingSpace || index === args.length - 2 && !completion.trailingSpace)) return choices;
+    }
     const presetIndex = args.lastIndexOf('--preset');
     if (presetIndex >= 0 && (presetIndex === args.length - 1 && completion.trailingSpace || presetIndex === args.length - 2 && !completion.trailingSpace)) {
       return (store?.snapshot?.().miningPresets || []).map((preset) => preset.name);
@@ -57,7 +71,7 @@ module.exports = {
     if (action === 'status') {
       const status = trees.status();
       if (!status) return sender.reply('[Tree] No tree activity has run in this session.');
-      return sender.reply(`[Tree] ${status.phase}; ${status.treesFinished}/${status.treesFound} trees; ${status.logsMined} logs mined${status.failed ? `; ${status.failed}` : ''}.`);
+      return sender.reply(`[Tree] ${status.phase}; ${status.treesFinished}/${status.treesFound} trees; ${status.logsMined} logs mined; ${status.itemsCollected || 0} items collected; ${status.saplingsPlanted || 0} saplings planted${status.failed ? `; ${status.failed}` : ''}.`);
     }
     if (action === 'stop') return sender.reply(trees.stop() ? '[Tree] Stopping.' : '[Tree] No tree activity is running.');
     let parsed;

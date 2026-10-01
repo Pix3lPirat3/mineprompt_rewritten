@@ -175,8 +175,11 @@ test('exposes tree-only block actions through the shared tree service', async ()
   const described = service.describeBlock(block);
   assert.deepEqual(described.tree, { species: 'oak', part: 'log' });
   assert.equal(described.actions.some((action) => action.id === 'block.tree-fell'), true);
+  assert.equal(described.actions.some((action) => action.id === 'block.tree-fell-replant'), true);
   await service.execute({ actionId: 'block.tree-inspect', target: 'cursor' });
   await service.execute({ actionId: 'block.tree-fell', target: 'cursor' });
+  await service.execute({ actionId: 'block.tree-fell-replant', target: 'cursor' });
   assert.equal(calls.some((entry) => entry[0] === 'tree-inspect'), true);
   assert.equal(calls.some((entry) => entry[0] === 'tree-start'), true);
+  assert.equal(calls.some((entry) => entry[0] === 'tree-start' && entry[1].policy?.replant === 'available'), true);
 });

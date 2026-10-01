@@ -33,6 +33,9 @@ const TreePolicy = Type.Object({
   logSupport: Type.Optional(Type.Union(['never', 'stump'].map((value) => Type.Literal(value)))),
   radius: Type.Optional(Type.Integer({ minimum: 1, maximum: 64 })),
   maxTrees: Type.Optional(Type.Integer({ minimum: 1, maximum: 128 })),
+  collectDrops: Type.Optional(Type.Boolean()),
+  collectionRadius: Type.Optional(Type.Integer({ minimum: 1, maximum: 32 })),
+  replant: Type.Optional(Type.Union(['never', 'available', 'required'].map((value) => Type.Literal(value)))),
   requireNatural: Type.Optional(Type.Boolean())
 }, { additionalProperties: false });
 
@@ -165,7 +168,7 @@ class ToolCatalog {
     }, { additionalProperties: false }), async (runtime, input, origin) => runtime.miningAction(input, origin), {
       destructive: true, capability: 'world', approval: 'recommended', openWorld: true
     }));
-    this.register(tool('mineprompt_tree', 'Inspect, fell, or farm trees with topology detection, support-aware route planning, durability controls, and continuous replanning.', Type.Object({
+    this.register(tool('mineprompt_tree', 'Inspect, fell, or farm trees with topology detection, support-aware route planning, durability controls, drop collection, optional replanting, and continuous replanning.', Type.Object({
       sessionId: SessionId,
       action: Type.Union(['inspect', 'fell', 'farm', 'stop', 'status'].map((value) => Type.Literal(value))),
       target: Type.Optional(Type.Union([Type.Literal('cursor'), Type.Literal('nearest'), Type.Literal('position')])),

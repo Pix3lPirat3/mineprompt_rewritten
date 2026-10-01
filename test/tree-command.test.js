@@ -31,12 +31,14 @@ test('maps tree commands to one service with mining and support policies', () =>
   const inspect = sender();
   command.execute(inspect.value, 'tree', ['inspect', '1', '64', '-2', '--leaf-support', 'never'], context);
   const farm = sender();
-  command.execute(farm.value, 'tree', ['farm', '--radius', '24', '--max-trees', '6', '--allow-uncertain'], context);
+  command.execute(farm.value, 'tree', ['farm', '--radius', '24', '--max-trees', '6', '--collection-radius', '10', '--replant', 'available', '--allow-uncertain'], context);
   assert.deepEqual(calls[0][1].position, { x: 1, y: 64, z: -2 });
   assert.equal(calls[0][1].policy.leafSupport, 'never');
   assert.equal(calls[1][1].mode, 'farm');
   assert.equal(calls[1][1].policy.radius, 24);
   assert.equal(calls[1][1].policy.maxTrees, 6);
+  assert.equal(calls[1][1].policy.collectionRadius, 10);
+  assert.equal(calls[1][1].policy.replant, 'available');
   assert.equal(calls[1][1].policy.requireNatural, false);
   assert.match(inspect.replies[0], /Logs: 7/u);
   assert.match(farm.replies[0], /Farming 3 trees/u);
@@ -50,4 +52,10 @@ test('reports and stops the current tree activity', () => {
   command.execute(stop.value, 'tree', ['stop'], context);
   assert.match(status.replies[0], /1\/3 trees/u);
   assert.equal(stop.replies[0], '[Tree] Stopping.');
+});
+
+test('completes policy values in place', () => {
+  const { context } = fixture();
+  assert.deepEqual(command.autocomplete('tree', ['fell', '--replant'], context, { trailingSpace: true }), ['never', 'available', 'required']);
+  assert.deepEqual(command.autocomplete('tree', ['fell', '--leaf-support'], context, { trailingSpace: true }), ['never', 'safe', 'always']);
 });

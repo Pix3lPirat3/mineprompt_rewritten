@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { candidateTreeStances, discoverTree, planForestRoute, planTreeRoute } = require('../src/main/tree-planner');
+const { candidateTreeStances, discoverTree, forestTravelDistance, optimizeForestRoute, planForestRoute, planTreeRoute } = require('../src/main/tree-planner');
 
 function positionKey(position) {
   return `${position.x},${position.y},${position.z}`;
@@ -114,4 +114,17 @@ test('routes a forest by expected yield and travel cost', () => {
   assert.equal(plan.route[0], trees[0]);
   assert.equal(plan.route.at(-1), trees[2]);
   assert.ok(plan.travelDistance > 0);
+});
+
+test('removes route crossings without replacing the preferred first tree', () => {
+  const route = [
+    { origin: { x: 1, y: 64, z: 0 } },
+    { origin: { x: 10, y: 64, z: 10 } },
+    { origin: { x: 1, y: 64, z: 10 } },
+    { origin: { x: 10, y: 64, z: 0 } }
+  ];
+  const before = forestTravelDistance(route, { x: 0, y: 64, z: 0 });
+  const optimized = optimizeForestRoute(route, { x: 0, y: 64, z: 0 });
+  assert.equal(optimized.route[0], route[0]);
+  assert.ok(optimized.travelDistance < before);
 });

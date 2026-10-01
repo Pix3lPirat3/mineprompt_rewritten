@@ -349,7 +349,40 @@ function planForestRoute(trees, start) {
     current = selected.tree.origin;
     route.push(selected.tree);
   }
-  return { route, travelDistance };
+  const optimized = optimizeForestRoute(route, start);
+  return { route: optimized.route, travelDistance: optimized.travelDistance, improvement: Math.round((travelDistance - optimized.travelDistance) * 100) / 100 };
+}
+
+function forestTravelDistance(route, start) {
+  let current = point(start);
+  let total = 0;
+  for (const tree of route) {
+    total += distance(current, tree.origin);
+    current = tree.origin;
+  }
+  return total;
+}
+
+function optimizeForestRoute(route, start, maximumPasses = 6) {
+  const result = [...route];
+  for (let pass = 0; pass < maximumPasses; pass += 1) {
+    let improved = false;
+    for (let left = 1; left < result.length - 1; left += 1) {
+      for (let right = left + 1; right < result.length; right += 1) {
+        const before = result[left - 1].origin;
+        const first = result[left].origin;
+        const last = result[right].origin;
+        const after = result[right + 1]?.origin || null;
+        const current = distance(before, first) + (after ? distance(last, after) : 0);
+        const reversed = distance(before, last) + (after ? distance(first, after) : 0);
+        if (reversed + 0.01 >= current) continue;
+        result.splice(left, right - left + 1, ...result.slice(left, right + 1).reverse());
+        improved = true;
+      }
+    }
+    if (!improved) break;
+  }
+  return { route: result, travelDistance: forestTravelDistance(result, start) };
 }
 
 module.exports = {
@@ -360,6 +393,8 @@ module.exports = {
   isTreeLeaf,
   isTreeLog,
   leafSpecies,
+  forestTravelDistance,
+  optimizeForestRoute,
   planForestRoute,
   planTreeRoute,
   solidSupport,

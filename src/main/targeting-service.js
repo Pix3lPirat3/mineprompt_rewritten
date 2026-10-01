@@ -260,9 +260,10 @@ class TargetingService {
       if (!this.trees) throw new Error('Tree planning is not available.');
       return this.trees.inspect({ position: block.position, policy: request.policy });
     }
-    if (actionId === 'block.tree-fell') {
+    if (actionId === 'block.tree-fell' || actionId === 'block.tree-fell-replant') {
       if (!this.trees) throw new Error('Tree planning is not available.');
-      const status = this.trees.start({ mode: 'fell', position: block.position, policy: request.policy });
+      const policy = actionId === 'block.tree-fell-replant' ? { ...request.policy, replant: 'available' } : request.policy;
+      const status = this.trees.start({ mode: 'fell', position: block.position, policy });
       return { message: `[Tree] Started ${status.currentTree?.species || treeSpecies(block) || leafSpecies(block)} tree plan at ${positionText(block.position)}.`, status };
     }
     throw new Error('The target action is not available for this block.');
