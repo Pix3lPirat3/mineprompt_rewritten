@@ -66,8 +66,9 @@ function nearestStorage(bot, radius) {
 }
 
 async function waitForPickup(bot, entity, maximumTicks = 20) {
-  if (typeof bot.waitForTicks !== 'function') return;
+  if (typeof bot.waitForTicks !== 'function') return entity.isValid === false;
   for (let elapsed = 0; elapsed < maximumTicks && entity.isValid !== false; elapsed += 2) await bot.waitForTicks(2);
+  return entity.isValid === false;
 }
 
 class StashService {
@@ -165,8 +166,8 @@ class StashService {
         if (entity.isValid === false) continue;
         state.phase = 'collecting';
         this.activities.update('stash', 'Checking nearby item drops');
-        await navigateGoal(bot, new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1), { description: 'a dropped item' });
-        await waitForPickup(bot, entity);
+        await navigateGoal(bot, new GoalNear(entity.position.x, entity.position.y, entity.position.z, 0), { description: 'a dropped item' });
+        if (!await waitForPickup(bot, entity)) throw new Error('A dropped item did not reach the inventory.');
       }
     }
     if (!state.running) return;

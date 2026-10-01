@@ -36,6 +36,7 @@ const TreePolicy = Type.Object({
   collectDrops: Type.Optional(Type.Boolean()),
   collectionRadius: Type.Optional(Type.Integer({ minimum: 1, maximum: 32 })),
   replant: Type.Optional(Type.Union(['never', 'available', 'required'].map((value) => Type.Literal(value)))),
+  onFailure: Type.Optional(Type.Union(['stop', 'skip'].map((value) => Type.Literal(value)))),
   requireNatural: Type.Optional(Type.Boolean())
 }, { additionalProperties: false });
 

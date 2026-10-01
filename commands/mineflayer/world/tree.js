@@ -3,7 +3,7 @@
 const { resolveMiningPolicy } = require('../../../src/main/mining-presets');
 const { parseTreeFlags, treePolicyText } = require('../../../src/main/tree-policy');
 
-const FLAGS = ['--preset', '--tool', '--low', '--min-durability', '--reach', '--max-blocks', '--leaf-support', '--log-support', '--radius', '--max-trees', '--collect', '--no-collect', '--collection-radius', '--replant', '--allow-uncertain'];
+const FLAGS = ['--preset', '--tool', '--low', '--min-durability', '--reach', '--max-blocks', '--leaf-support', '--log-support', '--radius', '--max-trees', '--collect', '--no-collect', '--collection-radius', '--replant', '--on-failure', '--allow-uncertain'];
 
 function coordinates(values) {
   const numbers = values.map(Number);
@@ -31,6 +31,7 @@ function resolvedPolicy(parsed, store) {
     collectDrops: parsed.policy.collectDrops,
     collectionRadius: parsed.policy.collectionRadius,
     replant: parsed.policy.replant,
+    onFailure: parsed.policy.onFailure,
     requireNatural: parsed.policy.requireNatural
   };
 }
@@ -50,6 +51,7 @@ module.exports = {
       ['--leaf-support', ['never', 'safe', 'always']],
       ['--log-support', ['never', 'stump']],
       ['--replant', ['never', 'available', 'required']],
+      ['--on-failure', ['stop', 'skip']],
       ['--low', ['switch', 'stop', 'skip']],
       ['--tool', ['auto', 'held', 'hand']]
     ]);
@@ -71,7 +73,7 @@ module.exports = {
     if (action === 'status') {
       const status = trees.status();
       if (!status) return sender.reply('[Tree] No tree activity has run in this session.');
-      return sender.reply(`[Tree] ${status.phase}; ${status.treesFinished}/${status.treesFound} trees; ${status.logsMined} logs mined; ${status.itemsCollected || 0} items collected; ${status.saplingsPlanted || 0} saplings planted${status.failed ? `; ${status.failed}` : ''}.`);
+      return sender.reply(`[Tree] ${status.phase}; ${status.treesFinished}/${status.treesFound} trees; ${status.treesFailed || 0} failed; ${status.logsMined} logs mined; ${status.remainingLogs || 0} remaining; ${status.itemsCollected || 0} items collected; ${status.saplingsPlanted || 0} saplings planted; ${status.routesRejected || 0} routes rejected${status.failed ? `; ${status.failed}` : ''}.`);
     }
     if (action === 'stop') return sender.reply(trees.stop() ? '[Tree] Stopping.' : '[Tree] No tree activity is running.');
     let parsed;

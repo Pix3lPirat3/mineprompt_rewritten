@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Vec3 } = require('vec3');
-const { plantingSites, relevantDrop, replantTree } = require('../src/main/tree-lifecycle');
+const { expectedLogDrops, plantingSites, relevantDrop, replantTree, waitForTreeDropWave } = require('../src/main/tree-lifecycle');
 
 function block(name, x, y, z) {
   return { name, position: new Vec3(x, y, z), boundingBox: name === 'air' ? 'empty' : 'block' };
@@ -14,6 +14,33 @@ test('filters item drops by the discovered tree volume', () => {
   assert.equal(relevantDrop({ name: 'item', position: new Vec3(2, 64, 0) }, tree, 4), true);
   assert.equal(relevantDrop({ name: 'item', position: new Vec3(8, 64, 0) }, tree, 4), false);
   assert.equal(relevantDrop({ name: 'zombie', position: new Vec3(1, 64, 0) }, tree, 4), false);
+});
+
+test('waits for delayed tree-drop entity packets', async () => {
+  const item = { id: 7, name: 'item', position: new Vec3(0.5, 64, 0.5) };
+  let ticks = 0;
+  const bot = {
+    entity: { position: new Vec3(1, 64, 0) },
+    entities: {},
+    waitForTicks: async (count) => {
+      ticks += count;
+      if (ticks >= 6) bot.entities[item.id] = item;
+    }
+  };
+  const drops = await waitForTreeDropWave(bot, { logs: [{ x: 0, y: 64, z: 0 }] }, 8, new Set(), 10);
+  assert.deepEqual(drops, [item]);
+  assert.equal(ticks, 6);
+});
+
+test('accounts for collected and pending logs without counting leaf drops', () => {
+  const oakLog = { type: 1, metadata: 0, name: 'oak_log', count: 2 };
+  const sapling = { type: 2, metadata: 0, name: 'oak_sapling', count: 4 };
+  const bot = { inventory: { items: () => [oakLog, sapling] } };
+  const pending = new Set([
+    { getDroppedItem: () => ({ name: 'oak_log', count: 3 }) },
+    { getDroppedItem: () => ({ name: 'stick', count: 2 }) }
+  ]);
+  assert.equal(expectedLogDrops(bot, { species: 'oak' }, new Map(), pending), 5);
 });
 
 test('selects only clear original bases on plantable soil', () => {

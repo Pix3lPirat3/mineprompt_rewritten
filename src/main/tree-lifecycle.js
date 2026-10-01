@@ -38,19 +38,47 @@ function treeDrops(bot, tree, radius) {
     bot.entity.position.distanceTo(left.position) - bot.entity.position.distanceTo(right.position) || Number(left.id) - Number(right.id));
 }
 
-async function collectTreeDrops(bot, tree, policy, before = inventoryCounts(bot), onProgress = () => {}) {
+async function waitForTreeDropWave(bot, tree, radius, attempted = new Set(), maximumTicks = 8) {
+  const pending = () => treeDrops(bot, tree, radius).filter((entity) => !attempted.has(entity));
+  if (typeof bot.waitForTicks !== 'function') return pending();
+  for (let elapsed = 0; elapsed < maximumTicks; elapsed += 2) {
+    await bot.waitForTicks(2);
+    const drops = pending();
+    if (drops.length) return drops;
+  }
+  return [];
+}
+
+function expectedLogDrops(bot, tree, before, collectedEntities) {
+  const name = `${tree.species}_log`;
+  const collected = collectedItems(before, inventoryCounts(bot)).filter((entry) => entry.item?.name === name).reduce((sum, entry) => sum + entry.count, 0);
+  const pending = [...collectedEntities].map(droppedItem).filter((item) => item?.name === name).reduce((sum, item) => sum + (Number(item.count) || 0), 0);
+  return collected + pending;
+}
+
+async function collectTreeDrops(bot, tree, policy, before = inventoryCounts(bot), onProgress = () => {}, expectedLogs = 0) {
   if (!policy.collectDrops) return { collected: 0, skipped: 0, entries: [] };
-  if (typeof bot.waitForTicks === 'function') await bot.waitForTicks(4);
-  const drops = treeDrops(bot, tree, policy.collectionRadius);
+  const attempted = new Set();
+  const collectedEntities = new Set();
   let skipped = 0;
-  for (const entity of drops) {
-    if (entity.isValid === false) continue;
-    onProgress(`Collecting ${droppedItem(entity)?.displayName || 'tree drop'}`);
-    try {
-      await navigateGoal(bot, new GoalNear(entity.position.x, entity.position.y, entity.position.z, 1), { timeout: 10000, description: 'a tree drop' });
-      await waitForPickup(bot, entity, 20);
-    } catch {
-      skipped += 1;
+  let firstWave = true;
+  while (true) {
+    const accounted = expectedLogDrops(bot, tree, before, collectedEntities);
+    const maximumTicks = expectedLogs > accounted ? 60 : firstWave ? 20 : 8;
+    const drops = await waitForTreeDropWave(bot, tree, policy.collectionRadius, attempted, maximumTicks);
+    firstWave = false;
+    if (!drops.length) break;
+    for (const entity of drops) {
+      if (entity.isValid === false) continue;
+      attempted.add(entity);
+      onProgress(`Collecting ${droppedItem(entity)?.displayName || 'tree drop'}`);
+      try {
+        await navigateGoal(bot, new GoalNear(entity.position.x, entity.position.y, entity.position.z, 0), { timeout: 10000, description: 'a tree drop' });
+        if (!await waitForPickup(bot, entity, 20)) throw new Error('A tree drop did not reach the inventory.');
+        collectedEntities.add(entity);
+      } catch {
+        skipped += 1;
+      }
     }
   }
   const entries = collectedItems(before, inventoryCounts(bot));
@@ -99,4 +127,4 @@ async function replantTree(bot, tree, policy, onProgress = () => {}) {
   return { planted, skipped: 0, reason: null };
 }
 
-module.exports = { SAPLINGS, SOILS, availableItems, collectTreeDrops, plantingSites, relevantDrop, replantTree, treeDrops };
+module.exports = { SAPLINGS, SOILS, availableItems, collectTreeDrops, expectedLogDrops, plantingSites, relevantDrop, replantTree, treeDrops, waitForTreeDropWave };

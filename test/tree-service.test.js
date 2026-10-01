@@ -6,7 +6,8 @@ const { Vec3 } = require('vec3');
 const { ActivityManager } = require('../src/main/activity-manager');
 const { discoverTree } = require('../src/main/tree-planner');
 const { normalizeTreePolicy } = require('../src/main/tree-policy');
-const { TreeService, allowLeafAccess, cardinalBridgeTarget, estimateTreePath, localCardinalStep, movementKey, nearbyHopTarget } = require('../src/main/tree-service');
+const { TreeService } = require('../src/main/tree-service');
+const { allowLeafAccess, cardinalBridgeTarget, estimateTreePath, localCardinalStep, movementKey, nearbyHopTarget } = require('../src/main/tree-navigation');
 
 function value(position) {
   return `${position.x},${position.y},${position.z}`;
@@ -71,6 +72,8 @@ test('replans between safe stance batches and removes the stump after using it',
   const state = { running: true, treesFinished: 0, treesFound: 1, logsMined: 0, logsSkipped: 0, phase: 'felling' };
   await service.fell(tree, policy, state);
   assert.equal(state.logsMined, 7);
+  assert.equal(state.remainingLogs, 0);
+  assert.ok(state.candidateStands > 0);
   assert.equal(new Set(mined).size, 7);
   assert.equal(mined.at(-1), '0,64,0');
   assert.ok(navigated.some((position) => position.split(',')[1] === '65'));
@@ -211,4 +214,35 @@ test('runs collection and replanting after each completed tree', async () => {
   assert.equal(state.itemsCollected, 5);
   assert.equal(state.dropsSkipped, 1);
   assert.equal(state.saplingsPlanted, 1);
+});
+
+test('skips an unreachable tree and continues a forest run when requested', async () => {
+  const { bot, service } = fixture(4);
+  bot.inventory = { items: () => [] };
+  let attempts = 0;
+  service.fell = async () => {
+    attempts += 1;
+    if (attempts === 1) throw new Error('No safe route.');
+  };
+  service.collectDrops = async () => ({ collected: 0, skipped: 0 });
+  service.replant = async () => ({ planted: 0, skipped: 0 });
+  const tree = discoverTree(service.reader(bot), { x: 0, y: 64, z: 0 });
+  const state = {
+    running: true,
+    treesFound: 2,
+    treesFinished: 0,
+    treesFailed: 0,
+    failures: [],
+    logsMined: 0,
+    logsSkipped: 0,
+    itemsCollected: 0,
+    dropsSkipped: 0,
+    saplingsPlanted: 0,
+    replantSkipped: 0
+  };
+  await service.run([tree, tree], normalizeTreePolicy({ onFailure: 'skip' }), state);
+  assert.equal(attempts, 2);
+  assert.equal(state.treesFailed, 1);
+  assert.equal(state.treesFinished, 1);
+  assert.match(state.failures[0].reason, /No safe route/u);
 });
