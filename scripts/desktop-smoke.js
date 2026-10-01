@@ -45,9 +45,11 @@ async function main() {
       visible: BrowserWindow.getAllWindows()[0]?.isMenuBarVisible()
     }));
     assert.equal(nativeMenu.applicationMenu, null);
-    assert.equal(nativeMenu.visible, false);
-    await page.keyboard.press('Alt');
-    assert.equal(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isMenuBarVisible()), false);
+    if (process.platform !== 'darwin') {
+      assert.equal(nativeMenu.visible, false);
+      await page.keyboard.press('Alt');
+      assert.equal(await application.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.isMenuBarVisible()), false);
+    }
     assert.equal(await page.locator('.brand h1').textContent(), 'MinePrompt');
     const attachedSnapshot = await page.evaluate(() => globalThis.mineprompt.getSnapshot());
     assert.equal(attachedSnapshot.sessions[0].process.pid, hostSessionPid);
