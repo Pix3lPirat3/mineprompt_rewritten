@@ -47,7 +47,7 @@
     "electron-squirrel-startup": "^1.0.1",
     "minecraft-folder-path": "^1.2.0",
     "mineflayer": "^4.39.0",
-    "mineflayer-pathfinder": "^2.4.5",
+    "mineflayer-pathfinder": "2.4.5",
     "prismarine-chat": "^1.13.0",
     "prismarine-nbt": "^2.8.0",
     "react": "^19.3.0",

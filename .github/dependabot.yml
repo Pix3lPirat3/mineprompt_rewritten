@@ -8,10 +8,27 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     groups:
+      prismarine:
+        applies-to: version-updates
+        patterns:
+          - "mineflayer*"
+          - "minecraft-data"
+          - "prismarine-*"
+          - "protodef*"
+          - "vec3"
+        update-types:
+          - minor
+          - patch
       npm-minor-patch:
         applies-to: version-updates
         patterns:
           - "*"
+        exclude-patterns:
+          - "mineflayer*"
+          - "minecraft-data"
+          - "prismarine-*"
+          - "protodef*"
+          - "vec3"
         update-types:
           - minor
           - patch
