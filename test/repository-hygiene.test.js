@@ -2,31 +2,31 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 const parser = require('@typescript-eslint/parser');
 
 const root = path.resolve(__dirname, '..');
 const checkedExtensions = new Set(['.cjs', '.css', '.html', '.js', '.json', '.md', '.mjs', '.ts', '.tsx']);
-const excludedDirectories = new Set(['.git', '.vite', 'dist', 'node_modules', 'out']);
 
 function hasCodeComment(source) {
   const parsed = parser.parseForESLint(source, { comment: true, ecmaVersion: 'latest', jsx: true, sourceType: 'unambiguous' });
   return parsed.ast.comments.length > 0;
 }
 
-function sourceFiles(directory) {
-  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
-    if (excludedDirectories.has(entry.name)) return [];
-    const target = path.join(directory, entry.name);
-    if (entry.isDirectory()) return sourceFiles(target);
-    return checkedExtensions.has(path.extname(entry.name)) ? [target] : [];
-  });
+function sourceFiles() {
+  return execFileSync('git', ['ls-files', '-z'], { cwd: root, encoding: 'utf8' })
+    .split('\0')
+    .filter(Boolean)
+    .filter((file) => checkedExtensions.has(path.extname(file)))
+    .filter((file) => fs.existsSync(path.join(root, file)))
+    .map((file) => path.join(root, file));
 }
 
 test('tracked source remains ASCII and free of comments', () => {
   const failures = [];
-  for (const file of sourceFiles(root)) {
+  for (const file of sourceFiles()) {
     const relative = path.relative(root, file);
     const source = fs.readFileSync(file, 'utf8');
     const extension = path.extname(file);

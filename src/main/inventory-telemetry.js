@@ -13,7 +13,9 @@ class InventoryPipelineTelemetry {
     this.lastEventAt = null;
     this.lastRevision = 0;
     this.timestamps = [];
+    this.timestampHead = 0;
     this.publicationTimestamps = [];
+    this.publicationTimestampHead = 0;
     this.peakEventsPerSecond = 0;
     this.byType = {};
     this.byScope = {};
@@ -31,17 +33,16 @@ class InventoryPipelineTelemetry {
     this.byType[event.type] = (this.byType[event.type] || 0) + 1;
     this.byScope[event.scope] = (this.byScope[event.scope] || 0) + 1;
     this.timestamps.push(now);
-    while (this.timestamps[0] < now - 1000) this.timestamps.shift();
-    this.peakEventsPerSecond = Math.max(this.peakEventsPerSecond, this.timestamps.length);
+    const eventsPerSecond = this.prune(this.timestamps, 'timestampHead', now - 1000);
+    this.peakEventsPerSecond = Math.max(this.peakEventsPerSecond, eventsPerSecond);
     this.measure(this.itemSerialization, event.processing?.itemSerializationMs);
-    return this.snapshot();
   }
 
   publish(snapshotSerializationMs) {
     const now = this.clock();
     this.published += 1;
     this.publicationTimestamps.push(now);
-    while (this.publicationTimestamps[0] < now - 1000) this.publicationTimestamps.shift();
+    this.prune(this.publicationTimestamps, 'publicationTimestampHead', now - 1000);
     this.measure(this.snapshotSerialization, snapshotSerializationMs);
     return this.snapshot();
   }
@@ -55,6 +56,17 @@ class InventoryPipelineTelemetry {
     target.totalMs += duration;
   }
 
+  prune(values, headProperty, cutoff) {
+    let head = this[headProperty];
+    while (head < values.length && values[head] < cutoff) head += 1;
+    if (head > 1024 && head * 2 > values.length) {
+      values.splice(0, head);
+      head = 0;
+    }
+    this[headProperty] = head;
+    return values.length - head;
+  }
+
   measurement(target) {
     return {
       samples: target.total,
@@ -66,8 +78,8 @@ class InventoryPipelineTelemetry {
 
   snapshot() {
     const now = this.clock();
-    while (this.timestamps[0] < now - 1000) this.timestamps.shift();
-    while (this.publicationTimestamps[0] < now - 1000) this.publicationTimestamps.shift();
+    const eventsPerSecond = this.prune(this.timestamps, 'timestampHead', now - 1000);
+    const publicationsPerSecond = this.prune(this.publicationTimestamps, 'publicationTimestampHead', now - 1000);
     return {
       received: this.received,
       published: this.published,
@@ -76,8 +88,8 @@ class InventoryPipelineTelemetry {
       firstEventAt: this.firstEventAt,
       lastEventAt: this.lastEventAt,
       lastEventAgeMs: this.lastEventAt === null ? null : Math.max(0, now - this.lastEventAt),
-      eventsPerSecond: this.timestamps.length,
-      publicationsPerSecond: this.publicationTimestamps.length,
+      eventsPerSecond,
+      publicationsPerSecond,
       peakEventsPerSecond: this.peakEventsPerSecond,
       byType: { ...this.byType },
       byScope: { ...this.byScope },

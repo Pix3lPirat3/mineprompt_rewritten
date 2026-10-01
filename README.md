@@ -33,13 +33,11 @@ The current 2.0 beta replaces the original renderer-owned runtime with a securit
 
 ## Requirements
 
-- Node.js 22.12 or newer
+- Node.js 22.13 or newer
 - npm 10 or newer
 - A supported Windows, macOS, or Linux desktop
 
 No global Electron installation is needed.
-
-The project npm configuration permits the commit-pinned Electron Node Gyp dependency used by Electron Forge. npm 12 otherwise blocks that transitive Git dependency before installation begins.
 
 ## Development
 
@@ -302,7 +300,7 @@ The store contains authentication mode, not account passwords. Login and registr
 
 ## Command extensions
 
-Public commands are CommonJS modules inside `commands/global` or `commands/mineflayer`. Use `commands/mineflayer/template.js` as the starting point. Run `reload commands` after editing a command module. <kbd>Ctrl</kbd>+<kbd>R</kbd> reloads the renderer, while <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> reloads commands and the renderer. These paths preserve the application host and connected bot processes. Changes to backend service modules still require restarting the affected process.
+Public commands are CommonJS modules inside `commands/global` or `commands/mineflayer`. The command contract and an example are in [CONTRIBUTING.md](CONTRIBUTING.md). Run `reload commands` after editing a command module. <kbd>Ctrl</kbd>+<kbd>R</kbd> reloads the renderer, while <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> reloads commands and the renderer. These paths preserve the application host and connected bot processes. Changes to backend service modules still require restarting the affected process.
 
 Private commands can live beside `mineprompt.json` in the application-data directory under `commands/global` or `commands/mineflayer`. They are loaded from the local machine at runtime and are never included in packaged builds or this repository. Commands receive an explicit runtime context instead of application globals. This is the appropriate location for server-specific diagnostics and private test commands.
 
@@ -346,4 +344,4 @@ JSONL is reserved for event and audit streams. Capability documentation uses JSO
 
 ## License
 
-Review [LICENSE](LICENSE), [TERMS.md](TERMS.md), and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for the project's licensing and usage terms. The bundled FaithfulVenom textures cannot be used in monetized content.
+Review [LICENSE](LICENSE) and [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for licensing details. The bundled FaithfulVenom textures cannot be used in monetized content.

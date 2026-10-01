@@ -9,18 +9,12 @@ const { HostServer } = require('../src/main/host-server');
 const { inventorySnapshot, serializedItem } = require('../test/support/renderer-fixtures');
 
 async function main() {
-  const executablePath = process.env.MINEPROMPT_EXECUTABLE;
-  if (executablePath && !fs.existsSync(executablePath)) throw new Error(`Application not found at ${executablePath}.`);
   const dataPath = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'mineprompt-desktop-'));
   const quietConsole = { log() {}, info() {}, warn() {}, error() {}, debug() {} };
   const host = await new HostServer({ rootPath: path.resolve('.'), userDataPath: dataPath, originalConsole: quietConsole }).start();
   const hostSessionPid = host.runtime.snapshot().sessions[0].process.pid;
   process.stdout.write('[Desktop] Host ready.\n');
-  const application = await electron.launch(executablePath ? {
-    executablePath,
-    artifactsDir: process.env.MINEPROMPT_SMOKE_ARTIFACTS,
-    env: { ...process.env, MINEPROMPT_DATA_DIR: dataPath }
-  } : {
+  const application = await electron.launch({
     args: [path.resolve('.')],
     artifactsDir: process.env.MINEPROMPT_SMOKE_ARTIFACTS,
     env: { ...process.env, MINEPROMPT_DATA_DIR: dataPath }

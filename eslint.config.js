@@ -9,10 +9,15 @@ module.exports = [
       'out/**',
       '.vite/**',
       '**/.vite/**',
+      '.mineprompt-test-lab/**',
+      'cache/**',
+      'logs/**',
+      'private-lab/**',
+      'servers/**',
+      'storage/**',
+      'test-lab/**',
       'src/renderer/dist/**',
-      'packages/mineflayer-ui/index.cjs',
-      'generate-embed.js',
-      'linux.js'
+      'packages/mineflayer-ui/index.cjs'
     ]
   },
   ...tseslint.configs.recommended.map((config) => ({ ...config, files: ['src/renderer/**/*.{ts,tsx}'] })),

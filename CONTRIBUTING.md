@@ -4,7 +4,7 @@ Contributions should keep MinePrompt approachable at the command line and conser
 
 ## Before opening a change
 
-1. Install with `npm ci` on Node.js 22 or newer.
+1. Install with `npm ci` on Node.js 22.13 or newer.
 2. Keep privileged functionality in `src/main`; renderer code should use only `window.mineprompt` from the preload bridge.
 3. Run `npm run check`.
 4. Launch with `npm start` for any renderer, IPC, or command change.

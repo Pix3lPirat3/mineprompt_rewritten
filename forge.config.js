@@ -5,9 +5,9 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 function packageIgnore(file) {
   if (!file) return false;
   file = file.replaceAll('\\', '/');
-  const roots = ['/.vite', '/commands', '/node_modules', '/package.json', '/src'];
+  const roots = ['/.vite', '/commands', '/node_modules', '/package.json', '/packages', '/src'];
   if (!roots.some((root) => file === root || file.startsWith(`${root}/`))) return true;
-  if (file === '/node_modules/@mineprompt/mineflayer-ui' || file.startsWith('/node_modules/@mineprompt/mineflayer-ui/')) return true;
+  if (file.startsWith('/packages/') && !['/packages/mineflayer-ui', '/packages/mineflayer-ui/package.json', '/packages/mineflayer-ui/index.cjs'].includes(file)) return true;
   if (file.startsWith('/src/') && file !== '/src/main' && file !== '/src/session-worker.js' && !file.startsWith('/src/main/')) return true;
   const bedrockData = '/node_modules/minecraft-data/minecraft-data/data/bedrock';
   const bedrockCommon = `${bedrockData}/common`;
@@ -17,7 +17,7 @@ function packageIgnore(file) {
 
 module.exports = {
   packagerConfig: {
-    asar: { unpackDir: '{commands,node_modules,src}' },
+    asar: { unpackDir: '{commands,node_modules,packages,src}' },
     executableName: 'MinePrompt',
     icon: 'src/icons/win/computer',
     ignore: packageIgnore

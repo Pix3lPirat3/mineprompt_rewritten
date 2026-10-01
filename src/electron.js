@@ -164,7 +164,7 @@ function createWindow() {
     icon: app.isPackaged ? undefined : path.join(app.getAppPath(), 'src', 'img', 'heads', 'computer.png'),
     show: false,
     webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
+      preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,
       contextIsolation: true,
       sandbox: true,

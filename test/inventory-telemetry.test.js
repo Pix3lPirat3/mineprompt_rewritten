@@ -38,3 +38,16 @@ test('starts a new measurement series when inventory revisions reset', () => {
   assert.equal(snapshot.lastRevision, 1);
   assert.deepEqual(snapshot.byType, { open: 1 });
 });
+
+test('compacts high-rate event timestamps without losing the live rate', () => {
+  let now = 0;
+  const telemetry = new InventoryPipelineTelemetry(() => now);
+  for (let revision = 1; revision <= 5000; revision += 1) {
+    now = revision;
+    telemetry.observe({ revision, type: 'update', scope: 'inventory' });
+  }
+  const snapshot = telemetry.snapshot();
+  assert.equal(snapshot.received, 5000);
+  assert.equal(snapshot.eventsPerSecond, 1001);
+  assert.equal(telemetry.timestamps.length < 2100, true);
+});

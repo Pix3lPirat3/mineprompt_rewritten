@@ -90,8 +90,12 @@ export function rendererState(store: AppStore, rendererPerformance: Record<strin
 }
 
 export function installRendererObserver(store: AppStore): () => void {
+  const reportDelay = 500;
+  const heartbeatDelay = 5000;
   let timer = 0;
   let active = true;
+  let lastFingerprint = '';
+  let lastReportAt = 0;
   const metrics = {
     storeUpdates: 0,
     storeUpdatesPerSecond: 0,
@@ -130,6 +134,10 @@ export function installRendererObserver(store: AppStore): () => void {
   const publish = () => {
     timer = 0;
     if (!active) return;
+    if (metrics.inFlightReports > 0) {
+      schedule();
+      return;
+    }
     updateRates();
     const buildStartedAt = performance.now();
     const state = rendererState(store, metrics);
@@ -137,6 +145,14 @@ export function installRendererObserver(store: AppStore): () => void {
     metrics.maximumStateBuildMs = Math.max(metrics.maximumStateBuildMs, metrics.lastStateBuildMs);
     const performanceState = state.performance as { renderer: Record<string, number> };
     performanceState.renderer = { ...metrics };
+    const { timestamp, performance: ignoredPerformance, ...visibleState } = state;
+    void timestamp;
+    void ignoredPerformance;
+    const fingerprint = JSON.stringify(visibleState);
+    const now = performance.now();
+    if (fingerprint === lastFingerprint && now - lastReportAt < heartbeatDelay) return;
+    lastFingerprint = fingerprint;
+    lastReportAt = now;
     const reportStartedAt = performance.now();
     metrics.reports += 1;
     metrics.inFlightReports += 1;
@@ -152,14 +168,14 @@ export function installRendererObserver(store: AppStore): () => void {
   };
   const schedule = () => {
     if (timer) return;
-    timer = window.setTimeout(publish, 100);
+    timer = window.setTimeout(publish, reportDelay);
   };
   const observer = new MutationObserver((records) => {
     metrics.domMutations += records.length;
     rateWindowDomMutations += records.length;
     schedule();
   });
-  observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style', 'data-active', 'disabled'] });
+  observer.observe(document.body, { childList: true, subtree: true });
   const unsubscribe = store.subscribe(() => {
     metrics.storeUpdates += 1;
     rateWindowStoreUpdates += 1;
