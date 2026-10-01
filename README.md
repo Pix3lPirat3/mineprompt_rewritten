@@ -33,7 +33,7 @@ The current 2.0 beta replaces the original renderer-owned runtime with a securit
 
 ## Requirements
 
-- Node.js 22.13 or newer
+- Node.js 24.11 or newer
 - npm 10 or newer
 - A supported Windows, macOS, or Linux desktop
 
