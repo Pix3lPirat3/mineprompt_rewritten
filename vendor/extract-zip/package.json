@@ -1,0 +1,9 @@
+{
+  "name": "mineprompt-extract-zip",
+  "version": "2.0.1",
+  "private": true,
+  "main": "index.js",
+  "dependencies": {
+    "@electron-internal/extract-zip": "^1.0.5"
+  }
+}

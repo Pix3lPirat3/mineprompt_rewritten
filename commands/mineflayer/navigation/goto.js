@@ -1,0 +1,46 @@
+'use strict';
+
+const { GoalNear } = require('mineflayer-pathfinder').goals;
+const { navigateGoal } = require('../../../src/main/navigation-service');
+
+function finiteNumber(value, label) {
+  const number = Number(value);
+  if (!Number.isFinite(number)) throw new TypeError(`${label} must be a number.`);
+  return number;
+}
+
+module.exports = {
+  command: 'goto',
+  usage: 'goto <player> [range] | goto <x> <y> <z> [range]',
+  description: 'Navigate to a visible player or coordinates.',
+  requires: { entity: true },
+  autocomplete: (command, args, { bot }) => Object.keys(bot.players),
+
+  async execute(sender, command, args, { bot }) {
+    if (args.length === 0) return sender.reply(`[Goto] Usage: ${this.usage}`);
+
+    if (args.length <= 2) {
+      const player = Object.values(bot.players).find((entry) => entry.username?.toLowerCase() === args[0].toLowerCase());
+      if (!player?.entity) return sender.reply(`[Goto] Could not see ${args[0]}.`);
+      const range = args[1] === undefined ? 2 : finiteNumber(args[1], 'Range');
+      if (range < 0) return sender.reply('[Goto] Range cannot be negative.');
+      const { x, y, z } = player.entity.position;
+      sender.reply(`[Goto] Navigating to ${player.username}.`);
+      return navigateGoal(bot, new GoalNear(x, y, z, range), { description: player.username });
+    }
+
+    if (args.length === 3 || args.length === 4) {
+      try {
+        const [x, y, z] = args.slice(0, 3).map((value, index) => finiteNumber(value, ['X', 'Y', 'Z'][index]));
+        const range = args[3] === undefined ? 2 : finiteNumber(args[3], 'Range');
+        if (range < 0) return sender.reply('[Goto] Range cannot be negative.');
+        sender.reply(`[Goto] Navigating to ${x}, ${y}, ${z}.`);
+        return await navigateGoal(bot, new GoalNear(x, y, z, range), { description: `${x}, ${y}, ${z}` });
+      } catch (error) {
+        return sender.reply(`[Goto] ${error.message}`);
+      }
+    }
+
+    return sender.reply(`[Goto] Usage: ${this.usage}`);
+  }
+};

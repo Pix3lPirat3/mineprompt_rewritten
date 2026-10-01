@@ -1,0 +1,40 @@
+{
+  "name": "@mineprompt/mineflayer-ui",
+  "version": "0.1.2",
+  "description": "Theme-neutral Mineflayer presentation state for Minecraft-style interfaces.",
+  "type": "module",
+  "main": "index.cjs",
+  "module": "index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./index.js",
+      "require": "./index.cjs",
+      "default": "./index.js"
+    }
+  },
+  "scripts": {
+    "prepack": "node build.cjs"
+  },
+  "sideEffects": false,
+  "files": [
+    "build.cjs",
+    "index.js",
+    "index.cjs",
+    "index.d.ts",
+    "README.md"
+  ],
+  "license": "ISC",
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  },
+  "peerDependencies": {
+    "mineflayer": ">=4.20.0"
+  },
+  "peerDependenciesMeta": {
+    "mineflayer": {
+      "optional": true
+    }
+  }
+}
