@@ -66,6 +66,22 @@ test('preserves a stump until it has been used to reach a tall trunk', () => {
   assert.equal(new Set(plan.steps.flatMap((step) => step.blocks.map(positionKey))).size, logs.length);
 });
 
+test('does not treat canopy leaves as ground when leaf support is disabled', () => {
+  const logs = column(0, 64, 70);
+  const leaves = [];
+  for (let x = -2; x <= 2; x += 1) for (let z = -2; z <= 2; z += 1) leaves.push({ x, y: 67, z });
+  const read = world([
+    ['dirt', flatGround()],
+    ['oak_leaves', leaves],
+    ['oak_log', logs]
+  ]);
+  const tree = discoverTree(read, logs[0]);
+  const withoutLeaves = candidateTreeStances(read, tree, { x: 2, y: 64, z: 0 }, { leafSupport: 'never' });
+  const withLeaves = candidateTreeStances(read, tree, { x: 2, y: 64, z: 0 }, { leafSupport: 'always' });
+  assert.equal(withoutLeaves.some((stand) => stand.position.y === 68), false);
+  assert.equal(withLeaves.some((stand) => stand.kind === 'leaf' && stand.position.y === 68), true);
+});
+
 test('plans deterministic generated trunks without duplicate or missing logs', () => {
   let seed = 0xa11ce;
   const random = () => {

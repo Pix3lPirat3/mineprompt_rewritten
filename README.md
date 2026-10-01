@@ -168,7 +168,7 @@ mine region 100 60 100 108 64 108 --include stone,deepslate --exclude diamond_or
 mine chunk 4 --allow-fluid-adjacent --allow-falling
 ```
 
-Tree planning identifies connected trunks and canopies, calculates reachable standing positions, and preserves a bottom log when it is needed as a step for higher logs. The planner searches several competing routes, accounts for movement and support risk, and replans after every mined log so server updates cannot silently invalidate the remaining sequence. Tree actions use the same mining policy, tool selection, durability reserve, and activity ownership as region mining.
+Tree planning identifies connected trunks and canopies, calculates reachable standing positions, and preserves a bottom log when it is needed as a step for higher logs. The planner searches several competing routes, accounts for movement and support risk, and replans between validated stance batches so server updates cannot silently invalidate the remaining sequence. Tree navigation remembers failed movement edges, uses bounded cardinal detours around unsafe diagonal routes, and can recover to a known-safe square after a failed hop. Tree actions use the same mining policy, tool selection, durability reserve, and activity ownership as region mining.
 
 ```text
 tree inspect cursor

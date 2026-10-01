@@ -217,7 +217,8 @@ function candidateTreeStances(getBlock, tree, currentPosition, options = {}) {
       for (let z = bounds.minZ; z <= bounds.maxZ; z += 1) {
         const position = { x, y, z };
         const floor = offset(position, 0, -1, 0);
-        if (solidSupport(getBlock(floor)) && !targetKeys.has(key(floor))) add(position, 'ground');
+        const support = getBlock(floor);
+        if (solidSupport(support) && !isTreeLeaf(support) && !isTreeLog(support) && !targetKeys.has(key(floor))) add(position, 'ground');
       }
     }
   }
@@ -361,5 +362,6 @@ module.exports = {
   leafSpecies,
   planForestRoute,
   planTreeRoute,
+  solidSupport,
   treeSpecies
 };
