@@ -1,6 +1,7 @@
 node_modules/
 .vite/
 out/
+release-assets/
 dist/
 build/Release/
 coverage/

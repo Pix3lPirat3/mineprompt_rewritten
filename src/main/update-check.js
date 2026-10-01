@@ -3,7 +3,7 @@
 const packageJson = require('../../package.json');
 
 const RELEASES_URL = 'https://github.com/Pix3lPirat3/mineprompt_rewritten/releases';
-const LATEST_RELEASE_URL = 'https://api.github.com/repos/Pix3lPirat3/mineprompt_rewritten/releases/latest';
+const RELEASES_API_URL = 'https://api.github.com/repos/Pix3lPirat3/mineprompt_rewritten/releases?per_page=20';
 
 function compareVersions(left, right) {
   const parse = (value) => {
@@ -33,8 +33,19 @@ function compareVersions(left, right) {
   return 0;
 }
 
-async function checkForUpdate(fetchImpl = fetch) {
-  const response = await fetchImpl(LATEST_RELEASE_URL, {
+function releaseVersion(release) {
+  if (!release || release.draft) return null;
+  const version = String(release.tag_name || '').replace(/^v/iu, '');
+  try {
+    compareVersions(version, version);
+    return version;
+  } catch {
+    return null;
+  }
+}
+
+async function checkForUpdate(fetchImpl = fetch, currentVersion = packageJson.version) {
+  const response = await fetchImpl(RELEASES_API_URL, {
     headers: {
       Accept: 'application/vnd.github+json',
       'User-Agent': `MinePrompt/${packageJson.version}`,
@@ -43,15 +54,21 @@ async function checkForUpdate(fetchImpl = fetch) {
     signal: AbortSignal.timeout(8000)
   });
   if (!response.ok) throw new Error(`GitHub returned status ${response.status}.`);
-  const release = await response.json();
-  const latestVersion = String(release.tag_name || '').replace(/^v/iu, '');
-  if (!latestVersion) throw new Error('The latest GitHub release has no version tag.');
+  const releases = await response.json();
+  if (!Array.isArray(releases)) throw new Error('GitHub returned invalid release metadata.');
+  const includePrereleases = currentVersion.includes('-');
+  const candidates = releases
+    .map((release) => ({ release, version: releaseVersion(release) }))
+    .filter((candidate) => candidate.version && (includePrereleases || !candidate.release.prerelease))
+    .sort((left, right) => compareVersions(right.version, left.version));
+  if (candidates.length === 0) throw new Error('GitHub has no compatible published release.');
+  const latestVersion = candidates[0].version;
   return {
-    currentVersion: packageJson.version,
+    currentVersion,
     latestVersion,
-    available: compareVersions(latestVersion, packageJson.version) > 0,
-    url: RELEASES_URL
+    available: compareVersions(latestVersion, currentVersion) > 0,
+    url: candidates[0].release.html_url || RELEASES_URL
   };
 }
 
-module.exports = { RELEASES_URL, checkForUpdate, compareVersions };
+module.exports = { RELEASES_API_URL, RELEASES_URL, checkForUpdate, compareVersions, releaseVersion };

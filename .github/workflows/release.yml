@@ -1,0 +1,166 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      tag: ${{ steps.metadata.outputs.tag }}
+      version: ${{ steps.metadata.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          cache: npm
+      - name: Validate release source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          test "$GITHUB_REF" = "refs/heads/main"
+          test "$GITHUB_SHA" = "$(git rev-parse origin/main)"
+      - id: metadata
+        name: Read version
+        shell: bash
+        run: |
+          version="$(node -p "require('./package.json').version")"
+          node -e "require('./src/main/update-check').compareVersions(process.argv[1], process.argv[1])" "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+      - name: Reject an existing version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.metadata.outputs.tag }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then exit 1; fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then exit 1; fi
+      - run: npm ci
+      - run: npm run audit
+      - run: npm run audit:production
+      - run: npm run check
+
+  build:
+    needs: validate
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: windows-x64
+            os: windows-latest
+          - target: macos-x64
+            os: macos-15-intel
+          - target: macos-arm64
+            os: macos-15
+          - target: linux-x64
+            os: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+          cache: npm
+      - name: Install Linux build tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install --yes fakeroot rpm xvfb
+      - run: npm ci
+      - run: npm run make:release
+      - run: node scripts/package-smoke.js
+      - name: Test desktop
+        if: runner.os != 'Linux'
+        run: npm run test:desktop
+      - name: Test Linux desktop
+        if: runner.os == 'Linux'
+        run: xvfb-run --auto-servernum npm run test:desktop
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: release-${{ matrix.target }}
+          path: release-assets/*
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  publish:
+    needs: [validate, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: write
+      artifact-metadata: write
+      attestations: write
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          pattern: release-*
+          path: release-assets
+          merge-multiple: true
+      - name: Verify release assets
+        run: node scripts/release-assets.js verify
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-checksums: release-assets/SHA256SUMS.txt
+      - id: create
+        name: Stage release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+          VERSION: ${{ needs.validate.outputs.version }}
+        shell: bash
+        run: |
+          mapfile -t assets < <(find release-assets -maxdepth 1 -type f ! -name RELEASE_NOTES.md -print | sort)
+          flags=(--draft --latest --target "$GITHUB_SHA" --title "MinePrompt $VERSION" --notes-file release-assets/RELEASE_NOTES.md)
+          if [[ "$VERSION" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "$TAG" "${assets[@]}" "${flags[@]}"
+          test "$(gh release view "$TAG" --json assets --jq '.assets | length')" = "7"
+      - id: publish
+        name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        run: gh release edit "$TAG" --draft=false --latest
+      - name: Remove older releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        shell: bash
+        run: |
+          gh release list --limit 1000 --json tagName --jq '.[].tagName' | while read -r old_tag; do
+            if [ "$old_tag" != "$TAG" ]; then gh release delete "$old_tag" --cleanup-tag --yes; fi
+          done
+      - name: Remove temporary artifacts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/artifacts?per_page=100" --jq '.artifacts[].id' | while read -r artifact_id; do
+            gh api --method DELETE "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id"
+          done
+      - name: Remove incomplete release
+        if: failure() && steps.publish.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.validate.outputs.tag }}
+        shell: bash
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then gh release delete "$TAG" --cleanup-tag --yes; fi

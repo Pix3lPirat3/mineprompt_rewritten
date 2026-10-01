@@ -31,7 +31,15 @@ The current 2.0 beta replaces the original renderer-owned runtime with a securit
 - Server resource packs declined by default
 - Manual GitHub release checks with no automatic downloads
 
-## Requirements
+## Download
+
+Download the current build from [GitHub Releases](https://github.com/Pix3lPirat3/mineprompt_rewritten/releases). Windows x64, macOS Intel and Apple silicon, and Linux x64 builds are produced automatically from the same tested revision. Only the current release is retained.
+
+The application is not code-signed. Windows SmartScreen or macOS Gatekeeper may require manual confirmation. Release downloads include SHA-256 checksums and GitHub build provenance.
+
+Packaged downloads include their runtime and do not require Node.js or npm.
+
+## Development requirements
 
 - Node.js 24.11 or newer
 - npm 10 or newer

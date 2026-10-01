@@ -19,7 +19,7 @@ module.exports = {
   packagerConfig: {
     asar: { unpackDir: '{commands,node_modules,packages,src}' },
     executableName: 'MinePrompt',
-    icon: 'src/icons/win/computer',
+    icon: process.platform === 'win32' ? 'src/icons/win/computer' : undefined,
     ignore: packageIgnore
   },
   rebuildConfig: {},
