@@ -83,6 +83,10 @@ function fixture() {
     getClient: () => ({ bot }),
     activities,
     playerActions,
+    trees: {
+      inspect: (request) => { calls.push(['tree-inspect', request]); return { message: '[Tree] Oak plan.' }; },
+      start: (request) => { calls.push(['tree-start', request]); return { currentTree: { species: 'oak' } }; }
+    },
     stash: {
       start: (request) => {
         calls.push(['stash', request]);
@@ -162,4 +166,17 @@ test('locks consistent mining to an exact position and bounded depth', async () 
   assert.match(depth.message, /4 locked blocks/u);
   assert.match(activities.values.get('consistentmine').detail, /4 locked blocks/u);
   activities.stop('consistentmine');
+});
+
+test('exposes tree-only block actions through the shared tree service', async () => {
+  const { block, calls, service } = fixture();
+  block.name = 'oak_log';
+  block.displayName = 'Oak Log';
+  const described = service.describeBlock(block);
+  assert.deepEqual(described.tree, { species: 'oak', part: 'log' });
+  assert.equal(described.actions.some((action) => action.id === 'block.tree-fell'), true);
+  await service.execute({ actionId: 'block.tree-inspect', target: 'cursor' });
+  await service.execute({ actionId: 'block.tree-fell', target: 'cursor' });
+  assert.equal(calls.some((entry) => entry[0] === 'tree-inspect'), true);
+  assert.equal(calls.some((entry) => entry[0] === 'tree-start'), true);
 });

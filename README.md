@@ -168,6 +168,27 @@ mine region 100 60 100 108 64 108 --include stone,deepslate --exclude diamond_or
 mine chunk 4 --allow-fluid-adjacent --allow-falling
 ```
 
+Tree planning identifies connected trunks and canopies, calculates reachable standing positions, and preserves a bottom log when it is needed as a step for higher logs. The planner searches several competing routes, accounts for movement and support risk, and replans after every mined log so server updates cannot silently invalidate the remaining sequence. Tree actions use the same mining policy, tool selection, durability reserve, and activity ownership as region mining.
+
+```text
+tree inspect cursor
+tree inspect nearest
+tree fell cursor
+tree fell nearest --leaf-support never
+tree farm --radius 32 --max-trees 12
+tree status
+tree stop
+```
+
+Tree farming accepts the ordinary mining flags plus:
+
+- `--leaf-support never|safe|always` controls whether routes may stand on leaves. Safe mode only trusts persistent leaves.
+- `--log-support never|stump` controls whether a bottom log may be preserved and climbed before it is removed.
+- `--radius N` and `--max-trees N` bound forest scanning.
+- `--allow-uncertain` permits structures that do not have strong natural-tree evidence.
+
+The cursor block menu exposes the same inspect and fell operations for supported logs and leaves. Headless and agent sessions use `mineprompt_tree`, which calls the same service rather than maintaining another implementation.
+
 Mining flags can be combined:
 
 - `--tool auto|held|hand` chooses automatic tool selection, the current held tool, or hand mining.

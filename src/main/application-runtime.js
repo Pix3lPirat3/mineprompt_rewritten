@@ -162,6 +162,10 @@ class ApplicationRuntime {
     return this.sessionRequest(request?.sessionId, 'miningAction', request, origin || { type: 'agent' });
   }
 
+  treeAction(request = {}) {
+    return this.sessionRequest(request.sessionId, 'treeAction', request);
+  }
+
   stashAction(request = {}) {
     return this.sessionRequest(request.sessionId, 'stashAction', request);
   }

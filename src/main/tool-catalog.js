@@ -19,6 +19,22 @@ const MiningPolicy = Type.Object({
   reach: Type.Optional(Type.Number({ minimum: 3, maximum: 5.5 })),
   maxBlocks: Type.Optional(Type.Integer({ minimum: 1, maximum: 16384 }))
 }, { additionalProperties: false });
+const TreePolicy = Type.Object({
+  tool: Type.Optional(Type.Union(['auto', 'held', 'hand'].map((value) => Type.Literal(value)))),
+  lowDurability: Type.Optional(Type.Union(['switch', 'stop', 'skip'].map((value) => Type.Literal(value)))),
+  minimumDurability: Type.Optional(Type.Integer({ minimum: 0, maximum: 65535 })),
+  allowFluidAdjacent: Type.Optional(Type.Boolean()),
+  allowFalling: Type.Optional(Type.Boolean()),
+  include: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 128 }), { maxItems: 128 })),
+  exclude: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 128 }), { maxItems: 128 })),
+  reach: Type.Optional(Type.Number({ minimum: 3, maximum: 5.5 })),
+  maxBlocks: Type.Optional(Type.Integer({ minimum: 1, maximum: 4096 })),
+  leafSupport: Type.Optional(Type.Union(['never', 'safe', 'always'].map((value) => Type.Literal(value)))),
+  logSupport: Type.Optional(Type.Union(['never', 'stump'].map((value) => Type.Literal(value)))),
+  radius: Type.Optional(Type.Integer({ minimum: 1, maximum: 64 })),
+  maxTrees: Type.Optional(Type.Integer({ minimum: 1, maximum: 128 })),
+  requireNatural: Type.Optional(Type.Boolean())
+}, { additionalProperties: false });
 
 function tool(name, description, inputSchema, execute, options = {}) {
   return Object.freeze({
@@ -147,6 +163,16 @@ class ToolCatalog {
       preset: Type.Optional(Type.String({ minLength: 1, maxLength: 48 })),
       policy: Type.Optional(MiningPolicy)
     }, { additionalProperties: false }), async (runtime, input, origin) => runtime.miningAction(input, origin), {
+      destructive: true, capability: 'world', approval: 'recommended', openWorld: true
+    }));
+    this.register(tool('mineprompt_tree', 'Inspect, fell, or farm trees with topology detection, support-aware route planning, durability controls, and continuous replanning.', Type.Object({
+      sessionId: SessionId,
+      action: Type.Union(['inspect', 'fell', 'farm', 'stop', 'status'].map((value) => Type.Literal(value))),
+      target: Type.Optional(Type.Union([Type.Literal('cursor'), Type.Literal('nearest'), Type.Literal('position')])),
+      position: Type.Optional(Position),
+      preset: Type.Optional(Type.String({ minLength: 1, maxLength: 48 })),
+      policy: Type.Optional(TreePolicy)
+    }, { additionalProperties: false }), async (runtime, input) => runtime.treeAction(input), {
       destructive: true, capability: 'world', approval: 'recommended', openWorld: true
     }));
     this.register(tool('mineprompt_stash', 'Collect nearby dropped items, deposit only the collected inventory increase into the nearest chest, barrel, or shulker box, then restore the saved position and view. Can also deposit an explicitly selected inventory item.', Type.Object({

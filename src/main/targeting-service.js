@@ -6,6 +6,7 @@ const { MiningService } = require('./mining-service');
 const { plainText } = require('./text-value');
 const { navigateGoal } = require('./navigation-service');
 const { BLOCK_ACTIONS, ENTITY_ACTIONS } = require('./target-actions');
+const { isTreeLeaf, isTreeLog, treeSpecies, leafSpecies } = require('./tree-planner');
 
 function roundedDistance(bot, position) {
   if (!bot?.entity?.position || !position) return null;
@@ -51,13 +52,14 @@ function positionText(position) {
 }
 
 class TargetingService {
-  constructor({ getClient, activities, playerActions, mining, stash, logger, onChange = () => {} }) {
+  constructor({ getClient, activities, playerActions, mining, trees, stash, logger, onChange = () => {} }) {
     this.getClient = getClient;
     this.activities = activities;
     this.playerActions = playerActions;
     this.logger = logger;
     this.onChange = onChange;
     this.mining = mining || new MiningService({ getClient, activities, logger, onChange });
+    this.trees = trees || null;
     this.stash = stash;
     this.cache = null;
   }
@@ -97,6 +99,7 @@ class TargetingService {
 
   describeBlock(block, bot = this.bot) {
     if (!block || !bot?.entity || block.name === 'air') return null;
+    const tree = isTreeLog(block) || isTreeLeaf(block);
     return {
       name: block.name,
       displayName: block.displayName || block.name,
@@ -104,7 +107,8 @@ class TargetingService {
       distance: roundedDistance(bot, block.position),
       diggable: block.diggable !== false,
       hardness: Number.isFinite(block.hardness) ? block.hardness : null,
-      actions: BLOCK_ACTIONS.map((action) => ({ ...action, enabled: action.id !== 'block.dig' || block.diggable !== false, reason: action.id === 'block.dig' && block.diggable === false ? 'This block cannot be mined.' : '' }))
+      tree: tree ? { species: treeSpecies(block) || leafSpecies(block), part: isTreeLog(block) ? 'log' : 'leaves' } : null,
+      actions: BLOCK_ACTIONS.filter((action) => !action.treesOnly || tree).map((action) => ({ ...action, enabled: action.id !== 'block.dig' || block.diggable !== false, reason: action.id === 'block.dig' && block.diggable === false ? 'This block cannot be mined.' : '' }))
     };
   }
 
@@ -251,6 +255,15 @@ class TargetingService {
       const policy = actionId === 'block.mine-held' ? { ...request.policy, tool: 'held', lowDurability: 'stop', minimumDurability: 10 } : request.policy;
       this.mining.startConsistent(block, depth, policy);
       return { message: `[Mining] Repeating ${depth === 1 ? 'the locked block' : `${depth} locked blocks`} from ${positionText(block.position)}.` };
+    }
+    if (actionId === 'block.tree-inspect') {
+      if (!this.trees) throw new Error('Tree planning is not available.');
+      return this.trees.inspect({ position: block.position, policy: request.policy });
+    }
+    if (actionId === 'block.tree-fell') {
+      if (!this.trees) throw new Error('Tree planning is not available.');
+      const status = this.trees.start({ mode: 'fell', position: block.position, policy: request.policy });
+      return { message: `[Tree] Started ${status.currentTree?.species || treeSpecies(block) || leafSpecies(block)} tree plan at ${positionText(block.position)}.`, status };
     }
     throw new Error('The target action is not available for this block.');
   }

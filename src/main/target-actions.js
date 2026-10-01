@@ -20,7 +20,9 @@ const BLOCK_ACTIONS = Object.freeze([
   { id: 'block.dig', label: 'Mine once', detail: 'target block dig | bot.dig', danger: true },
   { id: 'block.mine-exact', label: 'Repeat this block', detail: 'target block mine 1', danger: true },
   { id: 'block.mine-held', label: 'Repeat until held tool is low', detail: 'target block mine 1 --tool held --low stop', danger: true },
-  { id: 'block.mine-depth', label: 'Repeat 4 deep', detail: 'target block mine 4', danger: true }
+  { id: 'block.mine-depth', label: 'Repeat 4 deep', detail: 'target block mine 4', danger: true },
+  { id: 'block.tree-inspect', label: 'Inspect tree plan', detail: 'tree inspect cursor', treesOnly: true },
+  { id: 'block.tree-fell', label: 'Fell this tree', detail: 'tree fell cursor', treesOnly: true, danger: true }
 ]);
 
 const ENTITY_COMMAND_ACTIONS = Object.freeze({
@@ -44,11 +46,13 @@ const BLOCK_COMMAND_ACTIONS = Object.freeze({
   activate: 'block.activate',
   open: 'block.activate',
   dig: 'block.dig',
-  mine: 'block.mine'
+  mine: 'block.mine',
+  tree: 'block.tree-inspect',
+  fell: 'block.tree-fell'
 });
 
 const ENTITY_ACTION_COMPLETIONS = Object.freeze(['inspect', 'goto', 'look', 'pickup', 'stash', 'trade', 'activate', 'useitem', 'attack']);
-const BLOCK_ACTION_COMPLETIONS = Object.freeze(['inspect', 'goto', 'look', 'activate', 'dig', 'mine']);
+const BLOCK_ACTION_COMPLETIONS = Object.freeze(['inspect', 'goto', 'look', 'activate', 'dig', 'mine', 'tree', 'fell']);
 const TARGET_ACTION_IDS = Object.freeze([...ENTITY_ACTIONS, ...BLOCK_ACTIONS].map((action) => action.id));
 
 module.exports = {

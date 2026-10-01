@@ -31,6 +31,10 @@ function filterEntity(entity: EntityTarget, filter: EntityFilter) {
   return entity.kind === 'mob' || entity.kind === 'entity';
 }
 
+function usesMiningPolicy(actionId: string) {
+  return actionId.startsWith('block.mine') || actionId === 'block.dig' || actionId === 'block.tree-fell';
+}
+
 export function TargetRibbon() {
   const dispatch = useAppDispatch();
   const runtime = useAppSelector((state) => ({
@@ -75,7 +79,7 @@ export function TargetRibbon() {
         actionId: action.id,
         ...(type === 'entity' ? { entityId: (target as EntityTarget).id } : { target: 'position', position: target.position }),
         ...(action.id === 'block.mine-depth' ? { depth: 4 } : {}),
-        ...(action.id.startsWith('block.mine') || action.id === 'block.dig' ? { presetId: activeMiningPreset?.id || null } : {}),
+        ...(usesMiningPolicy(action.id) ? { presetId: activeMiningPreset?.id || null } : {}),
         overrideFriendProtection: overriding
       });
     } catch (error) {
@@ -104,7 +108,7 @@ export function TargetRibbon() {
     const overriding = action.relationshipProtected && action.overrideAllowed && overridePressed;
     return {
       id: action.id,
-      label: overriding ? `${action.label} with override` : activeMiningPreset && (action.id.startsWith('block.mine') || action.id === 'block.dig') ? `${action.label} with ${activeMiningPreset.name}` : action.label,
+      label: overriding ? `${action.label} with override` : activeMiningPreset && usesMiningPolicy(action.id) ? `${action.label} with ${activeMiningPreset.name}` : action.label,
       detail: action.detail?.replace('<target>', menu.type === 'entity' ? String((menu.target as EntityTarget).id) : 'block'),
       enabled: action.enabled || overriding,
       reason: overriding ? 'Friend protection override is active.' : action.reason,

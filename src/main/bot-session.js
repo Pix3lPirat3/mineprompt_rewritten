@@ -9,6 +9,7 @@ const { ConnectionService } = require('./connection-service');
 const { InventoryService } = require('./inventory-service');
 const { InventoryPipeline } = require('./inventory-pipeline');
 const { MiningService } = require('./mining-service');
+const { TreeService } = require('./tree-service');
 const { StashService } = require('./stash-service');
 const { CraftingService } = require('./crafting-service');
 const { PlayerActionRegistry } = require('./player-actions');
@@ -61,6 +62,13 @@ class BotSession {
       logger,
       onChange: () => this.publishSnapshot()
     });
+    this.trees = new TreeService({
+      getClient: () => this.client,
+      activities: this.activities,
+      mining: this.mining,
+      logger,
+      onChange: () => this.publishSnapshot()
+    });
     this.stash = new StashService({
       getClient: () => this.client,
       activities: this.activities,
@@ -73,6 +81,7 @@ class BotSession {
       activities: this.activities,
       playerActions: this.playerActions,
       mining: this.mining,
+      trees: this.trees,
       stash: this.stash,
       logger,
       onChange: () => this.publishSnapshot()
@@ -104,6 +113,7 @@ class BotSession {
       inventory: this.inventory,
       logger: this.logger,
       mining: this.mining,
+      trees: this.trees,
       stash: this.stash,
       relationships: this.relationships,
       targets: this.targets,
@@ -164,6 +174,7 @@ class BotSession {
       client: this.client,
       inventory: this.inventory,
       mining: this.mining,
+      trees: this.trees,
       stash: this.stash,
       targets: this.targets,
       activities: this.activities,
@@ -191,8 +202,8 @@ class BotSession {
   }
 
   async targetAction(request, origin = { type: 'gui' }) {
-    const miningRequest = String(request?.actionId || '').startsWith('block.mine') || request?.actionId === 'block.dig';
-    const result = await this.targets.execute(miningRequest ? { ...request, policy: this.resolveMiningPolicy(request.policy, request.presetId || request.preset) } : request, origin);
+    const worldAction = String(request?.actionId || '').startsWith('block.mine') || request?.actionId === 'block.dig' || String(request?.actionId || '').startsWith('block.tree-');
+    const result = await this.targets.execute(worldAction ? { ...request, policy: this.resolveMiningPolicy(request.policy, request.presetId || request.preset) } : request, origin);
     this.logger.log(result.message);
     this.publishSnapshot();
     return { ok: true, ...result };
@@ -228,6 +239,17 @@ class BotSession {
       return { ok: true, ...this.mining.startRegion({ x, y: originPosition.y - depth + 1, z }, { x: x + 15, y: originPosition.y, z: z + 15 }, policy) };
     }
     throw new Error('Unknown mining action.');
+  }
+
+  treeAction(request = {}) {
+    const action = String(request.action || 'inspect').toLowerCase();
+    if (action === 'status') return { ok: true, status: this.trees.status() };
+    if (action === 'stop') return { ok: this.trees.stop(), status: this.trees.status() };
+    const policy = this.resolveMiningPolicy(request.policy, request.presetId || request.preset);
+    const treePolicy = { ...policy, ...(request.policy || {}) };
+    if (action === 'inspect') return { ok: true, ...this.trees.inspect({ ...request, policy: treePolicy }) };
+    if (action === 'fell' || action === 'farm') return { ok: true, status: this.trees.start({ ...request, mode: action, policy: treePolicy }) };
+    throw new Error('Unknown tree action.');
   }
 
   stashAction(request = {}) {

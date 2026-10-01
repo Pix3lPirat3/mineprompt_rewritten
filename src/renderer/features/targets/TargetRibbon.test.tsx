@@ -42,6 +42,7 @@ describe('target ribbon', () => {
       position: { x: 10, y: 64, z: -2 },
       diggable: true,
       hardness: 1.5,
+      tree: null,
       actions: []
     };
     const execute = vi.fn(async () => ({ ok: true }));
@@ -56,5 +57,30 @@ describe('target ribbon', () => {
     await user.click(screen.getByText('Stone').closest('button') as HTMLButtonElement);
     await user.click(screen.getByRole('menuitem', { name: 'Mine selected region' }));
     expect(execute).toHaveBeenCalledWith('mine region 10 64 -2 10 64 -2', 'primary');
+  });
+
+  it('dispatches tree actions from supported cursor blocks', async () => {
+    const targetAction = vi.fn(async () => ({ ok: true }));
+    const { user } = renderWithRuntime(<TargetRibbon />, { api: { targetAction }, snapshot: {
+      selectedSessionId: 'primary',
+      state: { status: 'online', username: 'Bot' },
+      session: { targets: {
+        cursorBlock: {
+          name: 'oak_log',
+          displayName: 'Oak Log',
+          distance: 2,
+          position: { x: 1, y: 64, z: 0 },
+          diggable: true,
+          hardness: 2,
+          tree: { species: 'oak', part: 'log' },
+          actions: [{ id: 'block.tree-fell', label: 'Fell this tree', enabled: true, reason: '', danger: true }]
+        },
+        cursorEntity: null,
+        entities: []
+      } }
+    } });
+    await user.click(screen.getByText('Oak Log').closest('button') as HTMLButtonElement);
+    await user.click(screen.getByRole('menuitem', { name: 'Fell this tree' }));
+    expect(targetAction).toHaveBeenCalledWith(expect.objectContaining({ actionId: 'block.tree-fell', position: { x: 1, y: 64, z: 0 }, sessionId: 'primary' }));
   });
 });

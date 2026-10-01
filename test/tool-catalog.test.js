@@ -34,6 +34,7 @@ function fixture() {
     playerAction: async (...args) => { calls.push(['player', ...args]); return { ok: true }; },
     targetAction: async (...args) => { calls.push(['target', ...args]); return { ok: true }; },
     miningAction: async (...args) => { calls.push(['mining', ...args]); return { ok: true }; },
+    treeAction: async (...args) => { calls.push(['tree', ...args]); return { ok: true }; },
     stashAction: async (...args) => { calls.push(['stash', ...args]); return { ok: true }; },
     inventoryAction: async (...args) => { calls.push(['inventory', ...args]); return { ok: true }; },
     inventoryInspect: async (...args) => { calls.push(['inspect', ...args]); return { ok: true, item: { name: 'diamond_sword' } }; },
@@ -52,6 +53,7 @@ test('generates MCP and strict OpenAI tools from one catalog', () => {
   assert.equal(listed.some((entry) => entry.name === 'mineprompt_player_action'), true);
   assert.equal(listed.some((entry) => entry.name === 'mineprompt_target_action'), true);
   assert.equal(listed.some((entry) => entry.name === 'mineprompt_mining'), true);
+  assert.equal(listed.some((entry) => entry.name === 'mineprompt_tree'), true);
   assert.equal(listed.some((entry) => entry.name === 'mineprompt_reload'), true);
   assert.equal(listed.some((entry) => entry.name === 'mineprompt_stash'), true);
   assert.equal(listed.find((entry) => entry.name === 'mineprompt_ui_state').annotations.readOnlyHint, true);
@@ -81,7 +83,9 @@ test('validates agent input and executes dynamic command tools', async () => {
     to: { x: 3, y: 63, z: 3 },
     policy: { tool: 'auto', minimumDurability: 20 }
   }, { type: 'agent' });
+  await catalog.call('mineprompt_tree', { sessionId: 'primary', action: 'fell', target: 'nearest', policy: { leafSupport: 'safe', lowDurability: 'switch' } }, { type: 'agent' });
   assert.equal(calls.some((entry) => entry[0] === 'mining' && entry[1].policy.minimumDurability === 20), true);
+  assert.equal(calls.some((entry) => entry[0] === 'tree' && entry[1].action === 'fell'), true);
   await catalog.call('mineprompt_stash', { sessionId: 'primary', action: 'nearby', collectionRadius: 12, containerRadius: 20 }, { type: 'agent' });
   assert.equal(calls.some((entry) => entry[0] === 'stash' && entry[1].containerRadius === 20), true);
   await catalog.call('mineprompt_inventory_inspect', { sessionId: 'primary', scope: 'inventory', target: 36 }, { type: 'agent' });

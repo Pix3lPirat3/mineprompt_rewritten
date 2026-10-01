@@ -155,6 +155,7 @@ export interface BlockTarget {
   distance: number;
   diggable: boolean;
   hardness: number | null;
+  tree: { species: string; part: 'log' | 'leaves' } | null;
   actions: TargetActionDescriptor[];
 }
 
