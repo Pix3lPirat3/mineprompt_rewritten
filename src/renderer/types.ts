@@ -276,7 +276,7 @@ export interface BotSession {
   activities: Activity[];
   session: BotSnapshot;
   commands: CommandDescriptor[];
-  diagnostics?: { inventory: InventoryPipelineDiagnostics | null };
+  diagnostics?: { inventory: InventoryPipelineDiagnostics | null; snapshots?: Record<string, number | boolean> | null };
   process: { isolated: boolean; pid: number | null; status: 'starting' | 'running' | 'failed' };
 }
 
@@ -419,6 +419,8 @@ export interface MinePromptApi {
   reportRendererState(state: Record<string, unknown>): Promise<{ ok: boolean }>;
   playerAction(request: Record<string, unknown>): Promise<{ ok: boolean; message?: string; prepareCommand?: string }>;
   targetAction(request: Record<string, unknown>): Promise<{ ok: boolean; message?: string }>;
+  capabilities(request?: { sessionId?: string }): Promise<Record<string, unknown>>;
+  capabilityAction(request: { sessionId?: string; actionId: string; input?: Record<string, unknown> }): Promise<unknown>;
   recipes(request: Record<string, unknown>): Promise<RecipeDescriptor[]>;
   craft(request: Record<string, unknown>): Promise<{ ok: boolean; message?: string }>;
   saveWorkflow(workflow: WorkflowDefinition): Promise<{ ok: boolean; workflow: WorkflowDefinition }>;

@@ -19,11 +19,23 @@ test('renderer mounts through the typed application entry point', () => {
 });
 
 test('preload requests have matching trusted IPC handlers', () => {
+  const { IPC_EVENT_CHANNELS, IPC_REQUESTS, createIpcRequests } = require('../src/main/ipc-contract');
+  const { HostClient } = require('../src/main/host-client');
   const preload = fs.readFileSync(path.join(root, 'src', 'js', 'preload.js'), 'utf8');
   const electron = fs.readFileSync(path.join(root, 'src', 'electron.js'), 'utf8');
-  const requests = [...preload.matchAll(/ipcRenderer\.invoke\('([^']+)'/gu)].map((match) => match[1]);
-  const handlers = [...electron.matchAll(/ipcMain\.handle\('([^']+)'/gu)].map((match) => match[1]);
-  assert.deepEqual(requests.toSorted(), handlers.toSorted());
+  const calls = [];
+  const api = createIpcRequests((channel, ...args) => calls.push([channel, ...args]));
+  assert.equal(new Set(IPC_REQUESTS.map((entry) => entry.api)).size, IPC_REQUESTS.length);
+  assert.equal(new Set(IPC_REQUESTS.map((entry) => entry.channel)).size, IPC_REQUESTS.length);
+  assert.deepEqual(IPC_REQUESTS.filter((entry) => typeof HostClient.prototype[entry.method] !== 'function'), []);
+  assert.equal(IPC_EVENT_CHANNELS.includes('snapshot'), true);
+  assert.match(preload, /createIpcRequests/u);
+  assert.match(electron, /for \(const request of IPC_REQUESTS\)/u);
+  const specialRequests = [...preload.matchAll(/ipcRenderer\.invoke\('([^']+)'/gu)].map((match) => match[1]);
+  const specialHandlers = [...electron.matchAll(/ipcMain\.handle\('([^']+)'/gu)].map((match) => match[1]);
+  assert.deepEqual(specialRequests.toSorted(), specialHandlers.toSorted());
+  api.execute('ping', 'primary');
+  assert.deepEqual(calls, [['mineprompt:execute', 'ping', 'primary']]);
 });
 
 test('inventory texture map resolves representative item types', () => {

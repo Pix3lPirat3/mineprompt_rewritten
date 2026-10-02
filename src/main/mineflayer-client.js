@@ -83,6 +83,7 @@ class MineflayerClient {
     this.currentWindowProperties = {};
     this.presentation = null;
     this.effectFlags = new Map();
+    this.inventoryCache = null;
   }
 
   async startClient(options, { reconnect = false } = {}) {
@@ -104,6 +105,7 @@ class MineflayerClient {
       throw error;
     }
     this.bot = bot;
+    this.invalidateInventorySnapshot();
     this.effectFlags.clear();
     try {
       this.presentation = createMineflayerUiState(bot, {
@@ -124,6 +126,7 @@ class MineflayerClient {
       this.presentation?.close();
       this.presentation = null;
       this.bot = null;
+      bot.mineprompt?.close?.();
       try { bot.quit('Plugin initialization failed'); } catch { bot.end('Plugin initialization failed'); }
       this.interface.setFailure(error instanceof Error ? error.message : String(error));
       throw error;
@@ -369,7 +372,11 @@ class MineflayerClient {
     });
   }
 
-  inventorySnapshot() {
+  invalidateInventorySnapshot() {
+    this.inventoryCache = null;
+  }
+
+  inventorySnapshot(force = false) {
     const bot = this.bot;
     if (!bot?.entity) return {
       connectionId: this.connectionAttempt,
@@ -383,10 +390,12 @@ class MineflayerClient {
       containerLayout: null,
       inventoryRevision: this.inventoryEvents.revision
     };
-    const inventory = bot.inventory;
     const container = bot.currentWindow;
+    const cacheKey = `${this.connectionAttempt}:${this.inventoryEvents.revision}:${container?.id ?? 'inventory'}`;
+    if (!force && this.inventoryCache?.key === cacheKey) return this.inventoryCache.value;
+    const inventory = bot.inventory;
     const items = (values, window) => values.map((item) => serializeItem(item, window.hotbarStart, window.inventoryEnd, this.chatMessageClass, bot.registry));
-    return {
+    const snapshot = {
       connectionId: this.connectionAttempt,
       inventoryRevision: this.inventoryEvents.revision,
       windowId: container?.id ?? null,
@@ -407,6 +416,8 @@ class MineflayerClient {
         properties: { ...this.currentWindowProperties }
       } : null
     };
+    this.inventoryCache = { key: cacheKey, value: snapshot };
+    return snapshot;
   }
 
   snapshot() {
@@ -460,6 +471,7 @@ class MineflayerClient {
     this.currentWindowTitle = null;
     this.currentWindowProperties = {};
     this.inventoryEvents.reset();
+    this.invalidateInventorySnapshot();
     this.connectionAttempt += 1;
     try {
       bot.quit(reason);

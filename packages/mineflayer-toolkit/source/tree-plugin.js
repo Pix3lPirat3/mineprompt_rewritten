@@ -19,7 +19,7 @@ function installTrees(bot, options = {}) {
     activities: runtime.activities,
     mining: mining.service,
     logger: options.logger || runtime.logger,
-    onChange: () => runtime.events.emit('trees:change', service.status())
+    onChange: () => runtime.emit('trees:change', service.status())
   });
   const api = Object.freeze({
     service,

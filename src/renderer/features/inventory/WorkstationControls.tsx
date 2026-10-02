@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { shallowEqual } from 'react-redux';
 import { configureItemTexture } from '../../assets';
 import { useAppSelector } from '../../store';
 import type { ContainerLayout, InventoryRequest, ItemStack, RecipeDescriptor } from '../../types';
@@ -49,8 +50,12 @@ function BrewingProgress({ properties }: { properties: Record<string, number> })
 }
 
 export function WorkstationControls({ layout, request }: WorkstationControlsProps) {
-  const runtime = useAppSelector((state) => state.runtime);
-  const items = runtime.session.inventory;
+  const runtime = useAppSelector((state) => ({
+    selectedSessionId: state.runtime.selectedSessionId,
+    connectionId: state.runtime.session.connectionId,
+    items: state.runtime.session.inventory
+  }), shallowEqual);
+  const items = runtime.items;
   const [query, setQuery] = useState('');
   const [recipes, setRecipes] = useState<RecipeDescriptor[]>([]);
   const [loading, setLoading] = useState(false);
@@ -110,7 +115,7 @@ export function WorkstationControls({ layout, request }: WorkstationControlsProp
         <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Filter craftable recipes" />
         <div>
           {recipes.map((recipe) => (
-            <button key={recipe.id} type="button" disabled={!recipe.available} title={recipe.ingredients.map((item) => `${item.count} x ${item.displayName}`).join(', ')} onClick={() => void window.mineprompt.craft({ sessionId: runtime.selectedSessionId, connectionId: runtime.session.connectionId, recipeId: recipe.id, item: recipe.name, count: 1 })}>
+            <button key={recipe.id} type="button" disabled={!recipe.available} title={recipe.ingredients.map((item) => `${item.count} x ${item.displayName}`).join(', ')} onClick={() => void window.mineprompt.craft({ sessionId: runtime.selectedSessionId, connectionId: runtime.connectionId, recipeId: recipe.id, item: recipe.name, count: 1 })}>
               <ItemImage name={recipe.name} />
               <span><strong>{recipe.displayName}</strong><small>{recipe.resultCount} per craft</small></span>
             </button>

@@ -32,7 +32,7 @@ function installInventory(bot, options = {}) {
   const mining = options.mining || installMining(bot, options.miningOptions);
   const client = options.client || serviceClient(bot, options.clientState);
   let api;
-  const notify = () => runtime.events.emit('inventory:change', api?.snapshot());
+  const notify = () => runtime.emit('inventory:change', api?.snapshot());
   const inventory = options.service || new InventoryService({ getClient: () => client, onChange: notify });
   const crafting = options.crafting || new CraftingService({ getClient: () => client, onChange: notify });
   const stash = options.stash || new StashService({

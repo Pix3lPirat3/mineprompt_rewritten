@@ -10,6 +10,7 @@ const { validateServer } = require('./connection-service');
 const { RelationshipService } = require('./relationship-service');
 const { RendererDiagnostics } = require('./renderer-diagnostics');
 const { ToolCatalog } = require('./tool-catalog');
+const { SnapshotPublisher } = require('./snapshot-publisher');
 
 const REMOTE_CAPABILITIES = new Set(['status', 'chat', 'movement', 'inventory', 'combat', 'world']);
 
@@ -26,6 +27,11 @@ class ApplicationRuntime {
     this.toolCatalog = new ToolCatalog(this);
     this.sessions = new Map();
     this.selectedSessionId = null;
+    this.snapshotPublisher = new SnapshotPublisher({
+      capture: () => this.snapshot(),
+      publish: (snapshot) => this.emit('snapshot', snapshot),
+      onError: (error) => this.logger.error(`[Snapshot] ${error instanceof Error ? error.message : String(error)}`)
+    });
   }
 
   async init() {
@@ -34,6 +40,7 @@ class ApplicationRuntime {
     await session.ready;
     this.logger.log(`MinePrompt ${packageJson.version} is ready. Type "help" to see available commands.`);
     this.publishSnapshot();
+    this.snapshotPublisher.flush();
     return this;
   }
 
@@ -63,6 +70,10 @@ class ApplicationRuntime {
   get connections() { return this.selectedSession()?.connections; }
   get inventory() { return this.selectedSession()?.inventory; }
   get commands() { return this.selectedSession()?.commands; }
+
+  commandDescriptors() {
+    return this.selectedSession()?.commandDescriptors?.() || [];
+  }
 
   async sessionRequest(sessionId, method, ...args) {
     const session = this.sessions.get(sessionId || this.selectedSessionId);
@@ -223,8 +234,9 @@ class ApplicationRuntime {
     return this.sessionRequest(request.sessionId, 'stopWorkflow', request.workflowId);
   }
 
-  preferences() {
-    const settings = this.store.snapshot().settings;
+  preferences(snapshot = null) {
+    const data = snapshot || this.store.snapshot();
+    const settings = data.settings;
     return {
       resourcePackPolicy: settings.resourcePackPolicy === 'accept' ? 'accept' : 'deny',
       externalPlayerHeadsEnabled: settings.externalPlayerHeadsEnabled === true,
@@ -235,7 +247,7 @@ class ApplicationRuntime {
         : [],
       automaticReconnectEnabled: settings.automaticReconnectEnabled === true,
       reconnectAttempts: Number.isInteger(settings.reconnectAttempts) ? settings.reconnectAttempts : 3,
-      friendPlayers: this.relationships.friendNames()
+      friendPlayers: this.relationships.friendNames(data)
     };
   }
 
@@ -348,8 +360,8 @@ class ApplicationRuntime {
   }
 
   snapshot() {
-    const selected = this.selectedSession()?.snapshot();
     const sessions = [...this.sessions.values()].map((session) => session.snapshot());
+    const selected = sessions.find((session) => session.id === this.selectedSessionId) || sessions[0];
     const data = this.store.snapshot();
     return {
       version: packageJson.version,
@@ -358,7 +370,7 @@ class ApplicationRuntime {
       state: selected.state,
       accounts: data.accounts,
       servers: data.servers,
-      preferences: this.preferences(),
+      preferences: this.preferences(data),
       workflows: data.workflows,
       miningPresets: data.miningPresets,
       activeMiningPresetId: data.activeMiningPresetId,
@@ -382,18 +394,19 @@ class ApplicationRuntime {
       if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, redactValue(entry)]));
       return value;
     };
-    const selected = this.selectedSession()?.snapshot();
+    const sessions = [...this.sessions.values()].map((session) => session.snapshot());
+    const selected = sessions.find((session) => session.id === this.selectedSessionId) || sessions[0];
     return {
       application: { version: packageJson.version, platform: process.platform, architecture: process.arch },
       state: { status: selected.state.status, lastError: redact(selected.state.lastError || '') },
-      sessions: [...this.sessions.values()].map((session) => {
-        const snapshot = session.snapshot();
+      sessions: sessions.map((snapshot) => {
         return {
           id: snapshot.id,
           status: snapshot.state.status,
           process: snapshot.process,
           activities: snapshot.activities.map(({ id, label, startedAt }) => ({ id, label, startedAt })),
-          inventoryPipeline: snapshot.diagnostics?.inventory || null
+          inventoryPipeline: snapshot.diagnostics?.inventory || null,
+          snapshotPipeline: snapshot.diagnostics?.snapshots || null
         };
       }),
       logs: this.logger.recent().filter((entry) => entry.level !== 'log').map((entry) => ({ ...entry, message: redact(entry.message) })),
@@ -417,10 +430,11 @@ class ApplicationRuntime {
   }
 
   publishSnapshot() {
-    if (this.selectedSession()) this.emit('snapshot', this.snapshot());
+    if (this.selectedSession()) this.snapshotPublisher.request();
   }
 
   async close() {
+    this.snapshotPublisher.close();
     await Promise.all([...this.sessions.values()].map((session) => session.close()));
     await this.store.close();
   }

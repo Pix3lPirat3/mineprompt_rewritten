@@ -14,7 +14,7 @@ export interface ActivitySnapshot {
 }
 
 export class ActivityManager {
-  constructor(onChange?: (snapshot: ActivitySnapshot[], revision: number) => void);
+  constructor(onChange?: (snapshot: ActivitySnapshot[], revision: number) => void, onError?: (error: unknown) => void);
   register(id: string, options: { label?: string; detail?: string; resources?: string[]; stop(): void }): string;
   finish(id: string): boolean;
   has(id: string): boolean;
@@ -40,6 +40,8 @@ export class ActionDispatcher {
   registerPolicy(id: string, evaluate: (context: Record<string, unknown>) => Record<string, unknown> | null): () => void;
   get(id: string): ActionDefinition | null;
   list(): Array<Omit<ActionDefinition, 'execute'>>;
+  count(): number;
+  clear(): number;
   evaluate(action: ActionDefinition, context: Record<string, unknown>): Record<string, unknown>;
   execute<R = unknown>(id: string, input: Record<string, unknown>, context?: Record<string, unknown>): Promise<R>;
 }
@@ -104,7 +106,9 @@ export interface MinepromptRuntime {
   require<T = unknown>(id: string, minimumVersion?: number): T;
   register(id: string, api: object, metadata?: { version?: number; description?: string }): () => boolean;
   addDisposer(disposer: () => void): () => void;
+  emit(type: string, ...args: unknown[]): void;
   subscribe(listener: (event: { type: string; payload: unknown; revision: number; snapshot: RuntimeSnapshot }) => void, emitInitial?: boolean): () => void;
+  summary(): { apiVersion: number; revision: number; closed: boolean; capabilities: RuntimeSnapshot['capabilities']; actionCount: number; tasks: { active: TaskSnapshot[] } };
   snapshot(): RuntimeSnapshot;
   close(): boolean;
 }

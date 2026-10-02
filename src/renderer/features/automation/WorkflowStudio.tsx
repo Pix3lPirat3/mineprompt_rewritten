@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { shallowEqual } from 'react-redux';
 import { Modal } from '../../components/Modal';
 import { useAppSelector } from '../../store';
 import type { WorkflowDefinition, WorkflowStep } from '../../types';
@@ -29,7 +30,10 @@ function cleanError(error: unknown) {
 }
 
 export function WorkflowStudio({ close }: WorkflowStudioProps) {
-  const runtime = useAppSelector((state) => state.runtime);
+  const runtime = useAppSelector((state) => ({
+    workflows: state.runtime.workflows,
+    selectedSessionId: state.runtime.selectedSessionId
+  }), shallowEqual);
   const [selectedId, setSelectedId] = useState(runtime.workflows[0]?.id || '');
   const [draft, setDraft] = useState<WorkflowDefinition>(() => runtime.workflows[0] ? structuredClone(runtime.workflows[0]) : emptyWorkflow());
   const [error, setError] = useState('');

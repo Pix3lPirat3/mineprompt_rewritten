@@ -20,6 +20,7 @@ class HostClient extends EventEmitter {
     this.token = null;
     this.cached = null;
     this.external = true;
+    this.closing = false;
     this.logger = {
       log: (...parts) => console.log(...parts),
       info: (...parts) => console.info(...parts),
@@ -30,6 +31,7 @@ class HostClient extends EventEmitter {
   }
 
   async open() {
+    this.closing = false;
     this.token = (await fs.readFile(tokenPath(this.userDataPath), 'utf8')).trim();
     this.socket = net.createConnection(this.endpoint);
     await new Promise((resolve, reject) => {
@@ -50,7 +52,7 @@ class HostClient extends EventEmitter {
     this.socket.on('close', () => {
       const error = new Error('The MinePrompt host disconnected.');
       this.failPending(error);
-      this.emit('event', 'attention', { message: error.message });
+      if (!this.closing) this.emit('event', 'attention', { message: error.message });
     });
     this.cached = await this.request('snapshot');
     return this;
@@ -81,7 +83,13 @@ class HostClient extends EventEmitter {
         reject(new Error(`Runtime request timed out while running ${method}.`));
       }, method === 'connect' ? 180000 : this.timeout);
       this.pending.set(id, { resolve, reject, timer });
-      writeMessage(this.socket, { type: 'request', id, token: this.token, method, args });
+      try {
+        writeMessage(this.socket, { type: 'request', id, token: this.token, method, args });
+      } catch (error) {
+        clearTimeout(timer);
+        this.pending.delete(id);
+        reject(error);
+      }
     });
   }
 
@@ -96,6 +104,7 @@ class HostClient extends EventEmitter {
   snapshot() { return structuredClone(this.cached); }
 
   close() {
+    this.closing = true;
     this.socket?.destroy();
     this.socket = null;
     this.failPending(new Error('The MinePrompt host connection was closed.'));

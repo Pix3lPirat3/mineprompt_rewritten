@@ -7,6 +7,29 @@ const os = require('node:os');
 const path = require('node:path');
 const { ApplicationRuntime } = require('../src/main/application-runtime');
 
+test('captures each bot session once per application snapshot', () => {
+  const runtime = new ApplicationRuntime({ rootPath: process.cwd(), userDataPath: process.cwd(), emit: () => {} });
+  const calls = new Map();
+  runtime.sessions = new Map(['first', 'second'].map((id) => [id, {
+    snapshot: () => {
+      calls.set(id, (calls.get(id) || 0) + 1);
+      return { id, state: {}, activities: [], session: {}, commands: [] };
+    }
+  }]));
+  runtime.selectedSessionId = 'first';
+  let storeCaptures = 0;
+  runtime.store.snapshot = () => {
+    storeCaptures += 1;
+    return { accounts: [], servers: [], settings: {}, workflows: [], miningPresets: [], activeMiningPresetId: null };
+  };
+  const snapshot = runtime.snapshot();
+  assert.equal(snapshot.sessions.length, 2);
+  assert.equal(snapshot.session, snapshot.sessions[0].session);
+  assert.deepEqual(Object.fromEntries(calls), { first: 1, second: 1 });
+  assert.equal(storeCaptures, 1);
+  runtime.snapshotPublisher.close();
+});
+
 test('runs global commands through the application runtime', async (context) => {
   const userDataPath = await fs.mkdtemp(path.join(os.tmpdir(), 'mineprompt-runtime-'));
   const events = [];

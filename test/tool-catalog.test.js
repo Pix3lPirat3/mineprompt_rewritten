@@ -24,6 +24,7 @@ function fixture() {
   };
   const runtime = {
     snapshot: () => snapshot,
+    commandDescriptors: () => snapshot.commands,
     execute: async (...args) => { calls.push(['execute', ...args]); return { ok: true }; },
     connect: async (...args) => { calls.push(['connect', ...args]); return { ok: true }; },
     disconnect: async (...args) => { calls.push(['disconnect', ...args]); return { ok: true }; },

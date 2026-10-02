@@ -34,7 +34,7 @@ function installInteractions(bot, options = {}) {
   const relationships = options.relationships || new RelationshipService(options.store || new MemorySettingsStore(options.initialRelationships));
   const players = options.playerActions || new PlayerActionRegistry({ relationships, logger: options.logger || runtime.logger });
   let targets;
-  const notify = () => runtime.events.emit('interactions:change', targets.snapshot());
+  const notify = () => runtime.emit('interactions:change', targets.snapshot());
   targets = options.targets || new TargetingService({
     getClient: () => client,
     activities: runtime.activities,

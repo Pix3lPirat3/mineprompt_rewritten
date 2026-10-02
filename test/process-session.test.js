@@ -53,5 +53,8 @@ test('supervises isolated bot process requests and snapshots', async () => {
   assert.deepEqual(await session.debugEvaluate({ code: 'bot.inventory' }), { method: 'debugEvaluate' });
   assert.deepEqual(session.snapshot().process, { isolated: true, pid: 4242, status: 'running' });
   assert.equal(events.some((event) => event.channel === 'session-snapshot'), true);
+  session.child.postMessage = () => { throw new Error('IPC closed'); };
+  await assert.rejects(session.execute('late'), /IPC closed/u);
+  assert.equal(session.pending.size, 0);
   await session.close();
 });

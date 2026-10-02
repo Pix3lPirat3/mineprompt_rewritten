@@ -16,7 +16,7 @@ function installMining(bot, options = {}) {
     getClient: () => client,
     activities: runtime.activities,
     logger: options.logger || runtime.logger,
-    onChange: () => runtime.events.emit('mining:change', service.status())
+    onChange: () => runtime.emit('mining:change', service.status())
   });
   const api = Object.freeze({
     service,

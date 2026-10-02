@@ -196,12 +196,22 @@ class ProcessSession {
         reject(new Error(`Bot process timed out while running ${method}.`));
       }, method === 'connect' ? 180000 : 30000);
       this.pending.set(id, { resolve, reject, timer });
-      this.child.postMessage({ type: 'request', id, method, args });
+      try {
+        this.child.postMessage({ type: 'request', id, method, args });
+      } catch (error) {
+        clearTimeout(timer);
+        this.pending.delete(id);
+        reject(error);
+      }
     }));
   }
 
   snapshot() {
     return structuredClone(this.cached);
+  }
+
+  commandDescriptors() {
+    return structuredClone(this.cached.commands || []);
   }
 
   updateStore(snapshot) {

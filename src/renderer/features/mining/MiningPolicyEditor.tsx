@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { shallowEqual } from 'react-redux';
 import { Modal } from '../../components/Modal';
 import { useAppSelector } from '../../store';
 import type { MiningPolicy } from '../../types';
@@ -28,7 +29,10 @@ function blockNames(value: string) {
 }
 
 export function MiningPolicyEditor({ close }: MiningPolicyEditorProps) {
-  const { miningPresets, activeMiningPresetId } = useAppSelector((state) => state.runtime);
+  const { miningPresets, activeMiningPresetId } = useAppSelector((state) => ({
+    miningPresets: state.runtime.miningPresets,
+    activeMiningPresetId: state.runtime.activeMiningPresetId
+  }), shallowEqual);
   const [selectedId, setSelectedId] = useState(activeMiningPresetId || miningPresets[0]?.id || '');
   const selected = useMemo(() => miningPresets.find((preset) => preset.id === selectedId), [miningPresets, selectedId]);
   const [name, setName] = useState(selected?.name || '');
@@ -46,7 +50,7 @@ export function MiningPolicyEditor({ close }: MiningPolicyEditorProps) {
     setIncludeText(preset.policy.include.join(', '));
     setExcludeText(preset.policy.exclude.join(', '));
     setError('');
-  }, [selectedId]);
+  }, [miningPresets, selectedId]);
 
   const update = <Key extends keyof MiningPolicy>(key: Key, value: MiningPolicy[Key]) => setPolicy((current) => ({ ...current, [key]: value }));
   const save = async () => {

@@ -19,7 +19,13 @@ function serviceClient(bot, value = {}) {
 }
 
 function registerActions(runtime, definitions) {
-  const disposers = definitions.map((definition) => runtime.actions.register(definition));
+  const disposers = [];
+  try {
+    for (const definition of definitions) disposers.push(runtime.actions.register(definition));
+  } catch (error) {
+    for (const remove of disposers.reverse()) remove();
+    throw error;
+  }
   const dispose = () => {
     for (const remove of disposers.splice(0).reverse()) remove();
   };
@@ -28,8 +34,14 @@ function registerActions(runtime, definitions) {
 }
 
 function registerCapability(runtime, id, api, description, actionDefinitions = [], dispose = () => {}) {
-  const removeActions = registerActions(runtime, actionDefinitions);
   const removeCapability = runtime.register(id, api, { version: 1, description });
+  let removeActions;
+  try {
+    removeActions = registerActions(runtime, actionDefinitions);
+  } catch (error) {
+    removeCapability();
+    throw error;
+  }
   let removed = false;
   const remove = () => {
     if (removed) return false;

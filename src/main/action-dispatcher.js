@@ -11,6 +11,7 @@ class ActionDispatcher {
 
   register(action) {
     if (!action?.id || typeof action.execute !== 'function') throw new TypeError('An action id and executor are required.');
+    if (this.actions.has(action.id)) throw new Error(`The ${action.id} action is already registered.`);
     const registered = Object.freeze({
       risk: 'standard',
       capability: null,
@@ -19,7 +20,7 @@ class ActionDispatcher {
       validate: compileSchema(action.inputSchema || { type: 'object', properties: {}, additionalProperties: false })
     });
     this.actions.set(registered.id, registered);
-    return () => this.actions.delete(registered.id);
+    return () => this.actions.get(registered.id) === registered && this.actions.delete(registered.id);
   }
 
   registerPolicy(id, evaluate) {
@@ -35,6 +36,17 @@ class ActionDispatcher {
 
   list() {
     return [...this.actions.values()].map(({ execute, validate, ...action }) => ({ ...action }));
+  }
+
+  count() {
+    return this.actions.size;
+  }
+
+  clear() {
+    const count = this.actions.size;
+    this.actions.clear();
+    this.policies = [];
+    return count;
   }
 
   evaluate(action, context) {

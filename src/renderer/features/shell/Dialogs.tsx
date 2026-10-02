@@ -1,4 +1,5 @@
 import { useMemo, useState, type FormEvent } from 'react';
+import { shallowEqual } from 'react-redux';
 import { Modal } from '../../components/Modal';
 import { consoleActions, uiActions, useAppDispatch, useAppSelector } from '../../store';
 import type { Preferences } from '../../types';
@@ -20,7 +21,13 @@ function FormError({ value }: { value: string }) {
 }
 
 export function Dialogs({ target, close }: DialogsProps) {
-  const runtime = useAppSelector((state) => state.runtime);
+  const runtime = useAppSelector((state) => ({
+    accounts: state.runtime.accounts,
+    servers: state.runtime.servers,
+    preferences: state.runtime.preferences,
+    commands: state.runtime.commands,
+    status: state.runtime.state.status
+  }), shallowEqual);
   const dispatch = useAppDispatch();
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
@@ -159,7 +166,7 @@ export function Dialogs({ target, close }: DialogsProps) {
         <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search commands" autoFocus />
         <div>
           {commands.map((command) => (
-            <button key={command.command} type="button" disabled={command.requiresConnection && runtime.state.status !== 'online'} onClick={() => {
+            <button key={command.command} type="button" disabled={command.requiresConnection && runtime.status !== 'online'} onClick={() => {
               dispatch(consoleActions.commandPrepared(`${command.command} `));
               dispatch(uiActions.terminalOpened());
               close();

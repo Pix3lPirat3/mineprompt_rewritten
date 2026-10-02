@@ -18,6 +18,7 @@ const { TargetingService } = require('./targeting-service');
 const { WorkflowRunner } = require('./workflow-runtime');
 const { DebugEvaluator } = require('./debug-evaluator');
 const { resolveMiningPolicy } = require('./mining-presets');
+const { SnapshotPublisher } = require('./snapshot-publisher');
 const { Vec3 } = require('vec3');
 const { installToolkit } = require('../../packages/mineflayer-toolkit');
 
@@ -27,13 +28,21 @@ class BotSession {
     this.store = store;
     this.logger = logger;
     this.emit = emit;
+    this.snapshotPublisher = new SnapshotPublisher({
+      capture: () => this.snapshot(),
+      publish: (snapshot) => this.emit('session-snapshot', snapshot),
+      onError: (error) => this.logger.error(`[Snapshot] ${error instanceof Error ? error.message : String(error)}`)
+    });
     this.interface = new InterfaceState((channel, payload) => this.publish(channel, payload), logger);
-    this.activities = new ActivityManager(() => this.publishSnapshot());
+    this.activities = new ActivityManager(
+      () => this.publishSnapshot(),
+      (error) => this.logger.error(`[Activity] ${error instanceof Error ? error.message : String(error)}`)
+    );
     this.automation = new AutomationRuntime(this.activities, logger);
     this.relationships = new RelationshipService(store);
     this.playerActions = new PlayerActionRegistry({ relationships: this.relationships, logger });
     this.inventoryPipeline = new InventoryPipeline({
-      snapshot: () => this.client.inventorySnapshot(),
+      snapshot: () => this.client.inventorySnapshot(true),
       publish: (payload) => this.publish('inventory', payload)
     });
     this.commands = new CommandRegistry({
@@ -55,8 +64,12 @@ class BotSession {
       sessionId: this.id
     });
     this.connections = new ConnectionService({ client: this.client, store, logger, interfaceState: this.interface });
-    this.inventory = new InventoryService({ getClient: () => this.client, onChange: () => this.publishSnapshot() });
-    this.crafting = new CraftingService({ getClient: () => this.client, onChange: () => this.publishSnapshot() });
+    const inventoryChanged = () => {
+      this.client.invalidateInventorySnapshot();
+      this.publishSnapshot();
+    };
+    this.inventory = new InventoryService({ getClient: () => this.client, onChange: inventoryChanged });
+    this.crafting = new CraftingService({ getClient: () => this.client, onChange: inventoryChanged });
     this.mining = new MiningService({
       getClient: () => this.client,
       activities: this.activities,
@@ -108,6 +121,7 @@ class BotSession {
   init() {
     this.commands.setCommands('global');
     this.publishSnapshot();
+    this.snapshotPublisher.flush();
     return this;
   }
 
@@ -344,20 +358,24 @@ class BotSession {
     return this.client.bot?.mineprompt?.get(id) || null;
   }
 
+  commandDescriptors() {
+    return this.commands.descriptors();
+  }
+
   snapshot() {
-    const extensions = this.capabilities();
+    const extensions = this.client.bot?.mineprompt?.summary() || { apiVersion: null, revision: 0, capabilities: [], actionCount: 0, tasks: { active: [] } };
     return {
       id: this.id,
       state: this.interface.snapshot(),
       activities: this.activities.snapshot(),
       session: { ...this.client.snapshot(), targets: this.targets.snapshot() },
       commands: this.commands.descriptors(),
-      diagnostics: { inventory: this.inventoryPipeline.telemetry.snapshot() },
+      diagnostics: { inventory: this.inventoryPipeline.telemetry.snapshot(), snapshots: this.snapshotPublisher.snapshot() },
       extensions: {
         apiVersion: extensions.apiVersion,
         revision: extensions.revision,
         capabilities: extensions.capabilities,
-        actionCount: extensions.actions.length,
+        actionCount: extensions.actionCount,
         tasks: { active: extensions.tasks.active }
       },
       process: { isolated: false, pid: process.pid, status: 'running' }
@@ -369,12 +387,13 @@ class BotSession {
   }
 
   publishSnapshot() {
-    this.emit('session-snapshot', this.snapshot());
+    this.snapshotPublisher.request();
   }
 
   updateStore() {}
 
   async close() {
+    this.snapshotPublisher.close();
     this.inventoryPipeline.close();
     this.workflows.close();
     this.automation.close();

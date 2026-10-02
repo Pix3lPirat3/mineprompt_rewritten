@@ -214,6 +214,9 @@ test('tracks a complete connection lifecycle', async () => {
   assert.equal(context.client.snapshot().inventorySlots.length, 46);
   assert.equal(context.client.snapshot().inventorySlots[36].name, 'diamond');
   assert.equal(context.client.snapshot().inventoryLayout.selectedHotbar, 0);
+  const cachedInventory = context.client.inventorySnapshot();
+  assert.equal(context.client.inventorySnapshot(), cachedInventory);
+  assert.notEqual(context.client.inventorySnapshot(true), cachedInventory);
 
   bot.emit('kicked', { toString: () => 'Maintenance' });
   assert.equal(context.log.some((entry) => entry[1] === '[Connection] Kicked: Maintenance'), true);
@@ -223,13 +226,18 @@ test('tracks a complete connection lifecycle', async () => {
 });
 
 test('cleans up a connection when plugin initialization fails', async () => {
-  const context = fixture({}, { installPlugins: () => { throw new Error('Plugin failed'); } });
+  let closed = 0;
+  const context = fixture({}, { installPlugins: (bot) => {
+    bot.mineprompt = { close: () => { closed += 1; } };
+    throw new Error('Plugin failed');
+  } });
   await assert.rejects(
     context.client.startClient({ username: 'Bot', host: 'localhost', port: 25565 }),
     /Plugin failed/u
   );
   assert.equal(context.client.bot, null);
   assert.equal(context.bot.quitReason, 'Plugin initialization failed');
+  assert.equal(closed, 1);
   assert.deepEqual(context.state.at(-1), ['failure', 'Plugin failed']);
 });
 

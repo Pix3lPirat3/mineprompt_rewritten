@@ -61,6 +61,8 @@ function tool(name, description, inputSchema, execute, options = {}) {
 }
 
 function session(runtime, sessionId) {
+  const direct = runtime.selectedSession?.({ sessionId });
+  if (direct) return direct.snapshot();
   const snapshot = runtime.snapshot();
   const id = sessionId || snapshot.selectedSessionId;
   const selected = snapshot.sessions.find((entry) => entry.id === id);
@@ -266,14 +268,15 @@ class ToolCatalog {
   }
 
   list() {
-    const commands = this.runtime.snapshot().commands || [];
+    const commands = this.runtime.commandDescriptors?.() || this.runtime.snapshot().commands || [];
     const dynamic = commands.map(commandTool);
     return [...this.fixed.values(), ...dynamic].map(({ validate, execute, ...definition }) => definition);
   }
 
   resolve(name) {
     if (this.fixed.has(name)) return this.fixed.get(name);
-    const command = (this.runtime.snapshot().commands || []).find((entry) => `command_${entry.command.replaceAll('-', '_')}` === name);
+    const commands = this.runtime.commandDescriptors?.() || this.runtime.snapshot().commands || [];
+    const command = commands.find((entry) => `command_${entry.command.replaceAll('-', '_')}` === name);
     return command ? commandTool(command) : null;
   }
 

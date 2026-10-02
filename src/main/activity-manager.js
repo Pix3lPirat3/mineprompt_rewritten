@@ -1,8 +1,9 @@
 'use strict';
 
 class ActivityManager {
-  constructor(onChange = () => {}) {
+  constructor(onChange = () => {}, onError = () => {}) {
     this.onChange = onChange;
+    this.onError = onError;
     this.subscribers = new Set();
     this.activities = new Map();
     this.resources = new Map();
@@ -64,7 +65,7 @@ class ActivityManager {
   subscribe(subscriber, emitInitial = true) {
     if (typeof subscriber !== 'function') throw new TypeError('An activity subscriber must be a function.');
     this.subscribers.add(subscriber);
-    if (emitInitial) subscriber(this.snapshot(), this.revision);
+    if (emitInitial) this.notify(subscriber, this.snapshot());
     return () => this.subscribers.delete(subscriber);
   }
 
@@ -85,8 +86,16 @@ class ActivityManager {
   publish() {
     this.revision += 1;
     const snapshot = this.snapshot();
-    this.onChange(snapshot, this.revision);
-    for (const subscriber of this.subscribers) subscriber(snapshot, this.revision);
+    this.notify(this.onChange, snapshot);
+    for (const subscriber of this.subscribers) this.notify(subscriber, snapshot);
+  }
+
+  notify(subscriber, snapshot) {
+    try {
+      subscriber(snapshot, this.revision);
+    } catch (error) {
+      try { this.onError(error); } catch {}
+    }
   }
 }
 

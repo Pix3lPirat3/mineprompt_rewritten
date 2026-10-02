@@ -41,8 +41,8 @@ class RelationshipService {
     this.store = store;
   }
 
-  list(kind = null) {
-    const relationships = normalizeRelationships(this.store.snapshot().settings.relationships);
+  list(kind = null, snapshot = null) {
+    const relationships = normalizeRelationships((snapshot || this.store.snapshot()).settings.relationships);
     return kind ? relationships.filter((relationship) => relationship.kind === kind) : relationships;
   }
 
@@ -99,8 +99,8 @@ class RelationshipService {
     return this.list('friend');
   }
 
-  friendNames() {
-    return this.list('friend').map((relationship) => relationship.username);
+  friendNames(snapshot = null) {
+    return this.list('friend', snapshot).map((relationship) => relationship.username);
   }
 }
 

@@ -40,3 +40,15 @@ test('supports independent activity subscribers', () => {
   manager.stop('one');
   assert.deepEqual(revisions, [[0, 0], [1, 1]]);
 });
+
+test('contains subscriber failures and continues notifying observers', () => {
+  const errors = [];
+  const snapshots = [];
+  const manager = new ActivityManager(() => {}, (error) => errors.push(error.message));
+  manager.subscribe(() => { throw new Error('Observer failed'); }, false);
+  manager.subscribe((snapshot) => snapshots.push(snapshot), false);
+  manager.register('safe', { stop() {} });
+  assert.deepEqual(errors, ['Observer failed']);
+  assert.equal(snapshots.length, 1);
+  assert.equal(manager.has('safe'), true);
+});

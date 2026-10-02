@@ -1,5 +1,6 @@
 import { DragDropProvider, DragOverlay } from '@dnd-kit/react';
 import { useEffect, useState, type MouseEvent } from 'react';
+import { shallowEqual } from 'react-redux';
 import { playerHead } from '../../assets';
 import { ContextMenu, type MenuEntry } from '../../components/ContextMenu';
 import { consoleActions, useAppDispatch, useAppSelector } from '../../store';
@@ -32,12 +33,27 @@ function eventDescription(event: InventoryEvent): string {
 
 export function InventoryWorkspace() {
   const dispatch = useAppDispatch();
-  const runtime = useAppSelector((state) => state.runtime);
+  const runtime = useAppSelector((state) => ({
+    selectedSessionId: state.runtime.selectedSessionId,
+    displayName: state.runtime.state.displayName,
+    username: state.runtime.state.username,
+    sessionUsername: state.runtime.session.username,
+    externalPlayerHeadsEnabled: state.runtime.preferences.externalPlayerHeadsEnabled,
+    connectionId: state.runtime.session.connectionId,
+    inventoryRevision: state.runtime.session.inventoryRevision,
+    windowId: state.runtime.session.windowId,
+    containerOpen: state.runtime.session.containerOpen,
+    inventorySlots: state.runtime.session.inventorySlots,
+    inventoryLayout: state.runtime.session.inventoryLayout,
+    containerSlots: state.runtime.session.containerSlots,
+    containerLayout: state.runtime.session.containerLayout,
+    usingItem: state.runtime.session.presentation.hud.usingItem
+  }), shallowEqual);
   const activity = useAppSelector((state) => state.ui.inventoryActivity);
   const [menu, setMenu] = useState<ItemMenu | null>(null);
   const [toast, setToast] = useState<InventoryEventPayload | null>(null);
-  const inventorySlots = runtime.session.inventorySlots;
-  const container = runtime.session.containerLayout;
+  const inventorySlots = runtime.inventorySlots;
+  const container = runtime.containerLayout;
 
   useEffect(() => {
     if (!activity || activity.sessionId !== runtime.selectedSessionId) {
@@ -53,9 +69,9 @@ export function InventoryWorkspace() {
     try {
       await window.mineprompt.inventoryAction({
         sessionId: runtime.selectedSessionId,
-        connectionId: runtime.session.connectionId,
-        windowId: runtime.session.windowId,
-        expectedRevision: runtime.session.inventoryRevision,
+        connectionId: runtime.connectionId,
+        windowId: runtime.windowId,
+        expectedRevision: runtime.inventoryRevision,
         ...details
       });
     } catch (error) {
@@ -70,7 +86,7 @@ export function InventoryWorkspace() {
 
   const clickSlot = (event: MouseEvent<HTMLButtonElement>, address: SlotAddress, item: ItemStack | null) => {
     if (!item) return;
-    if (runtime.session.containerOpen && event.shiftKey) {
+    if (runtime.containerOpen && event.shiftKey) {
       void request({ scope: 'container', action: 'transfer', sourceScope: address.scope, target: String(address.slot), quantity: 'stack' });
       return;
     }
@@ -80,8 +96,8 @@ export function InventoryWorkspace() {
   const itemMenu: MenuEntry[] = (() => {
     if (!menu) return [];
     return itemActions(menu.item, menu.address, {
-      containerOpen: runtime.session.containerOpen,
-      containerTitle: runtime.session.containerLayout?.title
+      containerOpen: runtime.containerOpen,
+      containerTitle: runtime.containerLayout?.title
     }).map((action) => ({ ...action, run: () => request(action.request) }));
   })();
 
@@ -93,7 +109,7 @@ export function InventoryWorkspace() {
       item={item}
       role={role}
       selected={selected}
-      using={Boolean(selected && runtime.session.presentation.hud.usingItem)}
+      using={Boolean(selected && runtime.usingItem)}
       onClick={clickSlot}
       onMenu={(event, address, stack) => {
         setMenu({ address, item: stack, x: event.clientX, y: event.clientY });
@@ -127,8 +143,8 @@ export function InventoryWorkspace() {
                     {[5, 6, 7, 8].map((index) => slot('inventory', index, inventorySlots[index] || null, ['head', 'torso', 'legs', 'feet'][index - 5]))}
                   </div>
                   <div className="player-model">
-                    <img src={playerHead(runtime.session.username, runtime.preferences.externalPlayerHeadsEnabled)} alt="" />
-                    <strong>{runtime.state.displayName || runtime.state.username || 'Not connected'}</strong>
+                    <img src={playerHead(runtime.sessionUsername, runtime.externalPlayerHeadsEnabled)} alt="" />
+                    <strong>{runtime.displayName || runtime.username || 'Not connected'}</strong>
                   </div>
                   <div className="crafting-grid">
                     <span className="crafting-grid__label">Crafting</span>
@@ -146,7 +162,7 @@ export function InventoryWorkspace() {
                 <div className="hotbar-grid">
                   {Array.from({ length: 9 }, (_, offset) => {
                     const index = offset + 36;
-                    return slot('inventory', index, inventorySlots[index] || null, 'hotbar', runtime.session.inventoryLayout?.selectedHotbar === offset);
+                    return slot('inventory', index, inventorySlots[index] || null, 'hotbar', runtime.inventoryLayout?.selectedHotbar === offset);
                   })}
                 </div>
               </section>
@@ -161,7 +177,7 @@ export function InventoryWorkspace() {
                 <button type="button" onClick={() => void request({ scope: 'container', action: 'close' })}>Close</button>
               </div>
               <div className="container-grid" style={{ '--columns': container.columns } as React.CSSProperties}>
-                {Array.from({ length: container.slotCount }, (_, index) => slot('container', index, runtime.session.containerSlots[index] || null, container.slotRoles[index]))}
+                {Array.from({ length: container.slotCount }, (_, index) => slot('container', index, runtime.containerSlots[index] || null, container.slotRoles[index]))}
               </div>
               {Object.keys(container.properties).length ? (
                 <div className="container-properties">
@@ -179,7 +195,7 @@ export function InventoryWorkspace() {
           return item ? <ItemIcon item={item} preview /> : null;
         }}
       </DragOverlay>
-      {menu ? <ContextMenu x={menu.x} y={menu.y} title={menu.item.displayName} subtitle={`${menu.address.scope === 'container' ? runtime.session.containerLayout?.title || 'Container' : 'Player inventory'} slot ${menu.address.slot}`} entries={itemMenu} close={() => setMenu(null)} /> : null}
+      {menu ? <ContextMenu x={menu.x} y={menu.y} title={menu.item.displayName} subtitle={`${menu.address.scope === 'container' ? runtime.containerLayout?.title || 'Container' : 'Player inventory'} slot ${menu.address.slot}`} entries={itemMenu} close={() => setMenu(null)} /> : null}
     </DragDropProvider>
   );
 }

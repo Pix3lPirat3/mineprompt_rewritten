@@ -222,12 +222,18 @@ function installRuntime(botInput, options = {}) {
   let closed = false;
   let revision = 0;
   let runtime;
+  const emit = (type, ...args) => {
+    for (const listener of events.rawListeners(type)) {
+      try { listener.apply(events, args); } catch (error) { runtimeLogger.warn(error instanceof Error ? error.message : String(error)); }
+    }
+  };
   const publish = (type, payload) => {
     revision += 1;
-    events.emit(type, payload);
-    events.emit('change', { type, payload, revision, snapshot: runtime.snapshot() });
+    emit(type, payload);
+    if (events.listenerCount('change')) emit('change', { type, payload, revision, snapshot: runtime.snapshot() });
   };
-  const activities = options.activities || new ActivityManager();
+  const activities = options.activities || new ActivityManager(noop, (error) => runtimeLogger.warn(error instanceof Error ? error.message : String(error)));
+  const ownsActions = !options.actions;
   const actions = options.actions || new ActionDispatcher({ audit: (event) => publish('action', event) });
   runtime = {
     apiVersion: API_VERSION,
@@ -235,6 +241,7 @@ function installRuntime(botInput, options = {}) {
     activities,
     actions,
     events,
+    emit,
     logger: runtimeLogger,
     tasks: null,
     get closed() { return closed; },
@@ -278,6 +285,16 @@ function installRuntime(botInput, options = {}) {
       if (emitInitial) listener({ type: 'snapshot', payload: null, revision, snapshot: runtime.snapshot() });
       return () => events.removeListener('change', listener);
     },
+    summary() {
+      return {
+        apiVersion: API_VERSION,
+        revision,
+        closed,
+        capabilities: [...capabilities.values()].map(({ api, ...entry }) => ({ ...entry })),
+        actionCount: actions.count(),
+        tasks: { active: runtime.tasks?.snapshot().active || [] }
+      };
+    },
     snapshot() {
       return {
         apiVersion: API_VERSION,
@@ -298,7 +315,8 @@ function installRuntime(botInput, options = {}) {
         try { dispose(); } catch (error) { runtimeLogger.warn(error instanceof Error ? error.message : String(error)); }
       }
       capabilities.clear();
-      events.emit('close');
+      if (ownsActions) actions.clear();
+      emit('close');
       events.removeAllListeners();
       delete bot[RUNTIME];
       if (bot.mineprompt === runtime) delete bot.mineprompt;

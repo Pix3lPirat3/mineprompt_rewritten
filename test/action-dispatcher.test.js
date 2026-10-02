@@ -26,4 +26,6 @@ test('validates, evaluates, executes, and audits registered actions', async () =
   assert.equal(audit[1].status, 'failed');
   assert.equal(audit[2].status, 'failed');
   assert.deepEqual(dispatcher.list().map((action) => action.id), ['test.echo']);
+  assert.equal(dispatcher.count(), 1);
+  assert.throws(() => dispatcher.register({ id: 'test.echo', execute: () => null }), /already registered/u);
 });

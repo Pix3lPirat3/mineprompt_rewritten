@@ -6,6 +6,7 @@ const { EventEmitter } = require('node:events');
 const {
   API_VERSION,
   CapabilityError,
+  installMining,
   installRuntime,
   installToolkit,
   runtimePlugin
@@ -39,6 +40,19 @@ test('installs an isolated versioned runtime through Mineflayer loadPlugin seman
   right.mineprompt.close();
 });
 
+test('contains runtime observer failures and continues event delivery', () => {
+  const bot = new FakeBot();
+  const warnings = [];
+  const runtime = installRuntime(bot, { logger: { warn: (message) => warnings.push(message) } });
+  let received = 0;
+  runtime.events.on('capability', () => { throw new Error('Listener failed'); });
+  runtime.events.on('capability', () => { received += 1; });
+  assert.doesNotThrow(() => runtime.register('sample', { ready: true }));
+  assert.equal(received, 1);
+  assert.deepEqual(warnings, ['Listener failed']);
+  runtime.close();
+});
+
 test('runs observable resource-owned tasks and retains bounded results', async () => {
   const bot = new FakeBot();
   const runtime = installRuntime(bot);
@@ -52,6 +66,8 @@ test('runs observable resource-owned tasks and retains bounded results', async (
   assert.equal(task.snapshot().status, 'completed');
   assert.equal(runtime.tasks.snapshot().active.length, 0);
   assert.equal(runtime.tasks.snapshot().recent[0].completed, 1);
+  assert.equal(runtime.summary().tasks.active.length, 0);
+  assert.equal(runtime.summary().actionCount, 0);
   assert.equal(runtime.activities.snapshot().length, 0);
   assert.equal(progress.at(-1), 'completed');
   runtime.close();
@@ -108,6 +124,25 @@ test('installs supplied application services as public capabilities and actions'
     'trees.stop'
   ]);
   bot.mineprompt.close();
+});
+
+test('rolls back partial plugin registration after an action collision', () => {
+  const bot = new FakeBot();
+  const runtime = installRuntime(bot);
+  runtime.actions.register({ id: 'mining.region', execute: () => null });
+  assert.throws(() => installMining(bot, {
+    service: {
+      mineOnce() {},
+      startConsistent() {},
+      startRegion() {},
+      status: () => ({})
+    }
+  }), /already registered/u);
+  assert.equal(runtime.has('mining'), false);
+  assert.equal(runtime.actions.get('mining.once'), null);
+  assert.equal(runtime.actions.count(), 2);
+  runtime.close();
+  assert.equal(runtime.actions.count(), 0);
 });
 
 test('keeps CommonJS and ESM toolkit exports aligned', async () => {

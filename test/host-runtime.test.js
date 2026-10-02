@@ -49,4 +49,9 @@ test('shares one runtime with authenticated local clients', async (context) => {
     client.targetAction({ sessionId: 'primary', actionId: 'entity.goto', entityId: 7 }),
     /An active connection is required/u
   );
+  const attention = [];
+  client.on('event', (channel) => { if (channel === 'attention') attention.push(channel); });
+  await client.close();
+  await new Promise((resolve) => { globalThis.setImmediate(resolve); });
+  assert.deepEqual(attention, []);
 });
