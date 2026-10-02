@@ -367,16 +367,16 @@ function compilePlacementGraph(bot, analysis) {
     const column = [];
     let position = { ...target };
     for (let depth = 0; depth < MAX_SCAFFOLD_HEIGHT; depth += 1) {
-      if (isExistingSupport(bot, analysisByPosition, position, assumedAir) || scaffoldPlacements.has(positionKey(position))) break;
+      if (isExistingSupport(bot, analysisByPosition, position, assumedAir)) break;
       const key = positionKey(position);
       const record = analysisByPosition.get(key);
       if (finalSolid.has(key) || record && !['placeable', 'replaceable', 'ignoredAir'].includes(record.kind)) return null;
       const live = worldBlock(bot, position);
-      if (!record && !assumedAir.has(key) && (!live?.name || !PASSABLE_BLOCKS.has(live.name))) return null;
+      if (!scaffoldPlacements.has(key) && !record && !assumedAir.has(key) && (!live?.name || !PASSABLE_BLOCKS.has(live.name))) return null;
       column.push({ ...position });
       position = offsetPosition(position, DIRECTIONS.down);
     }
-    if (!isExistingSupport(bot, analysisByPosition, position, assumedAir) && !scaffoldPlacements.has(positionKey(position))) return null;
+    if (!isExistingSupport(bot, analysisByPosition, position, assumedAir)) return null;
     return { cells: column.reverse(), base: { ...position } };
   };
   const ensureScaffoldCell = (cell, support, dependencies, groupIdValue) => {
@@ -418,6 +418,7 @@ function compilePlacementGraph(bot, analysis) {
     const turns = first.x ? [DIRECTIONS.north, DIRECTIONS.south] : [DIRECTIONS.west, DIRECTIONS.east];
     return turns.map((turn) => ({ first, turn }));
   });
+  const scaffoldTargets = [...placements.values()].filter((operation) => operation.requiresScaffold && !operation.blocked.length).map((operation) => offsetPosition(operation.position, DIRECTIONS.down));
   const ensureScaffoldAccess = (target) => {
     const supportTrace = traceScaffoldColumn(target);
     if (!supportTrace) return null;
@@ -441,9 +442,12 @@ function compilePlacementGraph(bot, analysis) {
       const levels = aligned[0].cells.map((cell) => cell.y);
       if (aligned.some((trace) => trace.cells.length !== levels.length || !trace.cells.every((cell, index) => cell.y === levels[index]))) continue;
       const foundationCount = foundations.reduce((count, trace) => count + trace.cells.length, 0);
-      candidates.push({ supportTrace: aligned[0], firstTrace: aligned[1], secondTrace: aligned[2], foundations, firstTarget, secondTarget, foundationCount, score: positionDistance(bot.entity?.position || target, aligned[1].cells[0]) });
+      const newCellCount = aligned.concat(foundations).reduce((count, trace) => count + trace.cells.filter((cell) => !scaffoldPlacements.has(positionKey(cell))).length, 0);
+      const otherTargets = scaffoldTargets.filter((position) => positionKey(position) !== positionKey(target));
+      const clusterScore = otherTargets.length ? Math.min(...otherTargets.map((position) => positionDistance(position, firstTarget) + positionDistance(position, secondTarget))) : 0;
+      candidates.push({ supportTrace: aligned[0], firstTrace: aligned[1], secondTrace: aligned[2], foundations, firstTarget, secondTarget, foundationCount, newCellCount, clusterScore, score: positionDistance(bot.entity?.position || target, aligned[1].cells[0]) });
     }
-    const selected = candidates.sort((left, right) => left.foundationCount - right.foundationCount || left.score - right.score || positionKey(left.firstTarget).localeCompare(positionKey(right.firstTarget)) || positionKey(left.secondTarget).localeCompare(positionKey(right.secondTarget)))[0];
+    const selected = candidates.sort((left, right) => left.newCellCount - right.newCellCount || left.foundationCount - right.foundationCount || left.clusterScore - right.clusterScore || left.score - right.score || positionKey(left.firstTarget).localeCompare(positionKey(right.firstTarget)) || positionKey(left.secondTarget).localeCompare(positionKey(right.secondTarget)))[0];
     if (!selected) return null;
     ensureSingleScaffoldColumn(selected.foundations[0], target);
     ensureSingleScaffoldColumn(selected.foundations[1], selected.firstTarget);
@@ -511,7 +515,11 @@ function compilePlacementGraph(bot, analysis) {
     for (let index = tower.support.length - 1; index >= 0; index -= 1) {
       for (const column of [tower.support, tower.first, tower.second]) {
         const id = `scaffold-remove:${positionKey(column[index])}`;
-        if (previous) cleanupDependencies.set(id, new Set([previous]));
+        if (previous) {
+          const dependencies = cleanupDependencies.get(id) || new Set();
+          dependencies.add(previous);
+          cleanupDependencies.set(id, dependencies);
+        }
         previous = id;
       }
       cleanupStances.set(`scaffold-remove:${positionKey(tower.support[index])}`, [{ x: tower.first[index].x, y: tower.first[index].y + 1, z: tower.first[index].z }]);

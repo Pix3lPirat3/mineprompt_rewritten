@@ -205,6 +205,28 @@ test('skips occupied access columns while selecting a scaffold tower', () => {
   assert.deepEqual(graph.cyclic, []);
 });
 
+test('reuses shared access columns for nearby scaffold targets', () => {
+  const bot = flatBot();
+  const records = [record('placeable', 0, 74, 'minecraft:stone'), record('placeable', 2, 74, 'minecraft:stone')];
+  const graph = compilePlacementGraph(bot, {
+    policy: { scaffolding: ['dirt'] },
+    records
+  });
+  const targets = [0, 2].map((x) => graph.operations.find((operation) => operation.id === `place:${x},74,0`));
+  const scaffoldDependencies = targets.map((operation) => new Set(operation.dependencies.filter((id) => id.startsWith('scaffold-place:'))));
+  const shared = [...scaffoldDependencies[0]].filter((id) => scaffoldDependencies[1].has(id));
+  assert.equal(graph.counts.scaffoldBlocks, 40);
+  assert.equal(shared.length, 2);
+  assert.equal(graph.counts.blocked, 0);
+  assert.deepEqual(graph.cyclic, []);
+  const plan = compileStancePlan(bot, graph);
+  assert.deepEqual(plan.uncovered, []);
+  assert.equal(plan.counts.blocked, 0);
+  const reversed = compilePlacementGraph(bot, { policy: { scaffolding: ['dirt'] }, records: [...records].reverse() });
+  const scaffoldPositions = (value) => value.operations.filter((operation) => operation.kind === 'scaffold-place').map((operation) => positionKey(operation.position)).sort();
+  assert.deepEqual(scaffoldPositions(reversed), scaffoldPositions(graph));
+});
+
 test('does not use removable scaffolding as permanent attachment support', () => {
   const graph = compilePlacementGraph(flatBot(), {
     policy: { scaffolding: ['dirt'] },
