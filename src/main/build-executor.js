@@ -469,9 +469,13 @@ class BuildExecutor {
     const previousSneak = Boolean(bot.controlState?.sneak);
     if (!previousSneak) bot.setControlState?.('sneak', true);
     try {
+      if (instruction.look) {
+        await bot.look(instruction.look.yaw, instruction.look.pitch, true);
+        if (typeof bot.waitForTicks === 'function') await bot.waitForTicks(1);
+      }
       await bot._placeBlockWithOptions(reference, positionVector(instruction.clickedFace), {
         delta: positionVector(instruction.cursor),
-        forceLook: true,
+        forceLook: instruction.look ? 'ignore' : true,
         swingArm: 'right',
         showHand: true
       });

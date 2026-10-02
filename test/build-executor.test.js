@@ -32,6 +32,7 @@ function harness(options = {}) {
   let itemCount = options.itemCount ?? 2;
   const expectedState = options.expectedState || 'minecraft:stone';
   const itemName = options.itemName || 'stone';
+  const lookCalls = [];
   const placementCalls = [];
   const bot = {
     entity: { position: new Vec3(0, 64, 0), dimension: 'overworld' },
@@ -44,6 +45,8 @@ function harness(options = {}) {
       return blocks.get(key(position)) || (position.y === 63 ? block('stone', position) : block('air', position));
     },
     async equip() {},
+    async look(yaw, pitch, force) { lookCalls.push({ yaw, pitch, force }); },
+    async waitForTicks(ticks) { lookCalls.push({ ticks }); },
     setControlState(control, value) { this.controlState[control] = value; },
     async _placeBlockWithOptions(reference, face, placementOptions) {
       const position = reference.position.plus(face);
@@ -139,7 +142,7 @@ function harness(options = {}) {
     storage,
     owner: 'test'
   });
-  return { activities, blocks, bot, compiled, data, executor, fetches, operation, placementCalls, target };
+  return { activities, blocks, bot, compiled, data, executor, fetches, lookCalls, operation, placementCalls, target };
 }
 
 test('executes and verifies a survival placement', async () => {
@@ -320,4 +323,31 @@ test('executes face-determined wall placement instructions', async () => {
     face: { x: -1, y: 0, z: 0 },
     options: { delta: { x: 0, y: 0.5, z: 0.5 }, forceLook: true, swingArm: 'right', showHand: true }
   }]);
+});
+
+test('executes directional placement after synchronizing the required heading', async () => {
+  const value = harness({
+    expectedState: 'minecraft:furnace[facing=east,lit=false]',
+    itemName: 'furnace',
+    placeAs: 'furnace',
+    placeProperties: { facing: 'east', lit: false },
+    instruction: {
+      supportPosition: { x: 1, y: 63, z: 0 },
+      clickedFace: { x: 0, y: 1, z: 0 },
+      cursor: { x: 0.5, y: 1, z: 0.5 },
+      mode: 'directional',
+      look: { yaw: Math.PI / 2, pitch: 0 },
+      stateProperties: { facing: 'east', lit: 'false' }
+    }
+  });
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.equal(value.data.buildJobs[0].status, 'complete', value.data.buildJobs[0].latestError || 'No build error was recorded.');
+  assert.deepEqual(value.lookCalls, [{ yaw: Math.PI / 2, pitch: 0, force: true }, { ticks: 1 }]);
+  assert.deepEqual(value.placementCalls[0].options, {
+    delta: { x: 0.5, y: 1, z: 0.5 },
+    forceLook: 'ignore',
+    swingArm: 'right',
+    showHand: true
+  });
 });

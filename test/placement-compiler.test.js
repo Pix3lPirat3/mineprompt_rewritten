@@ -214,3 +214,23 @@ test('allows face-determined wall blocks without enabling ambiguous attachments'
   assert.deepEqual(byId.get('place:0,64,0').instruction.clickedFace, { x: 1, y: 0, z: 0 });
   assert.equal(byId.get('place:2,64,0').instruction.mode, 'attached');
 });
+
+test('compiles verified heading strategies for bounded directional states', () => {
+  const graph = compilePlacementGraph(flatBot(new Map([['2,64,-1', 'stone']])), {
+    policy: { scaffolding: ['dirt'] },
+    records: [
+      record('placeable', 0, 64, 'minecraft:furnace[facing=east,lit=false]'),
+      record('placeable', 2, 64, 'minecraft:oak_stairs[facing=west,half=top,shape=straight,waterlogged=false]'),
+      record('placeable', 4, 64, 'minecraft:oak_stairs[facing=west,half=bottom,shape=inner_left,waterlogged=false]')
+    ]
+  });
+  const byId = new Map(graph.operations.map((operation) => [operation.id, operation]));
+  assert.equal(byId.get('place:0,64,0').instruction.mode, 'directional');
+  assert.deepEqual(byId.get('place:0,64,0').instruction.look, { yaw: Math.PI / 2, pitch: 0 });
+  assert.equal(byId.get('place:2,64,0').instruction.mode, 'directional');
+  assert.deepEqual(byId.get('place:2,64,0').instruction.look, { yaw: Math.PI / 2, pitch: 0 });
+  assert.deepEqual(byId.get('place:2,64,0').instruction.clickedFace, { x: 0, y: 0, z: 1 });
+  assert.equal(byId.get('place:2,64,0').instruction.cursor.y, 0.75);
+  assert.equal(byId.get('place:4,64,0').instruction.mode, 'directional-unsupported');
+  assert.equal(byId.get('place:4,64,0').instruction.look, null);
+});

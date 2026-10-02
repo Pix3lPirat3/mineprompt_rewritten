@@ -2,7 +2,7 @@
 
 const { Vec3 } = require('vec3');
 const { isAirState, parseBlockState } = require('./blueprint-model');
-const { placementMode } = require('./placement-strategy');
+const { directionalLook, placementMode } = require('./placement-strategy');
 const { PriorityQueue } = require('./priority-queue');
 
 const MAX_PLACEMENT_OPERATIONS = 1048576;
@@ -60,6 +60,8 @@ function supportRule(entry) {
   if (properties.axis === 'x') return { kind: 'axis', offsets: [DIRECTIONS.west, DIRECTIONS.east], required: true };
   if (properties.axis === 'z') return { kind: 'axis', offsets: [DIRECTIONS.north, DIRECTIONS.south], required: true };
   if (properties.axis === 'y') return { kind: 'axis', offsets: [DIRECTIONS.down, DIRECTIONS.up], required: true };
+  if (parsed.name.endsWith('_stairs') && properties.half === 'top') return { kind: 'stairs', offsets: [DIRECTIONS.north, DIRECTIONS.south, DIRECTIONS.west, DIRECTIONS.east, DIRECTIONS.up], required: true };
+  if (parsed.name.endsWith('_stairs')) return { kind: 'stairs', offsets: [DIRECTIONS.down, DIRECTIONS.north, DIRECTIONS.south, DIRECTIONS.west, DIRECTIONS.east], required: true };
   if (parsed.name.endsWith('_slab') && properties.type === 'top') return { kind: 'slab', offsets: [DIRECTIONS.north, DIRECTIONS.south, DIRECTIONS.west, DIRECTIONS.east, DIRECTIONS.up], required: true };
   if (parsed.name.endsWith('_slab')) return { kind: 'slab', offsets: [DIRECTIONS.down, DIRECTIONS.north, DIRECTIONS.south, DIRECTIONS.west, DIRECTIONS.east], required: true };
   if (GRAVITY_BLOCKS.test(parsed.name)) return { kind: 'gravity', offsets: [DIRECTIONS.down], required: true };
@@ -134,6 +136,7 @@ function placementInstruction(operation, support, rule) {
     clickedFace: face,
     cursor,
     facing: facing ? { ...facing } : null,
+    look: directionalLook(parsed),
     rotation: parsed.properties.rotation === undefined ? null : Number(parsed.properties.rotation),
     sneak: false,
     supportKind: rule.kind,
