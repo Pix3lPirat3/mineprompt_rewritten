@@ -226,6 +226,31 @@ test('allows face-determined wall blocks without enabling ambiguous attachments'
   assert.equal(byId.get('place:2,64,0').instruction.mode, 'attached');
 });
 
+test('allows bounded floor and ceiling face attachments', () => {
+  const overrides = new Map([
+    ['0,63,0', 'stone'],
+    ['2,65,0', 'stone'],
+    ['4,63,0', 'stone'],
+    ['6,63,0', 'stone']
+  ]);
+  const graph = compilePlacementGraph(flatBot(overrides), {
+    policy: { scaffolding: ['dirt'] },
+    records: [
+      record('placeable', 0, 64, 'minecraft:torch'),
+      record('placeable', 2, 64, 'minecraft:lantern[hanging=true,waterlogged=false]'),
+      record('placeable', 4, 64, 'minecraft:oak_pressure_plate[powered=false]'),
+      record('placeable', 6, 64, 'minecraft:rail[shape=east_west,waterlogged=false]')
+    ]
+  });
+  const byId = new Map(graph.operations.map((operation) => [operation.id, operation]));
+  assert.equal(byId.get('place:0,64,0').instruction.mode, 'face-attached');
+  assert.deepEqual(byId.get('place:0,64,0').instruction.clickedFace, { x: 0, y: 1, z: 0 });
+  assert.equal(byId.get('place:2,64,0').instruction.mode, 'face-attached');
+  assert.deepEqual(byId.get('place:2,64,0').instruction.clickedFace, { x: 0, y: -1, z: 0 });
+  assert.equal(byId.get('place:4,64,0').instruction.mode, 'face-attached');
+  assert.equal(byId.get('place:6,64,0').instruction.mode, 'attached');
+});
+
 test('compiles verified heading strategies for bounded directional states', () => {
   const graph = compilePlacementGraph(flatBot(new Map([['2,64,-1', 'stone']])), {
     policy: { scaffolding: ['dirt'] },

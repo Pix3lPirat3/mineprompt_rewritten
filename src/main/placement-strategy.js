@@ -1,12 +1,29 @@
 'use strict';
 
 const FACE_DETERMINED_WALL_BLOCKS = /(?:wall_torch|ladder|button|lever|tripwire_hook|wall_sign|wall_hanging_sign|wall_banner)$/u;
-const EXECUTABLE_PLACEMENT_MODES = new Set(['simple', 'gravity', 'scaffold', 'axis', 'slab', 'wall-attached', 'directional', 'multiblock', 'paired-container']);
+const EXECUTABLE_PLACEMENT_MODES = new Set(['simple', 'gravity', 'scaffold', 'axis', 'slab', 'face-attached', 'wall-attached', 'directional', 'multiblock', 'paired-container']);
 const TOWARD_YAW = Object.freeze({ south: 0, east: Math.PI / 2, north: Math.PI, west: -Math.PI / 2 });
 const AWAY_YAW = Object.freeze({ north: 0, west: Math.PI / 2, south: Math.PI, east: -Math.PI / 2 });
 
 function falseState(value) {
   return value === undefined || value === 'false';
+}
+
+function onlyProperties(properties, names) {
+  return Object.keys(properties).every((name) => names.includes(name));
+}
+
+function faceAttached(parsed, supportKind) {
+  const properties = parsed.properties;
+  if (['lantern', 'soul_lantern'].includes(parsed.name)) {
+    const hanging = properties.hanging === 'true';
+    return onlyProperties(properties, ['hanging', 'waterlogged']) && falseState(properties.waterlogged) && (supportKind === 'ceiling' ? hanging : !hanging);
+  }
+  if (supportKind !== 'floor') return false;
+  if (['torch', 'soul_torch'].includes(parsed.name)) return onlyProperties(properties, []);
+  if (parsed.name.endsWith('_pressure_plate')) return onlyProperties(properties, ['powered']) && falseState(properties.powered);
+  if (parsed.name.endsWith('_carpet')) return onlyProperties(properties, []);
+  return false;
 }
 
 function directionalLook(parsed) {
@@ -40,7 +57,7 @@ function placementMode(parsed, supportKind, groupId) {
   if (groupId?.startsWith('container:')) return pairedContainerLook(parsed) ? 'paired-container' : 'container-unsupported';
   if (groupId) return multiblockLook(parsed) ? 'multiblock' : 'multiblock-unsupported';
   if (supportKind === 'wall') return parsed.properties.facing && FACE_DETERMINED_WALL_BLOCKS.test(parsed.name) ? 'wall-attached' : 'attached';
-  if (supportKind === 'ceiling' || supportKind === 'floor') return 'attached';
+  if (supportKind === 'ceiling' || supportKind === 'floor') return faceAttached(parsed, supportKind) ? 'face-attached' : 'attached';
   if (supportKind === 'gravity' || supportKind === 'scaffold' || supportKind === 'axis' || supportKind === 'slab') return supportKind;
   if (supportKind === 'stairs') return directionalLook(parsed) ? 'directional' : 'directional-unsupported';
   if (parsed.properties.facing) return directionalLook(parsed) ? 'directional' : 'directional-unsupported';
@@ -55,6 +72,7 @@ module.exports = {
   EXECUTABLE_PLACEMENT_MODES,
   directionalLook,
   executablePlacementMode,
+  faceAttached,
   multiblockLook,
   pairedContainerLook,
   placementMode
