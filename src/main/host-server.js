@@ -10,9 +10,26 @@ const { nodeProcessSessionFactory } = require('./node-process-session');
 const { HOST_METHOD_NAMES } = require('./transport-methods');
 
 const HOST_METHODS = new Set(HOST_METHOD_NAMES);
+const MAX_RUNTIME_MESSAGE_BYTES = 4 * 1024 * 1024;
+
+function encodeMessage(message) {
+  const payload = `${JSON.stringify(message)}\n`;
+  if (Buffer.byteLength(payload, 'utf8') > MAX_RUNTIME_MESSAGE_BYTES) throw new Error('Runtime message limit exceeded.');
+  return payload;
+}
+
+function writeEncodedMessage(socket, payload) {
+  if (!socket || socket.destroyed || socket.writable === false) return false;
+  if ((Number(socket.writableLength) || 0) + Buffer.byteLength(payload, 'utf8') > MAX_RUNTIME_MESSAGE_BYTES) {
+    socket.destroy(new Error('Runtime pending output limit exceeded.'));
+    return false;
+  }
+  socket.write(payload);
+  return true;
+}
 
 function writeMessage(socket, message) {
-  socket.write(`${JSON.stringify(message)}\n`);
+  return writeEncodedMessage(socket, encodeMessage(message));
 }
 
 function consumeMessages(socket, receive) {
@@ -20,7 +37,7 @@ function consumeMessages(socket, receive) {
   socket.setEncoding('utf8');
   socket.on('data', (chunk) => {
     buffer += chunk;
-    if (buffer.length > 4 * 1024 * 1024) {
+    if (Buffer.byteLength(buffer, 'utf8') > MAX_RUNTIME_MESSAGE_BYTES) {
       socket.destroy(new Error('Runtime message limit exceeded.'));
       return;
     }
@@ -136,8 +153,9 @@ class HostServer {
   }
 
   broadcast(message) {
+    const payload = encodeMessage(message);
     for (const client of this.clients) {
-      if (!client.destroyed) writeMessage(client, message);
+      writeEncodedMessage(client, payload);
     }
   }
 
@@ -152,4 +170,4 @@ class HostServer {
   }
 }
 
-module.exports = { HOST_METHODS, HostServer, consumeMessages, loadToken, probe, writeMessage };
+module.exports = { HOST_METHODS, MAX_RUNTIME_MESSAGE_BYTES, HostServer, consumeMessages, encodeMessage, loadToken, probe, writeEncodedMessage, writeMessage };

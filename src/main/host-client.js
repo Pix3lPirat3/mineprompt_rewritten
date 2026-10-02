@@ -84,7 +84,7 @@ class HostClient extends EventEmitter {
       }, method === 'connect' ? 180000 : this.timeout);
       this.pending.set(id, { resolve, reject, timer });
       try {
-        writeMessage(this.socket, { type: 'request', id, token: this.token, method, args });
+        if (!writeMessage(this.socket, { type: 'request', id, token: this.token, method, args })) throw new Error('The MinePrompt host connection is not writable.');
       } catch (error) {
         clearTimeout(timer);
         this.pending.delete(id);
