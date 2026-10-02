@@ -296,3 +296,28 @@ test('executes exact top slab placement instructions', async () => {
     options: { delta: { x: 0.5, y: 0.75, z: 1 }, forceLook: true, swingArm: 'right', showHand: true }
   }]);
 });
+
+test('executes face-determined wall placement instructions', async () => {
+  const value = harness({
+    expectedState: 'minecraft:ladder[facing=west,waterlogged=false]',
+    itemName: 'ladder',
+    placeAs: 'ladder',
+    placeProperties: { facing: 'west', waterlogged: false },
+    instruction: {
+      supportPosition: { x: 2, y: 64, z: 0 },
+      clickedFace: { x: -1, y: 0, z: 0 },
+      cursor: { x: 0, y: 0.5, z: 0.5 },
+      mode: 'wall-attached',
+      stateProperties: { facing: 'west', waterlogged: 'false' }
+    }
+  });
+  value.blocks.set('2,64,0', block('stone', { x: 2, y: 64, z: 0 }));
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.equal(value.data.buildJobs[0].status, 'complete', value.data.buildJobs[0].latestError || 'No build error was recorded.');
+  assert.deepEqual(value.placementCalls, [{
+    reference: { x: 2, y: 64, z: 0 },
+    face: { x: -1, y: 0, z: 0 },
+    options: { delta: { x: 0, y: 0.5, z: 0.5 }, forceLook: true, swingArm: 'right', showHand: true }
+  }]);
+});

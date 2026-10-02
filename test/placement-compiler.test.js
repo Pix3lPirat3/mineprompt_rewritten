@@ -55,7 +55,7 @@ test('compiles removal, support, gravity, and multi-block dependencies', () => {
   assert.deepEqual(byId.get('place:3,64,0').dependencies, ['place:4,64,0']);
   assert.deepEqual(byId.get('place:3,64,0').instruction.clickedFace, { x: -1, y: 0, z: 0 });
   assert.equal(byId.get('place:3,64,0').instruction.cursor.x, 0);
-  assert.equal(byId.get('place:3,64,0').instruction.mode, 'attached');
+  assert.equal(byId.get('place:3,64,0').instruction.mode, 'wall-attached');
   assert.equal(byId.has('place:2,64,0'), false);
   assert.equal(graph.counts.removals, 2);
   assert.equal(graph.counts.placements, 7);
@@ -195,4 +195,22 @@ test('compiles exact face and cursor strategies for axis blocks and slabs', () =
   assert.deepEqual(byId.get('place:2,64,0').instruction.clickedFace, { x: 0, y: 0, z: 1 });
   assert.equal(byId.get('place:2,64,0').instruction.cursor.y, 0.75);
   assert.equal(byId.get('place:4,64,0').blocked.some((reason) => reason.code === 'double-slab-unsupported'), true);
+});
+
+test('allows face-determined wall blocks without enabling ambiguous attachments', () => {
+  const overrides = new Map([
+    ['-1,64,0', 'stone'],
+    ['1,64,0', 'stone']
+  ]);
+  const graph = compilePlacementGraph(flatBot(overrides), {
+    policy: { scaffolding: ['dirt'] },
+    records: [
+      record('placeable', 0, 64, 'minecraft:ladder[facing=east,waterlogged=false]'),
+      record('placeable', 2, 64, 'minecraft:cocoa[age=0,facing=east]')
+    ]
+  });
+  const byId = new Map(graph.operations.map((operation) => [operation.id, operation]));
+  assert.equal(byId.get('place:0,64,0').instruction.mode, 'wall-attached');
+  assert.deepEqual(byId.get('place:0,64,0').instruction.clickedFace, { x: 1, y: 0, z: 0 });
+  assert.equal(byId.get('place:2,64,0').instruction.mode, 'attached');
 });

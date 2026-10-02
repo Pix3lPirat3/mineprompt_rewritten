@@ -5,12 +5,12 @@ const { Vec3 } = require('vec3');
 const { createBuildJob, updateBuildJob } = require('./build-job');
 const { isAirState } = require('./blueprint-model');
 const { basicStanceSafe, candidateStances, lineOfSight, positionDistance, positionKey } = require('./placement-compiler');
+const { EXECUTABLE_PLACEMENT_MODES, executablePlacementMode } = require('./placement-strategy');
 const { cancelNavigation, navigateGoal } = require('./navigation-service');
 const { currentStorageContext } = require('./storage-service');
 const { blockStateFromWorld, REPLACEABLE_BLOCKS } = require('./world-diff');
 const { abortableDelay } = require('./workflow-runtime');
 
-const EXECUTABLE_PLACEMENT_MODES = new Set(['simple', 'gravity', 'scaffold', 'axis', 'slab']);
 const BUILD_ACTIVITY_ID = 'builder';
 
 function positionVector(position) {
@@ -59,7 +59,7 @@ function missingItems(bot, compiled) {
 function unsupportedOperations(compiled) {
   return compiled.graph.operations.filter((operation) => {
     if (!['place', 'scaffold-place'].includes(operation.kind)) return false;
-    return !operation.instruction?.supportPosition || !EXECUTABLE_PLACEMENT_MODES.has(operation.instruction.mode);
+    return !operation.instruction?.supportPosition || !executablePlacementMode(operation.instruction.mode);
   });
 }
 

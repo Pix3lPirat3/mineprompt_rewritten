@@ -2,6 +2,7 @@
 
 const { Vec3 } = require('vec3');
 const { isAirState, parseBlockState } = require('./blueprint-model');
+const { placementMode } = require('./placement-strategy');
 const { PriorityQueue } = require('./priority-queue');
 
 const MAX_PLACEMENT_OPERATIONS = 1048576;
@@ -127,8 +128,7 @@ function placementInstruction(operation, support, rule) {
   }
   if (parsed.properties.half === 'top' || parsed.properties.type === 'top') cursor.y = 0.75;
   if (parsed.properties.half === 'bottom' || parsed.properties.type === 'bottom') cursor.y = 0.25;
-  const multiBlock = operation.groupId && !operation.groupId.startsWith('container:');
-  const mode = multiBlock ? 'multiblock' : rule.kind === 'wall' || rule.kind === 'ceiling' || rule.kind === 'floor' ? 'attached' : rule.kind === 'gravity' ? 'gravity' : rule.kind === 'scaffold' ? 'scaffold' : rule.kind === 'axis' ? 'axis' : rule.kind === 'slab' ? 'slab' : facing ? 'directional' : 'simple';
+  const mode = placementMode(parsed, rule.kind, operation.groupId);
   return {
     supportPosition: support ? { ...support } : null,
     clickedFace: face,
