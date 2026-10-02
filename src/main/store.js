@@ -5,6 +5,7 @@ const path = require('node:path');
 const { cleanWorkflow } = require('./workflow-model');
 const { cleanStoredPresets, createPreset } = require('./mining-presets');
 const { cleanStorageZones, createStorageZone } = require('./storage-model');
+const { StorageReservationBroker } = require('./storage-reservations');
 
 const EMPTY_DATA = Object.freeze({
   version: 1,
@@ -62,6 +63,7 @@ class Store {
     this.onChange = onChange;
     this.data = structuredClone(EMPTY_DATA);
     this.writeQueue = Promise.resolve();
+    this.storageReservations = new StorageReservationBroker();
   }
 
   async init() {
@@ -302,6 +304,26 @@ class Store {
     if (this.data.storageZones.length === previousLength) return false;
     await this.changed();
     return true;
+  }
+
+  storageReservationSnapshot(request = {}) {
+    return this.storageReservations.snapshot(request);
+  }
+
+  reserveStorage(request = {}) {
+    return this.storageReservations.reserve(request);
+  }
+
+  renewStorageReservation(id, owner, ttlMs) {
+    return this.storageReservations.renew(id, owner, ttlMs);
+  }
+
+  releaseStorageReservation(id, owner) {
+    return this.storageReservations.release(id, owner);
+  }
+
+  releaseStorageOwner(owner) {
+    return this.storageReservations.releaseOwner(owner);
   }
 
   async close() {

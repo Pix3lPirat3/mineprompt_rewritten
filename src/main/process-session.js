@@ -48,7 +48,7 @@ function emptySession(id, engine = null) {
       containerLayout: null,
       server: null,
       targets: { cursorBlock: null, cursorEntity: null, entities: [] },
-      storage: { active: null, zones: [] },
+      storage: { active: null, operation: null, zones: [] },
       blueprints: { blueprints: [] }
     },
     commands: [],
@@ -172,6 +172,7 @@ class ProcessSession {
 
   handleExit(code) {
     if (this.closed) return;
+    void Promise.resolve(this.store.releaseStorageOwner?.(this.id)).catch(() => {});
     if (this.cached.process.status === 'failed') return;
     if (this.closing) {
       for (const request of this.pending.values()) {

@@ -4,10 +4,12 @@ const { installRuntime } = require('./kernel');
 const { registerCapability, serviceClient } = require('./shared');
 const { StorageService } = require('../../../src/main/storage-service');
 const { cleanStorageZones, createStorageZone } = require('../../../src/main/storage-model');
+const { StorageReservationBroker } = require('../../../src/main/storage-reservations');
 
 class MemoryStorageStore {
   constructor(zones = []) {
     this.data = { storageZones: cleanStorageZones(zones) };
+    this.reservations = new StorageReservationBroker();
   }
 
   snapshot() {
@@ -31,6 +33,12 @@ class MemoryStorageStore {
     this.data.storageZones = this.data.storageZones.filter((zone) => zone.id.toLowerCase() !== target);
     return this.data.storageZones.length !== previous;
   }
+
+  storageReservationSnapshot(request = {}) { return this.reservations.snapshot(request); }
+  reserveStorage(request = {}) { return this.reservations.reserve(request); }
+  renewStorageReservation(id, owner, ttlMs) { return this.reservations.renew(id, owner, ttlMs); }
+  releaseStorageReservation(id, owner) { return this.reservations.release(id, owner); }
+  releaseStorageOwner(owner) { return this.reservations.releaseOwner(owner); }
 }
 
 function installStorage(bot, options = {}) {
@@ -56,11 +64,13 @@ function installStorage(bot, options = {}) {
     scan: (reference) => service.start(reference),
     inspect: (reference) => service.inspect(reference),
     find: (selector, request = {}) => service.find(selector, request),
-    status: () => service.status(),
+    planFetch: (request) => service.fetchPlan(request),
+    fetch: (request) => service.startFetch(request),
+    status: () => service.operationStatus?.() || service.status(),
     stop: () => service.stop(),
     snapshot: () => service.summary()
   });
-  return registerCapability(runtime, 'storage', api, 'Server-scoped storage zones, exact item indexes, and read-only container scanning.', [
+  return registerCapability(runtime, 'storage', api, 'Server-scoped storage zones, exact item indexes, container scanning, and reserved item fetching.', [
     {
       id: 'storage.zones',
       title: 'List storage zones',
@@ -113,6 +123,32 @@ function installStorage(bot, options = {}) {
         additionalProperties: false
       },
       execute: ({ request }) => api.find(request.item, request)
+    },
+    {
+      id: 'storage.plan-fetch',
+      title: 'Plan a storage fetch',
+      capability: 'storage',
+      risk: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: { item: { type: 'string' }, count: { type: 'integer', minimum: 1 }, zone: { type: 'string' } },
+        required: ['item', 'count', 'zone'],
+        additionalProperties: false
+      },
+      execute: ({ request }) => api.planFetch(request)
+    },
+    {
+      id: 'storage.fetch',
+      title: 'Fetch storage items',
+      capability: 'storage',
+      risk: 'dangerous',
+      inputSchema: {
+        type: 'object',
+        properties: { item: { type: 'string' }, count: { type: 'integer', minimum: 1 }, zone: { type: 'string' } },
+        required: ['item', 'count', 'zone'],
+        additionalProperties: false
+      },
+      execute: ({ request }) => api.fetch(request)
     },
     {
       id: 'storage.stop',

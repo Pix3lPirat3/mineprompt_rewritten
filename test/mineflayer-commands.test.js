@@ -227,7 +227,9 @@ test('registers, scans, and queries storage through one terminal service', async
     zones: () => [],
     saveZone: async (request) => { calls.push(['save', request]); return { id: 'main', name: request.name }; },
     start: (zone) => { calls.push(['scan', zone]); return { zoneName: 'Main', running: true }; },
-    find: (item, options) => { calls.push(['find', item, options]); return [{ zoneName: 'Main', count: 64, displayName: 'Stone', variantId: 'variant', stale: false }]; }
+    find: (item, options) => { calls.push(['find', item, options]); return [{ zoneName: 'Main', count: 64, displayName: 'Stone', variantId: 'variant', stale: false }]; },
+    fetchPlan: async (request) => { calls.push(['plan', request]); return { requested: request.count, variant: { displayName: 'Stone' }, allocations: [{}], estimatedCost: 7 }; },
+    startFetch: async (request) => { calls.push(['fetch', request]); return { requested: request.count, displayName: 'Stone', containersPlanned: 1 }; }
   };
   const added = sender();
   await storageCommand.execute(added.value, 'storage', ['add', 'Main', '0', '64', '0', '8', '72', '8'], { bot: { entity: {} }, storage });
@@ -239,6 +241,14 @@ test('registers, scans, and queries storage through one terminal service', async
   await storageCommand.execute(found.value, 'storage', ['find', 'stone', 'main', '32'], { bot: { entity: {} }, storage });
   assert.deepEqual(calls[2], ['find', 'stone', { zone: 'main', minimum: '32' }]);
   assert.match(found.replies[0], /64 x Stone/u);
+  const planned = sender();
+  await storageCommand.execute(planned.value, 'storage', ['plan', 'variant', '32', 'main'], { bot: { entity: {} }, storage });
+  assert.deepEqual(calls[3], ['plan', { item: 'variant', count: 32, zone: 'main' }]);
+  assert.match(planned.replies[0], /estimated route cost 7.0/u);
+  const fetched = sender();
+  await storageCommand.execute(fetched.value, 'storage', ['fetch', 'variant', '32', 'main'], { bot: { entity: {} }, storage });
+  assert.deepEqual(calls[4], ['fetch', { item: 'variant', count: 32, zone: 'main' }]);
+  assert.match(fetched.replies[0], /Fetching 32 x Stone/u);
 });
 
 test('imports and previews blueprints through the shared build service', async () => {

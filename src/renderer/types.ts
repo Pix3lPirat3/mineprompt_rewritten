@@ -194,7 +194,25 @@ export interface StorageZoneSummary {
 
 export interface StorageSnapshot {
   active: StorageScanSummary | null;
+  operation?: StorageOperationStatus | null;
   zones: StorageZoneSummary[];
+}
+
+export interface StorageOperationStatus {
+  kind: 'fetch';
+  running: boolean;
+  phase: string;
+  zoneId: string;
+  variantId: string;
+  displayName: string;
+  requested: number;
+  transferred: number;
+  containersPlanned: number;
+  containersVisited: number;
+  startPosition: TargetPosition;
+  failed: string | null;
+  returned: boolean;
+  settled?: boolean;
 }
 
 export interface BlueprintSummary {

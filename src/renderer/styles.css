@@ -521,7 +521,7 @@ a {
   overflow: auto;
 }
 
-.storage-item-grid article {
+.storage-item-grid > button {
   display: flex;
   min-width: 0;
   align-items: center;
@@ -529,6 +529,12 @@ a {
   padding: 7px;
   border: 1px solid var(--line);
   background: rgba(7, 11, 16, 0.62);
+  text-align: left;
+}
+
+.storage-item-grid > button.selected {
+  border-color: var(--accent);
+  background: rgba(49, 149, 99, 0.16);
 }
 
 .storage-item-grid img {
@@ -564,6 +570,39 @@ a {
 
 .storage-warning {
   color: var(--warning);
+}
+
+.storage-chip--operation {
+  border-color: var(--accent);
+}
+
+.storage-fetch-controls {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 10px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  background: rgba(7, 11, 16, 0.62);
+}
+
+.storage-fetch-controls > span {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.storage-fetch-controls small {
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.storage-fetch-controls input {
+  width: 72px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  background: #0c1118;
 }
 
 .target-ribbon__filters {

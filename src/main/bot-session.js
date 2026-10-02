@@ -106,6 +106,7 @@ class BotSession {
       store: this.store,
       activities: this.activities,
       logger,
+      owner: this.id,
       onChange: () => this.publishSnapshot()
     });
     this.blueprintLibrary = new BlueprintLibrary({
@@ -347,11 +348,13 @@ class BotSession {
     const storage = this.capability('storage')?.service || this.storage;
     const action = String(request.action || 'zones').toLowerCase();
     if (action === 'zones') return { ok: true, zones: storage.zones({ all: request.all === true }) };
-    if (action === 'status') return { ok: true, status: storage.status(), storage: storage.summary() };
+    if (action === 'status') return { ok: true, status: storage.operationStatus?.() || storage.status(), storage: storage.summary() };
     if (action === 'inspect') return { ok: true, ...storage.inspect(request.zone) };
     if (action === 'find') return { ok: true, items: storage.find(request.item, { zone: request.zone, minimum: request.minimum }) };
     if (action === 'scan') return { ok: true, status: storage.start(request.zone) };
-    if (action === 'stop') return { ok: storage.stop(), status: storage.status() };
+    if (action === 'plan') return { ok: true, plan: await storage.fetchPlan(request) };
+    if (action === 'fetch') return { ok: true, status: await storage.startFetch(request) };
+    if (action === 'stop') return { ok: storage.stop(), status: storage.operationStatus?.() || storage.status() };
     if (action === 'save') return { ok: true, zone: await storage.saveZone(request.zoneDetails || request) };
     if (action === 'remove') return { ok: await storage.removeZone(request.zone) };
     throw new Error('Unknown storage action.');
@@ -477,6 +480,7 @@ class BotSession {
     this.inventoryPipeline.close();
     this.workflows.close();
     this.automation.close();
+    await this.store.releaseStorageOwner?.(this.id);
     await this.blueprintLibrary.close();
     await this.client.close();
   }

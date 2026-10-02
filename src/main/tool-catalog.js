@@ -234,13 +234,14 @@ class ToolCatalog {
     }));
     this.register(tool('mineprompt_storage', 'Register bounded storage zones, scan loaded containers, and query exact item variants with freshness and partial-scan details.', Type.Object({
       sessionId: SessionId,
-      action: Type.Union(['zones', 'save', 'remove', 'scan', 'inspect', 'find', 'status', 'stop'].map((value) => Type.Literal(value))),
+      action: Type.Union(['zones', 'save', 'remove', 'scan', 'inspect', 'find', 'plan', 'fetch', 'status', 'stop'].map((value) => Type.Literal(value))),
       zone: Type.Optional(Type.String({ minLength: 1, maxLength: 80 })),
       name: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
       from: Type.Optional(Position),
       to: Type.Optional(Position),
       item: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
       minimum: Type.Optional(Type.Integer({ minimum: 0, maximum: 2147483647 })),
+      count: Type.Optional(Type.Integer({ minimum: 1, maximum: 2147483647 })),
       all: Type.Optional(Type.Boolean())
     }, { additionalProperties: false }), async (runtime, input) => runtime.storageAction(input), {
       destructive: true, capability: 'world', approval: 'recommended', openWorld: true

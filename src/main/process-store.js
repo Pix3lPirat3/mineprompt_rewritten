@@ -4,7 +4,8 @@ const LOCAL_STORE_METHOD_NAMES = Object.freeze(['getConnection', 'getAccount', '
 const REMOTE_STORE_METHOD_NAMES = Object.freeze([
   'addConnection', 'addAccount', 'saveAccount', 'removeAccount', 'renameAccount',
   'saveServer', 'removeServer', 'setSetting', 'setSettings', 'saveWorkflow', 'removeWorkflow',
-  'saveMiningPreset', 'removeMiningPreset', 'selectMiningPreset', 'saveStorageZone', 'removeStorageZone'
+  'saveMiningPreset', 'removeMiningPreset', 'selectMiningPreset', 'saveStorageZone', 'removeStorageZone',
+  'storageReservationSnapshot', 'reserveStorage', 'renewStorageReservation', 'releaseStorageReservation', 'releaseStorageOwner'
 ]);
 const STORE_METHOD_NAMES = Object.freeze([...LOCAL_STORE_METHOD_NAMES, ...REMOTE_STORE_METHOD_NAMES]);
 

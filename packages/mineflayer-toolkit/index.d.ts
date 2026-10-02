@@ -220,6 +220,8 @@ export interface StorageApi {
   scan(reference: string): unknown;
   inspect(reference: string): unknown;
   find(selector: string, request?: { zone?: string; minimum?: number }): unknown[];
+  planFetch(request: { item: string; count: number; zone: string }): Promise<unknown>;
+  fetch(request: { item: string; count: number; zone: string }): Promise<unknown>;
   status(): unknown;
   stop(): boolean;
   snapshot(): Record<string, unknown>;

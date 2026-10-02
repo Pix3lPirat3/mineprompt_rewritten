@@ -150,3 +150,17 @@ test('persists storage zones scoped to a server and dimension', async (context) 
   assert.equal(await restored.removeStorageZone('WAREHOUSE'), true);
   assert.deepEqual(await restored.getStorageZones(), []);
 });
+
+test('coordinates transient storage reservations across sessions', async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mineprompt-storage-reservations-'));
+  context.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const store = await new Store(path.join(directory, 'data.json')).init();
+  const entry = { key: 'withdraw:main:1,64,1:stone', count: 48, available: 64 };
+  store.reserveStorage({ owner: 'bot-a', entries: [entry] });
+  assert.throws(() => store.reserveStorage({ owner: 'bot-b', entries: [{ ...entry, count: 17 }] }), /only 16 available/u);
+  assert.equal(store.releaseStorageOwner('bot-a'), 1);
+  const lease = store.reserveStorage({ owner: 'bot-b', entries: [{ ...entry, count: 64 }] });
+  assert.equal(store.storageReservationSnapshot().reservations[0].count, 64);
+  assert.equal(store.releaseStorageReservation(lease.id, 'bot-b'), true);
+  await store.close();
+});
