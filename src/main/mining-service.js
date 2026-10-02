@@ -66,6 +66,10 @@ class MiningService {
     return this.getClient()?.bot || null;
   }
 
+  wait(delay) {
+    return new Promise((resolve) => { this.schedule(resolve, delay); });
+  }
+
   async equipFor(block, policyInput = {}) {
     const bot = this.bot;
     const decision = toolDecision(bot, block, policyInput);
@@ -255,7 +259,7 @@ class MiningService {
         if (loadAttempts >= 3) throw new Error(`The region near ${positionText(unloadedTarget)} could not be loaded.`);
         loadAttempts += 1;
         await navigate(bot, unloadedTarget, 4);
-        await new Promise((resolve) => { setTimeout(resolve, 250); });
+        await this.wait(250);
         continue;
       }
       if (!targets.length) break;
@@ -272,7 +276,7 @@ class MiningService {
       if (!plan.route.length && unloadedTarget && loadAttempts < 3) {
         loadAttempts += 1;
         await navigate(bot, unloadedTarget, 4);
-        await new Promise((resolve) => { setTimeout(resolve, 250); });
+        await this.wait(250);
         continue;
       }
       if (!plan.route.length) throw new Error(`${targets.length} blocks remain but no safe reachable standing position was found.`);

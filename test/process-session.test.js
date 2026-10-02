@@ -29,6 +29,19 @@ class FakeProcess extends EventEmitter {
   }
 
   kill() {
+    this.killed = true;
+    return true;
+  }
+}
+
+class PendingProcess extends EventEmitter {
+  constructor() {
+    super();
+    this.killed = false;
+  }
+
+  kill() {
+    this.killed = true;
     return true;
   }
 }
@@ -57,4 +70,38 @@ test('supervises isolated bot process requests and snapshots', async () => {
   await assert.rejects(session.execute('late'), /IPC closed/u);
   assert.equal(session.pending.size, 0);
   await session.close();
+});
+
+test('contains initialization send failures and terminates the child', async () => {
+  const child = new FakeProcess();
+  child.postMessage = () => { throw new Error('IPC initialization failed'); };
+  const session = new ProcessSession({
+    id: 'broken',
+    rootPath: 'C:\\application',
+    privateCommandsPath: 'C:\\private',
+    store: { snapshot: () => ({}) },
+    logger: { ingest() {}, error() {} },
+    emit() {},
+    spawn: () => child
+  });
+  await assert.rejects(session.ready, /IPC initialization failed/u);
+  assert.equal(child.killed, true);
+  assert.equal(session.snapshot().process.status, 'failed');
+});
+
+test('closes a pending startup without waiting for its timeout', async () => {
+  const child = new PendingProcess();
+  const session = new ProcessSession({
+    id: 'pending',
+    rootPath: 'C:\\application',
+    privateCommandsPath: 'C:\\private',
+    store: { snapshot: () => ({}) },
+    logger: { ingest() {}, error() {} },
+    emit() {},
+    spawn: () => child
+  });
+  await session.close();
+  await assert.rejects(session.ready, /closed during startup/u);
+  assert.equal(child.killed, true);
+  assert.equal(session.closed, true);
 });

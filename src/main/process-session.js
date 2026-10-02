@@ -63,7 +63,9 @@ class ProcessSession {
     this.closed = false;
     this.closing = false;
     this.child = null;
+    this.cancelStartup = null;
     this.ready = this.start();
+    void this.ready.catch(() => {});
   }
 
   start() {
@@ -73,29 +75,39 @@ class ProcessSession {
       const startupTimer = setTimeout(() => failed(new Error('Bot process did not start within 15 seconds.')), 15000);
       const failed = (error) => {
         if (complete) return;
+        const cause = error instanceof Error ? error : new Error(String(error || 'Bot process failed.'));
         complete = true;
         clearTimeout(startupTimer);
+        this.cancelStartup = null;
         this.cached.process.status = 'failed';
         this.cached.state.status = 'failed';
-        this.cached.state.lastError = error.message;
-        reject(error);
+        this.cached.state.lastError = cause.message;
+        try { this.child?.kill(); } catch {}
+        reject(cause);
       };
+      this.cancelStartup = failed;
       this.child.once('spawn', () => {
+        if (complete) return;
         this.cached.process = { isolated: true, pid: this.child.pid || null, status: 'running' };
-        this.child.postMessage({
-          type: 'init',
-          id: this.id,
-          rootPath: this.rootPath,
-          privateCommandsPath: this.privateCommandsPath,
-          store: this.store.snapshot()
-        });
+        try {
+          this.child.postMessage({
+            type: 'init',
+            id: this.id,
+            rootPath: this.rootPath,
+            privateCommandsPath: this.privateCommandsPath,
+            store: this.store.snapshot()
+          });
+        } catch (error) {
+          failed(error);
+        }
       });
-      this.child.once('error', (type, location, report) => failed(new Error([type, location, report].filter(Boolean).join(': ') || 'Bot process failed.')));
+      this.child.once('error', (error) => failed(error instanceof Error ? error : new Error(String(error || 'Bot process failed.'))));
       this.child.on('message', (message) => {
         this.handleMessage(message);
         if (message?.type === 'ready' && !complete) {
           complete = true;
           clearTimeout(startupTimer);
+          this.cancelStartup = null;
           resolve(this);
         }
         if (message?.type === 'fatal') failed(new Error(message.error || 'Bot process failed to start.'));
@@ -149,6 +161,7 @@ class ProcessSession {
 
   handleExit(code) {
     if (this.closed) return;
+    if (this.cached.process.status === 'failed') return;
     if (this.closing) {
       for (const request of this.pending.values()) {
         clearTimeout(request.timer);
@@ -206,6 +219,11 @@ class ProcessSession {
   async close() {
     if (this.closed || this.closing) return;
     this.closing = true;
+    if (this.cached.process.status === 'starting') {
+      this.cancelStartup?.(new Error('The bot process was closed during startup.'));
+      this.closed = true;
+      return;
+    }
     if (this.cached.process.status !== 'failed') {
       try { await this.request('close'); } catch {}
     }

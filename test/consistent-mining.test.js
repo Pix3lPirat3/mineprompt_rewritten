@@ -68,3 +68,11 @@ test('stops when a non-diggable replacement remains at the locked position', asy
   assert.equal(value.activities.has('consistentmine'), false);
   assert.equal(value.logs.some((entry) => entry[0] === 'warn' && entry[1].includes('remained at the locked position')), true);
 });
+
+test('routes region loading waits through the injected scheduler', async () => {
+  const value = fixture();
+  const waiting = value.service.wait(250);
+  assert.equal(value.queue.length, 1);
+  await value.queue.shift()();
+  await waiting;
+});

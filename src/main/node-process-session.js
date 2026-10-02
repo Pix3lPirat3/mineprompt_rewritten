@@ -10,7 +10,10 @@ function spawnSessionWorker(rootPath) {
     serialization: 'advanced',
     windowsHide: true
   });
-  child.postMessage = (message) => child.send(message);
+  child.postMessage = (message) => {
+    if (!child.connected) throw new Error('The bot process IPC channel is closed.');
+    return child.send(message);
+  };
   return child;
 }
 
