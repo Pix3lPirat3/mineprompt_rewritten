@@ -280,8 +280,28 @@ export interface BlueprintMaterial {
   count: number;
 }
 
+export interface BuildJobSummary {
+  id: string;
+  blueprintName: string;
+  status: 'planned' | 'running' | 'paused' | 'complete' | 'failed' | 'stopped';
+  phase: string;
+  operationCount: number;
+  completedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  latestError: string | null;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export interface BuildStatus {
+  active: BuildJobSummary | null;
+  jobs: BuildJobSummary[];
+}
+
 export interface BlueprintSnapshot {
   blueprints: BlueprintSummary[];
+  build: BuildStatus;
 }
 
 export interface StorageIndexedItem {

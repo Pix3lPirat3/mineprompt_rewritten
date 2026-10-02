@@ -10,7 +10,8 @@ test('serves mirrored reads locally and proxies writes', async () => {
     servers: [{ name: 'Local' }],
     settings: { resourcePackPolicy: 'accept' },
     connections: [{ host: 'localhost' }],
-    storageZones: [{ id: 'main' }]
+    storageZones: [{ id: 'main' }],
+    buildJobs: [{ id: 'job' }]
   };
   const requests = [];
   const store = new ProcessStore({
@@ -23,6 +24,7 @@ test('serves mirrored reads locally and proxies writes', async () => {
   assert.equal((await store.getServers())[0].name, 'Local');
   assert.equal(await store.getSetting('resourcePackPolicy'), 'accept');
   assert.equal((await store.getStorageZones())[0].id, 'main');
+  assert.equal((await store.getBuildJobs())[0].id, 'job');
   const snapshot = store.snapshot();
   snapshot.accounts[0].username = 'Changed';
   assert.equal(source.accounts[0].username, 'Alex');

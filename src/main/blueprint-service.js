@@ -2,11 +2,21 @@
 
 const { compilePlacementGraph, compileStancePlan, publicPlacementPlan } = require('./placement-compiler');
 const { analyzeBlueprint, diffBlueprint } = require('./world-diff');
+const { BuildExecutor } = require('./build-executor');
 
 class BlueprintService {
-  constructor({ library, getClient }) {
+  constructor({ library, getClient, store = null, activities = null, logger = null, owner = '', onChange = () => {} }) {
     this.library = library;
     this.getClient = getClient;
+    this.executor = store && activities ? new BuildExecutor({
+      compile: (reference, request) => this.compile(reference, request),
+      getClient,
+      store,
+      activities,
+      logger,
+      owner,
+      onChange
+    }) : null;
   }
 
   list() {
@@ -46,8 +56,33 @@ class BlueprintService {
     return publicPlacementPlan(compiled.analysis, compiled.graph, compiled.stances);
   }
 
+  requireExecutor() {
+    if (!this.executor) throw new Error('Build execution is not configured.');
+    return this.executor;
+  }
+
+  start(reference, request = {}) {
+    return this.requireExecutor().start(reference, request);
+  }
+
+  resume(id) {
+    return this.requireExecutor().resume(id);
+  }
+
+  pause() {
+    return this.requireExecutor().pause();
+  }
+
+  stop() {
+    return this.requireExecutor().stop();
+  }
+
+  buildStatus() {
+    return this.executor ? this.executor.status() : { active: null, jobs: [] };
+  }
+
   snapshot() {
-    return { blueprints: this.library.list() };
+    return { blueprints: this.library.list(), build: this.buildStatus() };
   }
 }
 

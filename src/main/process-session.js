@@ -49,7 +49,7 @@ function emptySession(id, engine = null) {
       server: null,
       targets: { cursorBlock: null, cursorEntity: null, entities: [] },
       storage: { active: null, operation: null, zones: [] },
-      blueprints: { blueprints: [] }
+      blueprints: { blueprints: [], build: { active: null, jobs: [] } }
     },
     commands: [],
     extensions: { apiVersion: null, revision: 0, capabilities: [], actionCount: 0, tasks: { active: [] } },

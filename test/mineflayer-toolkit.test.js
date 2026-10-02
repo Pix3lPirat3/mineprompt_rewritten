@@ -127,7 +127,12 @@ test('installs supplied application services as public capabilities and actions'
     materials: () => ({ materials: [] }),
     preview: async () => ({ counts: {} }),
     plan: async () => ({ graph: {} }),
-    snapshot: () => ({ blueprints: [] })
+    start: async () => ({ id: 'job' }),
+    resume: async () => ({ id: 'job' }),
+    pause: () => true,
+    stop: () => true,
+    buildStatus: () => ({ active: null, jobs: [] }),
+    snapshot: () => ({ blueprints: [], build: { active: null, jobs: [] } })
   };
   const installed = installToolkit(bot, {
     mining: { service: miningService },
@@ -148,8 +153,13 @@ test('installs supplied application services as public capabilities and actions'
     'builder.inspect',
     'builder.list',
     'builder.materials',
+    'builder.pause',
     'builder.plan',
     'builder.preview',
+    'builder.resume',
+    'builder.start',
+    'builder.status',
+    'builder.stop',
     'mining.once',
     'mining.region',
     'mining.stop',

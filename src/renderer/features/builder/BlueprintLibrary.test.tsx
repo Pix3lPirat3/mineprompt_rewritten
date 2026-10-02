@@ -36,7 +36,7 @@ describe('blueprint library', () => {
       api: { blueprintAction },
       snapshot: {
         state: { status: 'online', position: '10, 65, -4' },
-        session: { blueprints: { blueprints: [blueprint] } }
+        session: { blueprints: { blueprints: [blueprint], build: { active: null, jobs: [] } } }
       }
     });
     expect(screen.getAllByText('Starter House')).toHaveLength(2);
@@ -48,6 +48,8 @@ describe('blueprint library', () => {
     await user.click(screen.getByRole('button', { name: 'Compile plan' }));
     expect(blueprintAction).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'plan', blueprint: blueprint.id, anchor: { x: 10, y: 65, z: -4 } }));
     expect(await screen.findByText('need scaffold')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Start build' }));
+    expect(blueprintAction).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'start', blueprint: blueprint.id, confirmed: false }));
   });
 
   it('uses native import selection and explicit removal confirmation', async () => {
@@ -55,7 +57,7 @@ describe('blueprint library', () => {
     const removeBlueprint = vi.fn(async () => ({ ok: true }));
     const { user } = renderWithRuntime(<BlueprintLibrary close={() => {}} />, {
       api: { importBlueprint, removeBlueprint },
-      snapshot: { session: { blueprints: { blueprints: [blueprint] } } }
+      snapshot: { session: { blueprints: { blueprints: [blueprint], build: { active: null, jobs: [] } } } }
     });
     await user.type(screen.getByLabelText('Minecraft version'), '1.20.4');
     await user.click(screen.getByRole('button', { name: 'Choose schematic' }));

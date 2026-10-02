@@ -164,3 +164,29 @@ test('coordinates transient storage reservations across sessions', async (contex
   assert.equal(store.releaseStorageReservation(lease.id, 'bot-b'), true);
   await store.close();
 });
+
+test('persists and removes durable build jobs', async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mineprompt-build-jobs-'));
+  context.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const file = path.join(directory, 'data.json');
+  const store = await new Store(file).init();
+  const input = {
+    id: '12345678-1234-4123-8123-123456789abc',
+    blueprintHash: 'c'.repeat(64),
+    blueprintName: 'Workshop',
+    server: { host: 'build.test', port: 25565 },
+    dimension: 'overworld',
+    anchor: { x: 1, y: 64, z: 2 },
+    operationCount: 8,
+    completedCount: 3
+  };
+  const saved = await store.saveBuildJob(input);
+  await store.close();
+  const restored = await new Store(file).init();
+  assert.deepEqual(await restored.getBuildJobs(), [saved]);
+  const updated = await restored.saveBuildJob({ ...saved, status: 'paused', completedCount: 4 });
+  assert.equal(updated.status, 'paused');
+  assert.equal((await restored.getBuildJobs()).length, 1);
+  assert.equal(await restored.removeBuildJob(saved.id.toUpperCase()), true);
+  assert.deepEqual(await restored.getBuildJobs(), []);
+});

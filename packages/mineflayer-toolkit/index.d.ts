@@ -265,6 +265,33 @@ export interface BlueprintSummary {
   importedAt: number;
 }
 
+export interface BuildJob {
+  id: string;
+  owner: string;
+  blueprintHash: string;
+  blueprintId: string;
+  blueprintName: string;
+  server: { host: string; port: number };
+  dimension: string;
+  anchor: Position;
+  rotation: 0 | 90 | 180 | 270;
+  mirror: 'none' | 'x' | 'z';
+  status: 'planned' | 'running' | 'paused' | 'complete' | 'failed' | 'stopped';
+  phase: string;
+  operationCount: number;
+  completedCount: number;
+  skippedCount: number;
+  failedCount: number;
+  latestError: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface BuildStatus {
+  active: BuildJob | null;
+  jobs: BuildJob[];
+}
+
 export interface BuilderApi {
   readonly service: unknown;
   readonly library: unknown;
@@ -273,7 +300,12 @@ export interface BuilderApi {
   materials(reference: string): unknown;
   preview(reference: string, request: Record<string, unknown>): Promise<unknown>;
   plan(reference: string, request: Record<string, unknown>): Promise<unknown>;
-  snapshot(): { blueprints: BlueprintSummary[] };
+  start(reference: string, request: Record<string, unknown>): Promise<BuildJob>;
+  resume(id: string): Promise<BuildJob>;
+  pause(): boolean;
+  stop(): boolean;
+  status(): BuildStatus;
+  snapshot(): { blueprints: BlueprintSummary[]; build: BuildStatus };
 }
 
 export interface InteractionsApi {
@@ -294,6 +326,7 @@ export class StashService { constructor(options: Record<string, unknown>); }
 export class StorageService { constructor(options: Record<string, unknown>); }
 export class MemoryStorageStore { constructor(zones?: StorageZone[]); }
 export class MemoryBlueprintLibrary { constructor(blueprints?: unknown[]); }
+export class MemoryBuildJobStore { constructor(jobs?: unknown[]); }
 export class PlayerActionRegistry { constructor(options?: Record<string, unknown>); }
 export class RelationshipService { constructor(store: unknown); }
 export class TargetingService { constructor(options: Record<string, unknown>); }

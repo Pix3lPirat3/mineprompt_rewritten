@@ -2131,6 +2131,21 @@ button.danger {
   margin-top: 12px;
 }
 
+.blueprint-build-status {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel-raised);
+}
+
+.blueprint-build-status > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .blueprint-empty {
   display: grid;
   min-height: 420px;

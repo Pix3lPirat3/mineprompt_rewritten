@@ -6,6 +6,7 @@ const { cleanWorkflow } = require('./workflow-model');
 const { cleanStoredPresets, createPreset } = require('./mining-presets');
 const { cleanStorageZones, createStorageZone } = require('./storage-model');
 const { StorageReservationBroker } = require('./storage-reservations');
+const { MAX_BUILD_JOBS, cleanBuildJob, cleanBuildJobs } = require('./build-job');
 
 const EMPTY_DATA = Object.freeze({
   version: 1,
@@ -16,7 +17,8 @@ const EMPTY_DATA = Object.freeze({
   workflows: [],
   miningPresets: [],
   activeMiningPresetId: null,
-  storageZones: []
+  storageZones: [],
+  buildJobs: []
 });
 
 function cleanData(value) {
@@ -51,7 +53,8 @@ function cleanData(value) {
       : [],
     miningPresets: cleanStoredPresets(source.miningPresets),
     activeMiningPresetId: typeof source.activeMiningPresetId === 'string' ? source.activeMiningPresetId : null,
-    storageZones: cleanStorageZones(source.storageZones)
+    storageZones: cleanStorageZones(source.storageZones),
+    buildJobs: cleanBuildJobs(source.buildJobs)
   };
   if (!data.miningPresets.some((preset) => preset.id === data.activeMiningPresetId)) data.activeMiningPresetId = null;
   return data;
@@ -302,6 +305,30 @@ class Store {
     const previousLength = this.data.storageZones.length;
     this.data.storageZones = this.data.storageZones.filter((zone) => zone.id.toLowerCase() !== target);
     if (this.data.storageZones.length === previousLength) return false;
+    await this.changed();
+    return true;
+  }
+
+  async getBuildJobs() {
+    return structuredClone(this.data.buildJobs);
+  }
+
+  async saveBuildJob(input) {
+    const job = cleanBuildJob(input);
+    const index = this.data.buildJobs.findIndex((entry) => entry.id === job.id);
+    if (index >= 0) this.data.buildJobs[index] = job;
+    else this.data.buildJobs.push(job);
+    this.data.buildJobs.sort((left, right) => right.updatedAt - left.updatedAt);
+    this.data.buildJobs = this.data.buildJobs.slice(0, MAX_BUILD_JOBS);
+    await this.changed();
+    return structuredClone(job);
+  }
+
+  async removeBuildJob(id) {
+    const target = String(id || '').trim().toLowerCase();
+    const previousLength = this.data.buildJobs.length;
+    this.data.buildJobs = this.data.buildJobs.filter((job) => job.id !== target);
+    if (this.data.buildJobs.length === previousLength) return false;
     await this.changed();
     return true;
   }

@@ -53,6 +53,9 @@ test('compiles removal, support, gravity, and multi-block dependencies', () => {
   assert.deepEqual(byId.get('place:1,64,0').dependencies, ['remove:1,64,0']);
   assert.equal(byId.get('place:1,65,0').dependencies.includes('place:1,64,0'), true);
   assert.deepEqual(byId.get('place:3,64,0').dependencies, ['place:4,64,0']);
+  assert.deepEqual(byId.get('place:3,64,0').instruction.clickedFace, { x: -1, y: 0, z: 0 });
+  assert.equal(byId.get('place:3,64,0').instruction.cursor.x, 0);
+  assert.equal(byId.get('place:3,64,0').instruction.mode, 'attached');
   assert.equal(byId.has('place:2,64,0'), false);
   assert.equal(graph.counts.removals, 2);
   assert.equal(graph.counts.placements, 7);
@@ -123,4 +126,51 @@ test('maintains dependency order across generated support topologies', () => {
       for (const dependency of operation.dependencies) assert.equal(order.get(dependency) < order.get(operation.id), true);
     }
   }
+});
+
+test('compiles recoverable scaffold columns for floating full blocks', () => {
+  const analysis = {
+    policy: { scaffolding: ['dirt'] },
+    records: [record('placeable', 0, 68, 'minecraft:stone')]
+  };
+  const graph = compilePlacementGraph(flatBot(), analysis);
+  const byId = new Map(graph.operations.map((operation) => [operation.id, operation]));
+  assert.equal(graph.counts.scaffoldBlocks, 4);
+  assert.equal(graph.counts.operations, 9);
+  assert.deepEqual(byId.get('place:0,68,0').dependencies, ['scaffold-place:0,67,0']);
+  assert.equal(byId.get('scaffold-remove:0,67,0').dependencies.includes('place:0,68,0'), true);
+  assert.equal(byId.get('scaffold-remove:0,66,0').dependencies.includes('scaffold-remove:0,67,0'), true);
+  const order = new Map(graph.order.map((id, index) => [id, index]));
+  assert.equal(order.get('scaffold-place:0,67,0') < order.get('place:0,68,0'), true);
+  assert.equal(order.get('place:0,68,0') < order.get('scaffold-remove:0,67,0'), true);
+});
+
+test('does not use removable scaffolding as permanent attachment support', () => {
+  const graph = compilePlacementGraph(flatBot(), {
+    policy: { scaffolding: ['dirt'] },
+    records: [record('placeable', 0, 68, 'minecraft:oak_wall_sign[facing=north]')]
+  });
+  assert.equal(graph.counts.scaffoldBlocks, 0);
+  assert.equal(graph.operations[0].blocked.some((reason) => reason.code === 'missing-support'), true);
+});
+
+test('groups paired containers and gates unsupported state restoration', () => {
+  const records = [
+    record('placeable', 0, 64, 'minecraft:chest[facing=north,type=left,waterlogged=false]'),
+    record('placeable', 1, 64, 'minecraft:chest[facing=north,type=right,waterlogged=false]'),
+    record('placeable', 2, 64, 'minecraft:oak_slab[half=bottom,type=bottom,waterlogged=true]'),
+    record('placeable', 3, 64, 'minecraft:oak_sign[rotation=4,waterlogged=false]')
+  ];
+  const graph = compilePlacementGraph(flatBot(), {
+    anchor: { x: 0, y: 64, z: 0 },
+    transformed: { offset: { x: 0, y: 0, z: 0 }, blockEntities: [{ Pos: [3, 0, 0] }] },
+    policy: { scaffolding: ['dirt'] },
+    records
+  });
+  const byId = new Map(graph.operations.map((operation) => [operation.id, operation]));
+  assert.equal(byId.get('place:0,64,0').groupId, byId.get('place:1,64,0').groupId);
+  assert.equal(byId.get('place:1,64,0').dependencies.includes('place:0,64,0'), true);
+  assert.equal(byId.get('place:2,64,0').blocked.some((reason) => reason.code === 'waterlogged-unsupported'), true);
+  assert.equal(byId.get('place:3,64,0').blocked.some((reason) => reason.code === 'block-entity-unsupported'), true);
+  assert.equal(byId.get('place:3,64,0').instruction.rotation, 4);
 });

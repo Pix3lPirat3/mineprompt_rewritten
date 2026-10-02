@@ -47,6 +47,7 @@ function fixture() {
     stashAction: async (...args) => { calls.push(['stash', ...args]); return { ok: true }; },
     inventoryAction: async (...args) => { calls.push(['inventory', ...args]); return { ok: true }; },
     inventoryInspect: async (...args) => { calls.push(['inspect', ...args]); return { ok: true, item: { name: 'diamond_sword' } }; },
+    blueprintAction: async (...args) => { calls.push(['blueprint', ...args]); return { ok: true }; },
     debugEvaluate: async (...args) => { calls.push(['debug', ...args]); return { ok: true, value: 'result' }; },
     relationshipsList: () => [],
     relationshipAdd: async (input) => ({ ok: true, relationship: input }),
@@ -67,6 +68,7 @@ test('generates MCP and strict OpenAI tools from one catalog', () => {
   assert.equal(listed.some((entry) => entry.name === 'mineprompt_capabilities'), true);
   assert.equal(listed.some((entry) => entry.name === 'mineprompt_capability_action'), true);
   assert.equal(listed.some((entry) => entry.name === 'mineprompt_stash'), true);
+  assert.equal(listed.some((entry) => entry.name === 'mineprompt_build'), true);
   assert.equal(listed.find((entry) => entry.name === 'mineprompt_engines').annotations.readOnlyHint, true);
   assert.equal(listed.find((entry) => entry.name === 'mineprompt_engine_manage').approval, 'required');
   assert.equal(listed.find((entry) => entry.name === 'mineprompt_ui_state').annotations.readOnlyHint, true);

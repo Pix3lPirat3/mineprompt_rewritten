@@ -34,6 +34,13 @@ function parseFlags(values) {
     else if (value === '--air') options.policy.air = next;
     else if (value === '--max-replacements') options.policy.maximumReplacements = Number(next);
     else if (value === '--max-range') options.policy.maximumRange = Number(next);
+    else if (value === '--materials') options.policy.materials = next;
+    else if (value === '--storage-zone') options.policy.storageZone = next;
+    else if (value === '--scaffold') options.policy.scaffolding = next.split(',').map((entry) => entry.trim()).filter(Boolean);
+    else if (value === '--placement-delay') options.policy.placementDelay = Number(next);
+    else if (value === '--retry-limit') options.policy.retryLimit = Number(next);
+    else if (value === '--verify-batch') options.policy.verifyBatchSize = Number(next);
+    else if (value === '--on-failure') options.policy.onFailure = next;
     else throw new Error(`Unknown build option ${value}.`);
     index += 1;
   }
@@ -51,8 +58,8 @@ function blueprintReferences(blueprints) {
 module.exports = {
   command: 'build',
   aliases: ['blueprint'],
-  usage: 'build <import <file> --version <version>|list|inspect <blueprint>|materials <blueprint>|remove <blueprint> --confirm|preview <blueprint> --at x y z [--rotate 90] [--mirror x]|conflicts|requirements|plan>',
-  description: 'Import, inspect, compare, and compile dependency-aware plans for version-declared schematics.',
+  usage: 'build <import|list|inspect|materials|remove|preview|conflicts|requirements|plan|start|resume|pause|stop|status|jobs>',
+  description: 'Manage version-declared schematics and verified durable build jobs.',
   capability: 'world',
   risk: 'dangerous',
   approval: 'recommended',
@@ -60,15 +67,18 @@ module.exports = {
   agent: false,
 
   autocomplete(command, args, { blueprints }, completion = {}) {
-    if (!args.length || args.length === 1 && !completion.trailingSpace) return ['import', 'list', 'inspect', 'materials', 'remove', 'preview', 'conflicts', 'requirements', 'plan'];
-    if (['inspect', 'materials', 'remove', 'preview', 'conflicts', 'requirements', 'plan'].includes(args[0]?.toLowerCase()) && (args.length === 1 || args.length === 2 && !completion.trailingSpace)) return blueprintReferences(blueprints);
+    if (!args.length || args.length === 1 && !completion.trailingSpace) return ['import', 'list', 'inspect', 'materials', 'remove', 'preview', 'conflicts', 'requirements', 'plan', 'start', 'resume', 'pause', 'stop', 'status', 'jobs'];
+    if (['inspect', 'materials', 'remove', 'preview', 'conflicts', 'requirements', 'plan', 'start'].includes(args[0]?.toLowerCase()) && (args.length === 1 || args.length === 2 && !completion.trailingSpace)) return blueprintReferences(blueprints);
+    if (args[0]?.toLowerCase() === 'resume' && (args.length === 1 || args.length === 2 && !completion.trailingSpace)) return blueprints.buildStatus().jobs.map((job) => job.id);
     const previous = args.at(-2);
     if (previous === '--rotate') return ['0', '90', '180', '270'];
     if (previous === '--mirror') return ['none', 'x', 'z'];
     if (previous === '--terrain') return ['preserve', 'replace', 'flatten'];
     if (previous === '--conflicts') return ['stop', 'skip', 'replace'];
     if (previous === '--air') return ['ignore', 'clear'];
-    return ['--at', '--rotate', '--mirror', '--terrain', '--conflicts', '--air', '--max-replacements', '--max-range'];
+    if (previous === '--materials') return ['inventory', 'storage', 'both'];
+    if (previous === '--on-failure') return ['stop', 'skip'];
+    return ['--at', '--rotate', '--mirror', '--terrain', '--conflicts', '--air', '--max-replacements', '--max-range', '--materials', '--storage-zone', '--scaffold', '--placement-delay', '--retry-limit', '--verify-batch', '--on-failure', '--confirm'];
   },
 
   async execute(sender, command, args, { bot, blueprints }) {
@@ -114,6 +124,28 @@ module.exports = {
         if (action === 'conflicts') return sender.reply(`[Build] ${preview.blueprint.name}: ${preview.counts.conflicting} conflicts, ${preview.counts.replaceable} replacements, ${preview.counts.unknown} unknown blocks. Removals: ${preview.removals.map((entry) => `${entry.count} x ${entry.name}`).join(', ') || 'none'}.${warning}`);
         if (action === 'requirements') return sender.reply(`[Build] ${preview.blueprint.name}: ${preview.requirements.map((entry) => `${entry.count} x ${entry.name}${entry.missing ? ` (${entry.missing} missing)` : ''}`).join(', ') || 'no materials required'}.${warning}`);
         return sender.reply(`[Build] ${preview.blueprint.name}: ${preview.counts.correct} correct, ${preview.counts.placeable} placeable, ${preview.counts.replaceable} replaceable, ${preview.counts.conflicting} conflicts, ${preview.counts.temporarilyObstructed} obstructed, ${preview.counts.unknown} unknown, ${preview.counts.unsupported} unsupported.${warning}`);
+      }
+      if (action === 'start') {
+        if (!bot?.entity) throw new Error('An active connection is required for building.');
+        if (parsed.positional.length !== 1 || !parsed.options.anchor) throw new Error(`Usage: ${this.usage}`);
+        const job = await blueprints.start(parsed.positional[0], parsed.options);
+        return sender.reply(`[Build] Started ${job.blueprintName}; ${job.operationCount} operations; job ${job.id}.`);
+      }
+      if (action === 'resume') {
+        if (parsed.positional.length !== 1) throw new Error(`Usage: ${this.usage}`);
+        const job = await blueprints.resume(parsed.positional[0]);
+        return sender.reply(`[Build] Resumed ${job.blueprintName}; job ${job.id}.`);
+      }
+      if (action === 'pause' || action === 'stop') {
+        if (parsed.positional.length) throw new Error(`Usage: ${this.usage}`);
+        const changed = action === 'pause' ? blueprints.pause() : blueprints.stop();
+        return sender.reply(changed ? `[Build] ${action === 'pause' ? 'Pause requested.' : 'Stop requested.'}` : '[Build] No build is active.');
+      }
+      if (action === 'status' || action === 'jobs') {
+        if (parsed.positional.length) throw new Error(`Usage: ${this.usage}`);
+        const status = blueprints.buildStatus();
+        if (action === 'status') return sender.reply(status.active ? `[Build] ${status.active.blueprintName}: ${status.active.completedCount + status.active.skippedCount}/${status.active.operationCount}, ${status.active.phase}.` : '[Build] No build is active.');
+        return sender.reply(status.jobs.length ? `[Build] ${status.jobs.map((job) => `${job.id} ${job.blueprintName} ${job.status} ${job.completedCount + job.skippedCount}/${job.operationCount}`).join('; ')}` : '[Build] No durable build jobs.');
       }
       throw new Error(`Usage: ${this.usage}`);
     } catch (error) {

@@ -114,7 +114,15 @@ class BotSession {
       logger,
       onChange: () => this.publishSnapshot()
     });
-    this.blueprints = new BlueprintService({ library: this.blueprintLibrary, getClient: () => this.client });
+    this.blueprints = new BlueprintService({
+      library: this.blueprintLibrary,
+      getClient: () => this.client,
+      store: this.store,
+      activities: this.activities,
+      logger: this.logger,
+      owner: this.id,
+      onChange: () => this.publishSnapshot()
+    });
     this.targets = new TargetingService({
       getClient: () => this.client,
       activities: this.activities,
@@ -378,6 +386,11 @@ class BotSession {
       if (action === 'requirements') return { ok: true, blueprint: preview.blueprint, warnings: preview.warnings, requirements: preview.requirements, missing: preview.missing };
       return { ok: true, preview };
     }
+    if (action === 'start') return { ok: true, job: await this.blueprints.start(request.blueprint, request) };
+    if (action === 'resume') return { ok: true, job: await this.blueprints.resume(request.job) };
+    if (action === 'pause') return { ok: this.blueprints.pause(), build: this.blueprints.buildStatus() };
+    if (action === 'stop') return { ok: this.blueprints.stop(), build: this.blueprints.buildStatus() };
+    if (action === 'status' || action === 'jobs') return { ok: true, build: this.blueprints.buildStatus() };
     throw new Error('Unknown blueprint action.');
   }
 

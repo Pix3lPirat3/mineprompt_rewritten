@@ -39,6 +39,21 @@ const TreePolicy = Type.Object({
   onFailure: Type.Optional(Type.Union(['stop', 'skip'].map((value) => Type.Literal(value)))),
   requireNatural: Type.Optional(Type.Boolean())
 }, { additionalProperties: false });
+const BuildPolicy = Type.Object({
+  terrain: Type.Optional(Type.Union(['preserve', 'replace', 'flatten'].map((value) => Type.Literal(value)))),
+  conflicts: Type.Optional(Type.Union(['stop', 'skip', 'replace'].map((value) => Type.Literal(value)))),
+  air: Type.Optional(Type.Union([Type.Literal('ignore'), Type.Literal('clear')])),
+  scaffolding: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 128 }), { maxItems: 512 })),
+  materials: Type.Optional(Type.Union(['inventory', 'storage', 'both'].map((value) => Type.Literal(value)))),
+  storageZone: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+  maximumReplacements: Type.Optional(Type.Integer({ minimum: 0, maximum: 1048576 })),
+  maximumRange: Type.Optional(Type.Integer({ minimum: 1, maximum: 4096 })),
+  protectedBlocks: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 128 }), { maxItems: 512 })),
+  placementDelay: Type.Optional(Type.Integer({ minimum: 0, maximum: 60000 })),
+  retryLimit: Type.Optional(Type.Integer({ minimum: 0, maximum: 32 })),
+  verifyBatchSize: Type.Optional(Type.Integer({ minimum: 1, maximum: 4096 })),
+  onFailure: Type.Optional(Type.Union(['stop', 'skip'].map((value) => Type.Literal(value))))
+}, { additionalProperties: false });
 
 function tool(name, description, inputSchema, execute, options = {}) {
   return Object.freeze({
@@ -259,15 +274,22 @@ class ToolCatalog {
       anchor: Type.Optional(Position),
       rotation: Type.Optional(Type.Union([0, 90, 180, 270].map((value) => Type.Literal(value)))),
       mirror: Type.Optional(Type.Union(['none', 'x', 'z'].map((value) => Type.Literal(value)))),
-      policy: Type.Optional(Type.Object({
-        terrain: Type.Optional(Type.Union(['preserve', 'replace', 'flatten'].map((value) => Type.Literal(value)))),
-        conflicts: Type.Optional(Type.Union(['stop', 'skip', 'replace'].map((value) => Type.Literal(value)))),
-        air: Type.Optional(Type.Union([Type.Literal('ignore'), Type.Literal('clear')])),
-        maximumReplacements: Type.Optional(Type.Integer({ minimum: 0, maximum: 1048576 })),
-        maximumRange: Type.Optional(Type.Integer({ minimum: 1, maximum: 4096 }))
-      }, { additionalProperties: false }))
+      policy: Type.Optional(BuildPolicy)
     }, { additionalProperties: false }), async (runtime, input) => runtime.blueprintAction(input), {
       readOnly: true, capability: 'world', openWorld: true
+    }));
+    this.register(tool('mineprompt_build', 'Start, resume, pause, stop, or inspect a durable verified blueprint build. Start requires a blueprint and anchor. Destructive removals require confirmed true.', Type.Object({
+      sessionId: SessionId,
+      action: Type.Union(['start', 'resume', 'pause', 'stop', 'status', 'jobs'].map((value) => Type.Literal(value))),
+      blueprint: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+      job: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+      anchor: Type.Optional(Position),
+      rotation: Type.Optional(Type.Union([0, 90, 180, 270].map((value) => Type.Literal(value)))),
+      mirror: Type.Optional(Type.Union(['none', 'x', 'z'].map((value) => Type.Literal(value)))),
+      policy: Type.Optional(BuildPolicy),
+      confirmed: Type.Optional(Type.Boolean())
+    }, { additionalProperties: false }), async (runtime, input) => runtime.blueprintAction(input), {
+      destructive: true, capability: 'world', approval: 'recommended', openWorld: true
     }));
     this.register(tool('mineprompt_inventory_action', 'Run the same validated inventory or open-container action exposed by the GUI and terminal. Use equips the selected item and calls bot.activateItem. Swing optionally equips an item and calls bot.swingArm with the requested arm. Transfer moves one, half, or a full stack between the player inventory and open container.', Type.Object({
       sessionId: Type.String({ minLength: 1, maxLength: 128 }),

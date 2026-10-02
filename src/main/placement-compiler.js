@@ -8,6 +8,8 @@ const MAX_PLACEMENT_OPERATIONS = 1048576;
 const MAX_STANCE_OPERATIONS = 4096;
 const MAX_STANCES = 4096;
 const PLAN_SAMPLE_LIMIT = 128;
+const MAX_SCAFFOLD_HEIGHT = 64;
+const MAX_SCAFFOLD_BLOCKS = 8192;
 const PASSABLE_BLOCKS = new Set(['air', 'cave_air', 'void_air', 'grass', 'short_grass', 'tall_grass', 'fern', 'large_fern', 'dead_bush', 'snow', 'vine']);
 const HAZARD_BLOCKS = new Set(['lava', 'fire', 'soul_fire', 'cactus', 'magma_block', 'campfire', 'soul_campfire', 'sweet_berry_bush', 'powder_snow']);
 const GRAVITY_BLOCKS = /(?:sand|gravel|concrete_powder|anvil|dragon_egg|scaffolding)$/u;
@@ -71,11 +73,21 @@ function groupId(record) {
     const foot = parsed.properties.part === 'head' ? offsetPosition(record.position, opposite(DIRECTIONS[parsed.properties.facing])) : record.position;
     return `horizontal:${positionKey(foot)}`;
   }
+  if (['chest', 'trapped_chest'].includes(parsed.name) && ['left', 'right'].includes(parsed.properties.type) && DIRECTIONS[parsed.properties.facing]) {
+    const facing = DIRECTIONS[parsed.properties.facing];
+    const right = { x: -facing.z, y: 0, z: facing.x };
+    const partner = offsetPosition(record.position, parsed.properties.type === 'left' ? right : opposite(right));
+    const base = [record.position, partner].sort((left, rightPosition) => left.x - rightPosition.x || left.y - rightPosition.y || left.z - rightPosition.z)[0];
+    return `container:${positionKey(base)}`;
+  }
   return null;
 }
 
 function operationPriority(operation) {
-  return operation.kind === 'remove' ? 0 : 1;
+  if (operation.kind === 'remove') return 0;
+  if (operation.kind === 'scaffold-place') return 1;
+  if (operation.kind === 'place') return 2;
+  return 3;
 }
 
 function compareOperations(left, right) {
@@ -102,14 +114,26 @@ function placementInstruction(operation, support, rule) {
   const parsed = parseBlockState(operation.expected);
   const face = support ? subtractPosition(operation.position, support) : null;
   const facing = DIRECTIONS[parsed.properties.facing] || null;
+  const cursor = { x: 0.5, y: 0.5, z: 0.5 };
+  if (face) {
+    if (face.x) cursor.x = face.x > 0 ? 1 : 0;
+    if (face.y) cursor.y = face.y > 0 ? 1 : 0;
+    if (face.z) cursor.z = face.z > 0 ? 1 : 0;
+  }
+  if (parsed.properties.half === 'top') cursor.y = 0.75;
+  if (parsed.properties.half === 'bottom') cursor.y = 0.25;
+  const mode = operation.groupId ? 'multiblock' : rule.kind === 'wall' || rule.kind === 'ceiling' || rule.kind === 'floor' ? 'attached' : rule.kind === 'gravity' ? 'gravity' : rule.kind === 'scaffold' ? 'scaffold' : facing ? 'directional' : 'simple';
   return {
     supportPosition: support ? { ...support } : null,
     clickedFace: face,
-    cursor: { x: 0.5, y: 0.5, z: 0.5 },
+    cursor,
     facing: facing ? { ...facing } : null,
+    rotation: parsed.properties.rotation === undefined ? null : Number(parsed.properties.rotation),
     sneak: false,
     supportKind: rule.kind,
-    special: rule.kind !== 'reference' || Boolean(operation.groupId)
+    mode,
+    stateProperties: { ...parsed.properties },
+    special: mode !== 'simple'
   };
 }
 
@@ -152,6 +176,11 @@ function compilePlacementGraph(bot, analysis) {
   const operations = [];
   const placements = new Map();
   const analysisByPosition = new Map(analysis.records.map((record) => [positionKey(record.position), record]));
+  const blockEntityPositions = new Set((analysis.transformed?.blockEntities || []).flatMap((entity) => {
+    const local = Array.isArray(entity?.Pos) ? entity.Pos : Array.isArray(entity?.pos) ? entity.pos : null;
+    if (!local) return [];
+    return [positionKey({ x: analysis.anchor.x + analysis.transformed.offset.x + Number(local[0]), y: analysis.anchor.y + analysis.transformed.offset.y + Number(local[1]), z: analysis.anchor.z + analysis.transformed.offset.z + Number(local[2]) })];
+  }));
   for (const record of actionable) {
     let removal = null;
     if (record.kind === 'replaceable') {
@@ -180,8 +209,12 @@ function compilePlacementGraph(bot, analysis) {
       groupId: groupId(record),
       blocked: [],
       instruction: null,
-      requiresScaffold: false
+      requiresScaffold: false,
+      requiresBlockEntityData: blockEntityPositions.has(positionKey(record.position))
     };
+    const properties = parseBlockState(record.entry.state).properties;
+    if (properties.waterlogged === 'true') operation.blocked.push({ code: 'waterlogged-unsupported', message: 'Waterlogged placement requires an explicit fluid strategy.' });
+    if (operation.requiresBlockEntityData) operation.blocked.push({ code: 'block-entity-unsupported', message: 'Block entity data application is not implemented.' });
     operations.push(operation);
     placements.set(positionKey(operation.position), operation);
   }
@@ -209,6 +242,113 @@ function compilePlacementGraph(bot, analysis) {
     operation.dependencies = [...new Set(operation.dependencies)].sort();
     operation.instruction = placementInstruction(operation, support, rule);
   }
+  const groups = new Map();
+  for (const operation of placements.values()) {
+    if (!operation.groupId) continue;
+    const group = groups.get(operation.groupId) || [];
+    group.push(operation);
+    groups.set(operation.groupId, group);
+  }
+  for (const group of groups.values()) {
+    const ordered = group.sort(compareOperations);
+    for (let index = 1; index < ordered.length; index += 1) {
+      ordered[index].dependencies = [...new Set([...ordered[index].dependencies, ordered[index - 1].id])].sort();
+    }
+  }
+  const scaffoldMaterial = String(analysis.policy?.scaffolding?.[0] || '').trim().toLowerCase();
+  const scaffoldUsers = new Map();
+  const scaffoldPlacements = new Map();
+  const finalSolid = new Set(analysis.records.filter((record) => !isAirState(record.entry.state)).map((record) => positionKey(record.position)));
+  const scaffoldMaterialAvailable = scaffoldMaterial && (!bot.registry || Boolean(bot.registry.blocksByName?.[scaffoldMaterial] && bot.registry.itemsByName?.[scaffoldMaterial]));
+  const ensureScaffoldColumn = (target) => {
+    const column = [];
+    let position = { ...target };
+    for (let depth = 0; depth < MAX_SCAFFOLD_HEIGHT; depth += 1) {
+      if (isExistingSupport(bot, analysisByPosition, position) || scaffoldPlacements.has(positionKey(position))) break;
+      const key = positionKey(position);
+      const record = analysisByPosition.get(key);
+      if (finalSolid.has(key) || record && !['placeable', 'replaceable', 'ignoredAir'].includes(record.kind)) return null;
+      const live = worldBlock(bot, position);
+      if (!record && (!live?.name || !PASSABLE_BLOCKS.has(live.name))) return null;
+      column.push({ ...position });
+      position = offsetPosition(position, DIRECTIONS.down);
+    }
+    if (!isExistingSupport(bot, analysisByPosition, position) && !scaffoldPlacements.has(positionKey(position))) return null;
+    let dependency = scaffoldPlacements.get(positionKey(position))?.id || null;
+    for (const cell of column.reverse()) {
+      const key = positionKey(cell);
+      let scaffold = scaffoldPlacements.get(key);
+      if (!scaffold) {
+        const record = analysisByPosition.get(key);
+        const removalDependency = record?.kind === 'replaceable' ? `remove:${key}` : null;
+        scaffold = {
+          id: `scaffold-place:${key}`,
+          kind: 'scaffold-place',
+          position: { ...cell },
+          current: record?.current || 'minecraft:air',
+          expected: `minecraft:${scaffoldMaterial}`,
+          item: scaffoldMaterial,
+          dependencies: [...(dependency ? [dependency] : []), ...(removalDependency ? [removalDependency] : [])].sort(),
+          groupId: `scaffold:${positionKey(target)}`,
+          blocked: [],
+          requiresScaffold: false,
+          instruction: placementInstruction({ position: cell, expected: `minecraft:${scaffoldMaterial}`, groupId: null }, dependency ? offsetPosition(cell, DIRECTIONS.down) : position, { kind: 'scaffold' })
+        };
+        scaffoldPlacements.set(key, scaffold);
+        operations.push(scaffold);
+      }
+      dependency = scaffold.id;
+    }
+    return dependency;
+  };
+  for (const operation of placements.values()) {
+    if (!operation.requiresScaffold || operation.blocked.length) continue;
+    if (!scaffoldMaterialAvailable) {
+      operation.blocked.push({ code: 'scaffold-unavailable', message: 'No supported scaffold material is configured.' });
+      continue;
+    }
+    const supportPosition = offsetPosition(operation.position, DIRECTIONS.down);
+    const scaffoldId = ensureScaffoldColumn(supportPosition);
+    if (!scaffoldId) {
+      operation.blocked.push({ code: 'scaffold-path-missing', message: `No scaffold column can reach within ${MAX_SCAFFOLD_HEIGHT} blocks.` });
+      continue;
+    }
+    operation.dependencies.push(scaffoldId);
+    operation.dependencies.sort();
+    operation.instruction = placementInstruction(operation, supportPosition, { kind: 'scaffold' });
+    const users = scaffoldUsers.get(scaffoldId) || new Set();
+    users.add(operation.id);
+    scaffoldUsers.set(scaffoldId, users);
+  }
+  if (scaffoldPlacements.size > MAX_SCAFFOLD_BLOCKS) throw new Error(`Placement plans cannot use more than ${MAX_SCAFFOLD_BLOCKS} scaffold blocks.`);
+  const scaffoldRemovals = new Map();
+  for (const scaffold of [...scaffoldPlacements.values()].sort((left, right) => right.position.y - left.position.y || left.id.localeCompare(right.id))) {
+    const key = positionKey(scaffold.position);
+    const above = scaffoldRemovals.get(positionKey(offsetPosition(scaffold.position, DIRECTIONS.up)));
+    const directUsers = scaffoldUsers.get(scaffold.id) || new Set();
+    const removal = {
+      id: `scaffold-remove:${key}`,
+      kind: 'scaffold-remove',
+      position: { ...scaffold.position },
+      current: scaffold.expected,
+      expected: 'minecraft:air',
+      item: null,
+      dependencies: [...directUsers, ...(above ? [above.id] : [])].sort(),
+      groupId: scaffold.groupId,
+      blocked: [],
+      requiresScaffold: false,
+      instruction: null
+    };
+    scaffoldRemovals.set(key, removal);
+    operations.push(removal);
+    const belowPlacement = scaffoldPlacements.get(positionKey(offsetPosition(scaffold.position, DIRECTIONS.down)));
+    if (belowPlacement) {
+      const belowUsers = scaffoldUsers.get(belowPlacement.id) || new Set();
+      for (const user of directUsers) belowUsers.add(user);
+      scaffoldUsers.set(belowPlacement.id, belowUsers);
+    }
+  }
+  if (operations.length > MAX_PLACEMENT_OPERATIONS) throw new Error(`Placement plans cannot exceed ${MAX_PLACEMENT_OPERATIONS} operations.`);
   const topology = topologicalOrder(operations);
   const operationById = new Map(operations.map((operation) => [operation.id, operation]));
   for (const id of topology.cyclic) {
@@ -225,7 +365,8 @@ function compilePlacementGraph(bot, analysis) {
       placements: placements.size,
       blocked: operations.filter((operation) => operation.blocked.length).length,
       scaffolded: operations.filter((operation) => operation.requiresScaffold).length,
-      groups: new Set(operations.map((operation) => operation.groupId).filter(Boolean)).size
+      scaffoldBlocks: scaffoldPlacements.size,
+      groups: groups.size
     }
   };
 }
@@ -277,6 +418,9 @@ function candidateStances(bot, operation, options = {}) {
     for (let x = operation.position.x - 4; x <= operation.position.x + 4; x += 1) {
       for (let z = operation.position.z - 4; z <= operation.position.z + 4; z += 1) {
         const position = { x, y, z };
+        const stanceKey = positionKey(position);
+        const headKey = positionKey(offsetPosition(position, DIRECTIONS.up));
+        if (stanceKey === positionKey(operation.position) || headKey === positionKey(operation.position)) continue;
         const eye = { x: x + 0.5, y: y + 1.62, z: z + 0.5 };
         const target = { x: operation.position.x + 0.5, y: operation.position.y + 0.5, z: operation.position.z + 0.5 };
         const distance = positionDistance(eye, target);
@@ -390,6 +534,7 @@ function publicPlacementPlan(analysis, graph, stancePlan) {
         dependencies: [...operation.dependencies],
         groupId: operation.groupId,
         requiresScaffold: operation.requiresScaffold === true,
+        requiresBlockEntityData: operation.requiresBlockEntityData === true,
         instruction: operation.instruction ? structuredClone(operation.instruction) : null
       })),
       blockedSamples: blocked.slice(0, PLAN_SAMPLE_LIMIT).map((operation) => ({ id: operation.id, position: { ...operation.position }, reasons: operation.blocked.map((entry) => ({ ...entry })) }))

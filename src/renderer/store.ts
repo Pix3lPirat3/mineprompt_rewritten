@@ -58,7 +58,7 @@ export function createInitialSnapshot(): ApplicationSnapshot {
       server: null,
       targets: { cursorBlock: null, cursorEntity: null, entities: [] },
       storage: { active: null, operation: null, zones: [] },
-      blueprints: { blueprints: [] }
+      blueprints: { blueprints: [], build: { active: null, jobs: [] } }
     },
     commands: [],
     engines: { profiles: [], catalog: [] }

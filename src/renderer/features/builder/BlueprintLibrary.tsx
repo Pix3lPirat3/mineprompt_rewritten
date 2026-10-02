@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '../../components/Modal';
 import { useAppSelector } from '../../store';
-import type { BlueprintMaterial, BlueprintSummary, TargetPosition } from '../../types';
+import type { BlueprintMaterial, BlueprintSummary, BuildJobSummary, TargetPosition } from '../../types';
 
 interface BlueprintLibraryProps {
   close(): void;
@@ -41,6 +41,7 @@ function dimensions(blueprint: BlueprintSummary) {
 export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
   const runtime = useAppSelector((state) => state.runtime);
   const blueprints = runtime.session.blueprints?.blueprints || [];
+  const build = runtime.session.blueprints?.build || { active: null, jobs: [] };
   const [selectedId, setSelectedId] = useState(blueprints[0]?.id || '');
   const selected = useMemo(() => blueprints.find((entry) => entry.id === selectedId) || blueprints[0] || null, [blueprints, selectedId]);
   const [details, setDetails] = useState<BlueprintDetails | null>(null);
@@ -55,13 +56,20 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [pendingRemove, setPendingRemove] = useState('');
+  const [pendingBuild, setPendingBuild] = useState(false);
 
   useEffect(() => {
     setDetails(null);
     setPreview(null);
     setPlan(null);
     setPendingRemove('');
+    setPendingBuild(false);
   }, [selected?.id]);
+
+  useEffect(() => {
+    setPlan(null);
+    setPendingBuild(false);
+  }, [anchor.x, anchor.y, anchor.z, rotation, mirror]);
 
   const loadDetails = async () => {
     if (!selected) return;
@@ -163,6 +171,54 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
     }
   };
 
+  const startBlueprint = async () => {
+    if (!selected) return;
+    setBusy(true);
+    setError('');
+    try {
+      const result = await window.mineprompt.blueprintAction({
+        sessionId: runtime.selectedSessionId,
+        action: 'plan',
+        blueprint: selected.id,
+        anchor,
+        rotation,
+        mirror
+      });
+      const nextPlan = result.plan as BlueprintPlan;
+      setPlan(nextPlan);
+      if (nextPlan.graph.counts.removals > 0 && !pendingBuild) {
+        setPendingBuild(true);
+        return;
+      }
+      await window.mineprompt.blueprintAction({
+        sessionId: runtime.selectedSessionId,
+        action: 'start',
+        blueprint: selected.id,
+        anchor,
+        rotation,
+        mirror,
+        confirmed: pendingBuild
+      });
+      setPendingBuild(false);
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const controlBuild = async (action: 'pause' | 'stop' | 'resume', job?: BuildJobSummary) => {
+    setBusy(true);
+    setError('');
+    try {
+      await window.mineprompt.blueprintAction({ sessionId: runtime.selectedSessionId, action, job: job?.id });
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Modal eyebrow="Build" title="Blueprint library" close={close}>
       <div className="blueprint-library">
@@ -216,6 +272,7 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
                 <label><span>Mirror</span><select value={mirror} onChange={(event) => setMirror(event.target.value)}><option value="none">None</option><option value="x">X</option><option value="z">Z</option></select></label>
                 <button className="primary" type="button" disabled={busy || runtime.state.status !== 'online'} onClick={() => void previewBlueprint()}>Compare with world</button>
                 <button type="button" disabled={busy || runtime.state.status !== 'online'} onClick={() => void planBlueprint()}>Compile plan</button>
+                <button className={pendingBuild ? 'danger' : 'primary'} type="button" disabled={busy || runtime.state.status !== 'online' || Boolean(build.active)} onClick={() => void startBlueprint()}>{pendingBuild ? 'Confirm build and removals' : 'Start build'}</button>
               </section>
               {preview ? (
                 <section className="blueprint-preview">
@@ -234,6 +291,22 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
                     <span><strong>{plan.stances.estimatedTravel.toFixed(1)}</strong>travel</span>
                   </div>
                   {plan.graph.cyclicCount || plan.stances.uncoveredCount ? <p className="form-error">{plan.graph.cyclicCount} cyclic operations, {plan.stances.uncoveredCount} without a safe stance</p> : null}
+                </section>
+              ) : null}
+              {build.active ? (
+                <section className="blueprint-build-status">
+                  <div><strong>{build.active.blueprintName}</strong><span>{build.active.completedCount + build.active.skippedCount} / {build.active.operationCount}, {build.active.phase}</span></div>
+                  <div className="blueprint-actions">
+                    <button type="button" disabled={busy} onClick={() => void controlBuild('pause')}>Pause</button>
+                    <button className="danger" type="button" disabled={busy} onClick={() => void controlBuild('stop')}>Stop</button>
+                  </div>
+                </section>
+              ) : null}
+              {!build.active && build.jobs.some((job) => ['running', 'paused', 'failed', 'stopped'].includes(job.status)) ? (
+                <section className="blueprint-build-status">
+                  {build.jobs.filter((job) => ['running', 'paused', 'failed', 'stopped'].includes(job.status)).slice(0, 5).map((job) => (
+                    <div key={job.id}><span>{job.blueprintName}, {job.status}, {job.completedCount + job.skippedCount} / {job.operationCount}</span><button type="button" disabled={busy || runtime.state.status !== 'online'} onClick={() => void controlBuild('resume', job)}>Resume</button></div>
+                  ))}
                 </section>
               ) : null}
             </>
