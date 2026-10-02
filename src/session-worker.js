@@ -3,6 +3,7 @@
 const crypto = require('node:crypto');
 const { RuntimeLogger } = require('./main/logger');
 const { BotSession } = require('./main/bot-session');
+const { ProcessStore } = require('./main/process-store');
 const { SESSION_METHOD_NAMES } = require('./main/transport-methods');
 
 const port = process.parentPort || {
@@ -18,25 +19,17 @@ function send(message) {
   port.postMessage(message);
 }
 
-class ProcessStore {
-  snapshot() {
-    return structuredClone(storeSnapshot);
-  }
-
-  request(method, ...args) {
-    const id = crypto.randomUUID();
-    return new Promise((resolve, reject) => {
-      pendingStore.set(id, { resolve, reject });
+function storeRequest(method, ...args) {
+  const id = crypto.randomUUID();
+  return new Promise((resolve, reject) => {
+    pendingStore.set(id, { resolve, reject });
+    try {
       send({ type: 'store-request', id, method, args });
-    });
-  }
-}
-
-for (const method of [
-  'addConnection', 'getConnection', 'addAccount', 'saveAccount', 'removeAccount', 'renameAccount', 'getAccount', 'getAccounts',
-  'saveServer', 'removeServer', 'getServers', 'getSetting', 'setSetting', 'setSettings', 'saveWorkflow', 'removeWorkflow'
-]) {
-  ProcessStore.prototype[method] = function proxyStoreMethod(...args) { return this.request(method, ...args); };
+    } catch (error) {
+      pendingStore.delete(id);
+      reject(error);
+    }
+  });
 }
 
 async function initialize(message) {
@@ -48,7 +41,7 @@ async function initialize(message) {
     id: message.id,
     rootPath: message.rootPath,
     privateCommandsPath: message.privateCommandsPath,
-    store: new ProcessStore(),
+    store: new ProcessStore({ read: () => storeSnapshot, request: storeRequest }),
     logger,
     emit: (channel, payload) => send({ type: 'event', channel, payload })
   });

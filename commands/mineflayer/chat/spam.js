@@ -1,5 +1,7 @@
 'use strict';
 
+const { startManagedLoop } = require('../../../src/main/managed-loop');
+
 let nextId = 1;
 
 module.exports = {
@@ -26,15 +28,19 @@ module.exports = {
       if (!message || message.length > 256) return sender.reply('[Spam] Message must contain 1 to 256 characters.');
       const id = nextId++;
       const activityId = `spam:${id}`;
-      const handle = setInterval(() => {
-        if (!bot.entity) return activities.stop(activityId);
-        bot.chat(message);
-      }, delay);
-      activities.register(activityId, {
+      startManagedLoop({
+        activities,
+        id: activityId,
         label: `Chat repeater ${id}`,
         detail: `Every ${delay} ms - ${message}`,
         resources: [`chat:${id}`],
-        stop: () => clearInterval(handle)
+        delay,
+        initialDelay: delay,
+        run: () => {
+          if (!bot.entity) return false;
+          bot.chat(message);
+          return true;
+        }
       });
       return sender.reply(`[Spam] Started repeater ${id}.`);
     }

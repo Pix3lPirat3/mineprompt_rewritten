@@ -1,5 +1,7 @@
 'use strict';
 
+const { startManagedLoop } = require('../../../src/main/managed-loop');
+
 const settings = new WeakMap();
 
 function configuration(bot) {
@@ -10,15 +12,15 @@ function configuration(bot) {
 function start(bot, activities, actions, logger, overrideFriendProtection, origin) {
   const state = configuration(bot);
   state.overrideFriendProtection = overrideFriendProtection;
-  let running = true;
-  let timer = null;
-  const stop = () => {
-    running = false;
-    if (timer) clearTimeout(timer);
-  };
-  const tick = async () => {
-    if (!running || !bot.entity) return activities.stop('autoclicker');
-    try {
+  startManagedLoop({
+    activities,
+    id: 'autoclicker',
+    label: 'Autoclicker',
+    detail: `Every ${state.interval} ms${overrideFriendProtection ? ', friend override' : ''}`,
+    resources: ['combat'],
+    delay: () => state.interval,
+    run: async () => {
+      if (!bot.entity) return false;
       const entity = bot.entityAtCursor();
       if (entity && !['experience_orb', 'item'].includes(entity.name)) {
         if (entity.type === 'player' && entity.username) {
@@ -29,18 +31,10 @@ function start(bot, activities, actions, logger, overrideFriendProtection, origi
       } else {
         bot.swingArm();
       }
-    } catch (error) {
-      logger.debug(`[Autoclicker] ${error.message}`);
-    }
-    if (running) timer = setTimeout(tick, state.interval);
-  };
-  activities.register('autoclicker', {
-    label: 'Autoclicker',
-    detail: `Every ${state.interval} ms${overrideFriendProtection ? ', friend override' : ''}`,
-    resources: ['combat'],
-    stop
+      return true;
+    },
+    onError: (error) => logger.debug(`[Autoclicker] ${error.message}`)
   });
-  timer = setTimeout(tick, 0);
 }
 
 module.exports = {

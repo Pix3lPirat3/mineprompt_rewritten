@@ -21,6 +21,8 @@ for (const excluded of ['/test/', '/scripts/', '/.github/', '/CHANGELOG.md', '/T
 for (const relative of [
   'src/session-worker.js',
   'src/main/process-session.js',
+  'src/main/process-store.js',
+  'src/main/managed-loop.js',
   'packages/mineflayer-ui/package.json',
   'packages/mineflayer-ui/index.cjs',
   'packages/mineflayer-toolkit/package.json',

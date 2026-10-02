@@ -2,26 +2,10 @@
 
 const crypto = require('node:crypto');
 const { emptyPresentation } = require('../../packages/mineflayer-ui');
+const { STORE_METHOD_NAMES } = require('./process-store');
 const { SESSION_METHOD_NAMES, installRequestMethods } = require('./transport-methods');
 
-const STORE_METHODS = new Set([
-  'addConnection',
-  'getConnection',
-  'addAccount',
-  'saveAccount',
-  'removeAccount',
-  'renameAccount',
-  'getAccount',
-  'getAccounts',
-  'saveServer',
-  'removeServer',
-  'getServers',
-  'getSetting',
-  'setSetting',
-  'setSettings',
-  'saveWorkflow',
-  'removeWorkflow'
-]);
+const STORE_METHODS = new Set(STORE_METHOD_NAMES);
 
 function emptySession(id) {
   return {

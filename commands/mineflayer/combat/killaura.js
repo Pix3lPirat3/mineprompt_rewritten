@@ -1,44 +1,35 @@
 'use strict';
 
+const { startManagedLoop } = require('../../../src/main/managed-loop');
+
 async function attack(bot, actions, activities, entity, overrideFriendProtection, origin) {
   if (entity.type !== 'player' || !entity.username) return bot.attack(entity);
   return actions.execute({ actionId: 'player.attack', username: entity.username, overrideFriendProtection }, { bot, activities, origin });
 }
 
 function start(bot, activities, logger, actions, whitelist, delay, overrideFriendProtection, origin) {
-  let running = true;
-  let timer = null;
-  const stop = () => {
-    running = false;
-    if (timer) clearTimeout(timer);
-  };
-  const schedule = (callback, timeout) => {
-    timer = setTimeout(callback, timeout);
-  };
-  const tick = async () => {
-    if (!running || !bot.entity) return activities.stop('killaura');
-    const entity = bot.nearestEntity((candidate) => {
-      const allowed = whitelist.includes('*') || whitelist.includes(candidate.name);
-      const player = candidate.type === 'player' ? Object.values(bot.players || {}).find((entry) => entry.entity?.id === candidate.id) : null;
-      const protectedFriend = player && actions.isFriend(player, bot) && !overrideFriendProtection;
-      return allowed && !protectedFriend && candidate.isValid && bot.entity.position.distanceTo(candidate.position) < 3.5;
-    });
-    if (!entity || bot.usingHeldItem) return schedule(tick, 100);
-    try {
-      await bot.lookAt(entity.position.offset(0, 0.5, 0));
-      if (running && entity.isValid && bot.entityAtCursor()?.id === entity.id) await attack(bot, actions, activities, entity, overrideFriendProtection, origin);
-    } catch (error) {
-      logger.debug(`[Killaura] ${error.message}`);
-    }
-    if (running) schedule(tick, delay);
-  };
-  activities.register('killaura', {
+  startManagedLoop({
+    activities,
+    id: 'killaura',
     label: 'Killaura',
     detail: `${whitelist.join(', ')} every ${delay} ms${overrideFriendProtection ? ', friend override' : ''}`,
     resources: ['combat'],
-    stop
+    delay,
+    run: async () => {
+      if (!bot.entity) return false;
+      const entity = bot.nearestEntity((candidate) => {
+        const allowed = whitelist.includes('*') || whitelist.includes(candidate.name);
+        const player = candidate.type === 'player' ? Object.values(bot.players || {}).find((entry) => entry.entity?.id === candidate.id) : null;
+        const protectedFriend = player && actions.isFriend(player, bot) && !overrideFriendProtection;
+        return allowed && !protectedFriend && candidate.isValid && bot.entity.position.distanceTo(candidate.position) < 3.5;
+      });
+      if (!entity || bot.usingHeldItem) return 100;
+      await bot.lookAt(entity.position.offset(0, 0.5, 0));
+      if (entity.isValid && bot.entityAtCursor()?.id === entity.id) await attack(bot, actions, activities, entity, overrideFriendProtection, origin);
+      return delay;
+    },
+    onError: (error) => logger.debug(`[Killaura] ${error.message}`)
   });
-  schedule(tick, 0);
 }
 
 module.exports = {
