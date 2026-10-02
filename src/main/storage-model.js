@@ -5,6 +5,9 @@ const { itemIdentity } = require('./item-identity');
 
 const MAX_STORAGE_AXIS = 128;
 const MAX_STORAGE_VOLUME = 262144;
+const MAX_STORAGE_CATEGORIES = 64;
+const MAX_CATEGORY_SELECTORS = 256;
+const MAX_CATEGORY_CONTAINERS = 512;
 
 function finiteInteger(value, label) {
   const number = Number(value);
@@ -43,6 +46,54 @@ function normalizeBounds(from, to) {
   const volume = size.x * size.y * size.z;
   if (volume > MAX_STORAGE_VOLUME) throw new Error(`Storage zones cannot exceed ${MAX_STORAGE_VOLUME} blocks.`);
   return { from: lower, to: upper, size, volume };
+}
+
+function positionInBounds(position, bounds) {
+  return position.x >= bounds.from.x && position.x <= bounds.to.x && position.y >= bounds.from.y && position.y <= bounds.to.y && position.z >= bounds.from.z && position.z <= bounds.to.z;
+}
+
+function categoryId(value) {
+  return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-+|-+$/gu, '').slice(0, 48);
+}
+
+function cleanStorageCategories(value, bounds) {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > MAX_STORAGE_CATEGORIES) throw new Error(`Storage zones cannot contain more than ${MAX_STORAGE_CATEGORIES} categories.`);
+  const categories = [];
+  const ids = new Set();
+  const names = new Set();
+  const assigned = new Set();
+  const selectors = new Set();
+  let overflow = false;
+  for (const input of value) {
+    const name = String(input?.name || '').trim();
+    const id = categoryId(input?.id || name);
+    if (!name || name.length > 64 || !id) throw new Error('Storage category names must contain 1 to 64 characters.');
+    if (ids.has(id) || names.has(name.toLowerCase())) throw new Error(`Storage category ${name} is duplicated.`);
+    const items = [...new Set((Array.isArray(input?.items) ? input.items : []).map((entry) => String(entry || '').trim().toLowerCase()).filter(Boolean))];
+    if (items.length > MAX_CATEGORY_SELECTORS || items.some((entry) => entry.length > 128 || [...entry].some((character) => character.codePointAt(0) < 32 || character.codePointAt(0) === 127))) throw new Error(`Storage categories can contain up to ${MAX_CATEGORY_SELECTORS} valid item selectors.`);
+    for (const selector of items) {
+      if (selectors.has(selector)) throw new Error(`Storage item selector ${selector} belongs to more than one category.`);
+      selectors.add(selector);
+    }
+    const containers = (Array.isArray(input?.containers) ? input.containers : []).map((entry) => normalizePosition(entry, 'Category container'));
+    if (containers.length > MAX_CATEGORY_CONTAINERS) throw new Error(`Storage categories cannot contain more than ${MAX_CATEGORY_CONTAINERS} containers.`);
+    const uniqueContainers = [];
+    for (const position of containers) {
+      if (!positionInBounds(position, bounds)) throw new Error(`A ${name} container is outside the storage zone.`);
+      const key = `${position.x},${position.y},${position.z}`;
+      if (assigned.has(key)) throw new Error(`Storage container ${key} belongs to more than one category.`);
+      assigned.add(key);
+      uniqueContainers.push(position);
+    }
+    const isOverflow = input?.overflow === true;
+    if (isOverflow && overflow) throw new Error('A storage zone can have only one overflow category.');
+    overflow ||= isOverflow;
+    ids.add(id);
+    names.add(name.toLowerCase());
+    categories.push({ id, name, items: items.sort(), containers: uniqueContainers.sort((left, right) => left.x - right.x || left.y - right.y || left.z - right.z), overflow: isOverflow });
+  }
+  return categories.sort((left, right) => left.name.localeCompare(right.name));
 }
 
 function normalizeServer(value) {
@@ -89,6 +140,7 @@ function cleanStorageZone(input, options = {}) {
     dimension: normalizeDimension(input.dimension),
     from: bounds.from,
     to: bounds.to,
+    categories: cleanStorageCategories(input.categories, bounds),
     createdAt,
     updatedAt: now
   };
@@ -143,8 +195,13 @@ function storageVariant(item) {
 }
 
 module.exports = {
+  MAX_CATEGORY_CONTAINERS,
+  MAX_CATEGORY_SELECTORS,
+  MAX_STORAGE_CATEGORIES,
   MAX_STORAGE_AXIS,
   MAX_STORAGE_VOLUME,
+  categoryId,
+  cleanStorageCategories,
   cleanStorageZone,
   cleanStorageZones,
   createStorageZone,

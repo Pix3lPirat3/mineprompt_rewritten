@@ -605,6 +605,25 @@ a {
   background: #0c1118;
 }
 
+.storage-deposit {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}
+
+.storage-deposit > header {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  gap: 8px;
+}
+
+.storage-deposit > header small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
 .target-ribbon__filters {
   align-self: center;
 }

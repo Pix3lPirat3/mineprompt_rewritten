@@ -228,8 +228,12 @@ test('registers, scans, and queries storage through one terminal service', async
     saveZone: async (request) => { calls.push(['save', request]); return { id: 'main', name: request.name }; },
     start: (zone) => { calls.push(['scan', zone]); return { zoneName: 'Main', running: true }; },
     find: (item, options) => { calls.push(['find', item, options]); return [{ zoneName: 'Main', count: 64, displayName: 'Stone', variantId: 'variant', stale: false }]; },
+    categories: () => [],
+    saveCategory: async (zone, request) => { calls.push(['category', zone, request]); return { id: 'blocks', name: request.name, items: request.items || [], containers: request.containers || [], overflow: false }; },
     fetchPlan: async (request) => { calls.push(['plan', request]); return { requested: request.count, variant: { displayName: 'Stone' }, allocations: [{}], estimatedCost: 7 }; },
-    startFetch: async (request) => { calls.push(['fetch', request]); return { requested: request.count, displayName: 'Stone', containersPlanned: 1 }; }
+    startFetch: async (request) => { calls.push(['fetch', request]); return { requested: request.count, displayName: 'Stone', containersPlanned: 1 }; },
+    depositPlan: async (request) => { calls.push(['plan-deposit', request]); return { requested: request.count, variant: { displayName: 'Stone' }, allocations: [{}], estimatedCost: 5 }; },
+    startDeposit: async (request) => { calls.push(['deposit', request]); return { requested: request.count, displayName: 'Stone', containersPlanned: 1 }; }
   };
   const added = sender();
   await storageCommand.execute(added.value, 'storage', ['add', 'Main', '0', '64', '0', '8', '72', '8'], { bot: { entity: {} }, storage });
@@ -249,6 +253,16 @@ test('registers, scans, and queries storage through one terminal service', async
   await storageCommand.execute(fetched.value, 'storage', ['fetch', 'variant', '32', 'main'], { bot: { entity: {} }, storage });
   assert.deepEqual(calls[4], ['fetch', { item: 'variant', count: 32, zone: 'main' }]);
   assert.match(fetched.replies[0], /Fetching 32 x Stone/u);
+  const category = sender();
+  await storageCommand.execute(category.value, 'storage', ['category', 'add', 'main', 'Blocks', 'stone,cobblestone'], { bot: { entity: {} }, storage });
+  assert.deepEqual(calls[5], ['category', 'main', { id: undefined, name: 'Blocks', items: ['stone', 'cobblestone'] }]);
+  const depositPlan = sender();
+  await storageCommand.execute(depositPlan.value, 'storage', ['plan-deposit', 'slot:9', '16', 'main', 'blocks'], { bot: { entity: {} }, storage });
+  assert.deepEqual(calls[6], ['plan-deposit', { item: undefined, slot: 9, count: 16, zone: 'main', category: 'blocks' }]);
+  const deposited = sender();
+  await storageCommand.execute(deposited.value, 'storage', ['deposit', 'stone', '8', 'main'], { bot: { entity: {} }, storage });
+  assert.deepEqual(calls[7], ['deposit', { item: 'stone', slot: undefined, count: 8, zone: 'main', category: undefined }]);
+  assert.match(deposited.replies[0], /Depositing 8 x Stone/u);
 });
 
 test('imports and previews blueprints through the shared build service', async () => {

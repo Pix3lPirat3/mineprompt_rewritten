@@ -187,9 +187,18 @@ export interface StorageZoneSummary {
   dimension: string;
   from: TargetPosition;
   to: TargetPosition;
+  categories: StorageCategory[];
   createdAt: number;
   updatedAt: number;
   scan: StorageScanSummary | null;
+}
+
+export interface StorageCategory {
+  id: string;
+  name: string;
+  items: string[];
+  containers: TargetPosition[];
+  overflow: boolean;
 }
 
 export interface StorageSnapshot {
@@ -199,10 +208,11 @@ export interface StorageSnapshot {
 }
 
 export interface StorageOperationStatus {
-  kind: 'fetch';
+  kind: 'fetch' | 'deposit';
   running: boolean;
   phase: string;
   zoneId: string;
+  category: { id: string; name: string } | null;
   variantId: string;
   displayName: string;
   requested: number;
@@ -274,7 +284,7 @@ export interface StorageScanDetails {
   unknownBlocks: number;
   failures: Array<{ position: TargetPosition | null; message: string }>;
   items: StorageIndexedItem[];
-  containers: Array<{ position: TargetPosition; block: string; slotCount: number; itemCount: number; items: StorageIndexedItem[] }>;
+  containers: Array<{ position: TargetPosition; block: string; slotCount: number; freeSlots: number; itemCount: number; items: StorageIndexedItem[] }>;
 }
 
 export interface InventoryLayout {

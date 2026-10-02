@@ -207,8 +207,17 @@ export interface StorageZone {
   dimension: string;
   from: Position;
   to: Position;
+  categories: StorageCategory[];
   createdAt: number;
   updatedAt: number;
+}
+
+export interface StorageCategory {
+  id: string;
+  name: string;
+  items: string[];
+  containers: Position[];
+  overflow: boolean;
 }
 
 export interface StorageApi {
@@ -219,9 +228,14 @@ export interface StorageApi {
   removeZone(reference: string): Promise<boolean>;
   scan(reference: string): unknown;
   inspect(reference: string): unknown;
-  find(selector: string, request?: { zone?: string; minimum?: number }): unknown[];
-  planFetch(request: { item: string; count: number; zone: string }): Promise<unknown>;
-  fetch(request: { item: string; count: number; zone: string }): Promise<unknown>;
+    find(selector: string, request?: { zone?: string; minimum?: number }): unknown[];
+    categories(reference: string): StorageCategory[];
+    saveCategory(reference: string, request: Partial<StorageCategory> & Pick<StorageCategory, 'name'>): Promise<StorageCategory>;
+    removeCategory(reference: string, category: string): Promise<boolean>;
+    planFetch(request: { item: string; count: number; zone: string }): Promise<unknown>;
+    fetch(request: { item: string; count: number; zone: string }): Promise<unknown>;
+    planDeposit(request: { item?: string; slot?: number; count?: number; zone: string; category?: string }): Promise<unknown>;
+    deposit(request: { item?: string; slot?: number; count?: number; zone: string; category?: string }): Promise<unknown>;
   status(): unknown;
   stop(): boolean;
   snapshot(): Record<string, unknown>;

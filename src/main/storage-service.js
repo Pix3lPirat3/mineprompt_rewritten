@@ -7,8 +7,8 @@ const { serializeItem } = require('./inventory-model');
 const { itemIdentity } = require('./item-identity');
 const { cancelNavigation, navigateGoal } = require('./navigation-service');
 const { isStorageBlock } = require('./stash-service');
-const { planWithdrawal } = require('./storage-allocation');
-const { normalizePosition, storageContext, storageVariant, zoneMatchesContext } = require('./storage-model');
+const { planDeposit: planDepositAllocation, planWithdrawal } = require('./storage-allocation');
+const { categoryId, normalizePosition, storageContext, storageVariant, zoneMatchesContext } = require('./storage-model');
 
 function positionKey(position) {
   return `${Math.floor(position.x)},${Math.floor(position.y)},${Math.floor(position.z)}`;
@@ -104,6 +104,22 @@ function inventoryIdentityCount(bot, identity) {
   return (bot.inventory?.items?.() || []).reduce((sum, item) => sum + (itemIdentity(item) === identity ? Number(item.count) || 0 : 0), 0);
 }
 
+function depositInventory(bot, client) {
+  const items = new Map();
+  for (const item of bot.inventory?.items?.() || []) {
+    if (!Number.isInteger(item.slot) || item.slot < 9 || item.slot > 44) continue;
+    mergeItem(items, itemRecord(item, client));
+  }
+  return items;
+}
+
+function windowInventoryItems(window) {
+  if (Array.isArray(window?.slots)) {
+    return window.slots.slice(window.inventoryStart, window.inventoryEnd).filter(Boolean);
+  }
+  return (window?.items?.() || []).filter((item) => item.slot >= window.inventoryStart && item.slot < window.inventoryEnd);
+}
+
 function publicScan(state, stale) {
   if (!state) return null;
   return {
@@ -195,6 +211,46 @@ class StorageService {
     return removed;
   }
 
+  categories(reference) {
+    const zone = this.resolveZone(reference);
+    return (zone.categories || []).map((category) => ({ ...category, items: [...category.items], containers: category.containers.map((position) => ({ ...position })) }));
+  }
+
+  async saveCategory(reference, input = {}) {
+    const zone = this.resolveZone(reference);
+    const lookup = String(input.id || input.name || '').trim().toLowerCase();
+    const existingCategories = zone.categories || [];
+    const current = existingCategories.find((entry) => entry.id.toLowerCase() === lookup || entry.name.toLowerCase() === lookup);
+    const name = String(input.name || current?.name || '').trim();
+    if (!name) throw new Error('A storage category name is required.');
+    const category = {
+      id: current?.id || categoryId(input.id || name),
+      name,
+      items: input.items === undefined ? current?.items || [] : input.items,
+      containers: input.containers === undefined ? current?.containers || [] : input.containers,
+      overflow: input.overflow === undefined ? current?.overflow === true : input.overflow === true
+    };
+    const categories = current ? existingCategories.map((entry) => entry.id === current.id ? category : entry) : [...existingCategories, category];
+    const saved = await this.store.saveStorageZone({ ...zone, categories });
+    const state = this.scans.get(zone.id);
+    if (state) state.zoneUpdatedAt = saved.updatedAt;
+    this.onChange();
+    return saved.categories.find((entry) => entry.id === category.id);
+  }
+
+  async removeCategory(reference, categoryReference) {
+    const zone = this.resolveZone(reference);
+    const target = String(categoryReference || '').trim().toLowerCase();
+    const existingCategories = zone.categories || [];
+    const categories = existingCategories.filter((entry) => entry.id.toLowerCase() !== target && entry.name.toLowerCase() !== target);
+    if (categories.length === existingCategories.length) return false;
+    const saved = await this.store.saveStorageZone({ ...zone, categories });
+    const state = this.scans.get(zone.id);
+    if (state) state.zoneUpdatedAt = saved.updatedAt;
+    this.onChange();
+    return true;
+  }
+
   scanSnapshot(zone) {
     const state = this.scans.get(zone.id);
     if (!state) return null;
@@ -263,21 +319,91 @@ class StorageService {
     return this.publicFetchPlan(await this.planFetch(request));
   }
 
+  async planDeposit(request = {}) {
+    const bot = this.bot;
+    if (!bot?.entity) throw new Error('An active connection is required.');
+    const zone = this.resolveZone(request.zone);
+    const state = this.scans.get(zone.id);
+    const scan = this.scanSnapshot(zone);
+    if (!state || !scan) throw new Error(`${zone.name} must be scanned before depositing items.`);
+    const reservations = await this.store.storageReservationSnapshot({ prefix: `deposit:${zone.id}:` });
+    return planDepositAllocation({
+      zone,
+      scan: { ...state, stale: scan.stale },
+      inventory: depositInventory(bot, this.client),
+      selector: request.item,
+      slot: request.slot,
+      count: request.count,
+      category: request.category,
+      origin: bot.entity.position,
+      reservations,
+      beamWidth: request.beamWidth
+    });
+  }
+
+  publicDepositPlan(plan) {
+    return {
+      zoneId: plan.zoneId,
+      category: plan.category,
+      variant: { variantId: plan.variant.variantId, name: plan.variant.name, displayName: plan.variant.displayName },
+      requested: plan.requested,
+      available: plan.available,
+      estimatedCost: plan.estimatedCost,
+      allocations: plan.allocations.map((entry) => ({
+        position: { ...entry.position },
+        count: entry.count,
+        destinations: entry.slots.map((destination) => ({ slot: destination.slot, count: destination.count, kind: destination.kind, priority: destination.tier }))
+      }))
+    };
+  }
+
+  async depositPlan(request = {}) {
+    return this.publicDepositPlan(await this.planDeposit(request));
+  }
+
   async startFetch(request = {}) {
     const bot = this.bot;
     if (!bot?.entity) throw new Error('An active connection is required.');
     if (bot.currentWindow) throw new Error('Close the current container before fetching storage items.');
     if (this.active || this.operation?.running || this.activities.has('storage-transfer')) throw new Error('A storage operation is already active.');
     const plan = await this.planFetch(request);
+    return this.startTransfer({
+      bot,
+      plan,
+      kind: 'fetch',
+      label: 'Storage fetch',
+      detail: `Fetching ${plan.requested} x ${plan.variant.displayName}`,
+      run: (context) => this.runFetch(context)
+    });
+  }
+
+  async startDeposit(request = {}) {
+    const bot = this.bot;
+    if (!bot?.entity) throw new Error('An active connection is required.');
+    if (bot.currentWindow) throw new Error('Close the current container before depositing storage items.');
+    if (this.active || this.operation?.running || this.activities.has('storage-transfer')) throw new Error('A storage operation is already active.');
+    const plan = await this.planDeposit(request);
+    return this.startTransfer({
+      bot,
+      plan,
+      kind: 'deposit',
+      label: 'Storage deposit',
+      detail: `Depositing ${plan.requested} x ${plan.variant.displayName}`,
+      run: (context) => this.runDeposit(context)
+    });
+  }
+
+  async startTransfer({ bot, plan, kind, label, detail, run }) {
     const lease = await this.store.reserveStorage({ owner: this.owner, ttlMs: 120000, entries: plan.reservationEntries });
     const startPosition = bot.entity.position.clone();
     const lookBlock = bot.blockAtCursor?.(32);
     const lookPosition = lookBlock?.position?.offset?.(0.5, 0.5, 0.5) || null;
     const state = {
-      kind: 'fetch',
+      kind,
       running: true,
       phase: 'reserved',
       zoneId: plan.zoneId,
+      category: plan.category || null,
       variantId: plan.variant.variantId,
       displayName: plan.variant.displayName,
       requested: plan.requested,
@@ -299,8 +425,8 @@ class StorageService {
     };
     try {
       this.activities.register('storage-transfer', {
-        label: 'Storage fetch',
-        detail: `Fetching ${plan.requested} x ${plan.variant.displayName}`,
+        label,
+        detail,
         resources: ['movement', 'inventory'],
         stop
       });
@@ -309,7 +435,7 @@ class StorageService {
       throw error;
     }
     this.operation = state;
-    void this.runFetch({ bot, plan, state, startPosition, startYaw: bot.entity.yaw, startPitch: bot.entity.pitch, lookPosition })
+    void run({ bot, plan, state, startPosition, startYaw: bot.entity.yaw, startPitch: bot.entity.pitch, lookPosition })
       .catch((error) => {
         state.failed = error.message;
         state.phase = 'failed';
@@ -393,6 +519,70 @@ class StorageService {
     state.returned = true;
     state.phase = 'complete';
     this.logger.log(`[Storage] Fetched ${state.transferred} x ${state.displayName} and restored the starting position and view.`);
+  }
+
+  async runDeposit({ bot, plan, state, startPosition, startYaw, startPitch, lookPosition }) {
+    state.startYaw = startYaw;
+    state.startPitch = startPitch;
+    const inventoryBefore = inventoryIdentityCount(bot, plan.variant.identity);
+    for (const allocation of plan.allocations) {
+      if (!state.running) return;
+      state.phase = 'navigating';
+      this.activities.update('storage-transfer', `Depositing ${state.transferred}/${state.requested} x ${state.displayName}`);
+      if (bot.entity.position.distanceTo(allocation.position) > 4.5) {
+        await navigateGoal(bot, new GoalNear(allocation.position.x, allocation.position.y, allocation.position.z, 3), { description: 'a reserved storage container' });
+      }
+      if (!state.running) return;
+      const block = bot.blockAt(allocation.position);
+      if (!isStorageBlock(block)) throw new Error('A reserved storage container is no longer available.');
+      await bot.lookAt(block.position.offset(0.5, 0.5, 0.5), true);
+      state.phase = 'depositing';
+      state.window = await bot.openContainer(block);
+      for (const destination of allocation.slots) {
+        if (!state.running) return;
+        const current = (state.window.containerItems?.() || []).find((item) => item.slot === destination.slot) || null;
+        if (destination.kind === 'empty' && current) throw new Error(`Reserved destination slot ${destination.slot} is no longer empty.`);
+        if (destination.kind === 'partial') {
+          if (!current || itemIdentity(current) !== plan.variant.identity) throw new Error(`Reserved destination slot ${destination.slot} no longer contains matching ${state.displayName}.`);
+          if (Math.max(0, plan.variant.stackSize - (Number(current.count) || 0)) < destination.count) throw new Error(`Reserved destination slot ${destination.slot} no longer has enough capacity.`);
+        }
+        let remaining = destination.count;
+        while (remaining && state.running) {
+          const source = windowInventoryItems(state.window).find((item) => itemIdentity(item) === plan.variant.identity);
+          if (!source) throw new Error(`The inventory no longer contains enough matching ${state.displayName}.`);
+          const transferred = Math.min(remaining, Number(source.count) || 0);
+          if (!transferred) throw new Error(`A matching ${state.displayName} stack has no transferable items.`);
+          await bot.transfer({
+            window: state.window,
+            itemType: source.type,
+            metadata: source.metadata,
+            nbt: source.nbt,
+            count: transferred,
+            sourceStart: source.slot,
+            sourceEnd: source.slot + 1,
+            destStart: destination.slot,
+            destEnd: destination.slot + 1
+          });
+          remaining -= transferred;
+          state.transferred += transferred;
+        }
+        if (remaining) return;
+      }
+      await state.window.close();
+      state.window = null;
+      state.containersVisited += 1;
+      await this.store.renewStorageReservation(state.leaseId, this.owner, 120000);
+      if (typeof bot.waitForTicks === 'function') await bot.waitForTicks(1);
+    }
+    if (!state.running) return;
+    const inventoryAfter = inventoryIdentityCount(bot, plan.variant.identity);
+    if (inventoryBefore - inventoryAfter < plan.requested) throw new Error(`Inventory verification found only ${Math.max(0, inventoryBefore - inventoryAfter)} of ${plan.requested} deposited ${state.displayName}.`);
+    state.phase = 'returning';
+    this.activities.update('storage-transfer', `Deposited ${state.transferred} items; returning to ${state.startPosition.x}, ${state.startPosition.y}, ${state.startPosition.z}`);
+    await this.returnToStart(bot, startPosition, startYaw, startPitch, lookPosition);
+    state.returned = true;
+    state.phase = 'complete';
+    this.logger.log(`[Storage] Deposited ${state.transferred} x ${state.displayName} and restored the starting position and view.`);
   }
 
   async returnToStart(bot, position, yaw, pitch, lookPosition = null) {
@@ -594,9 +784,11 @@ module.exports = {
   StorageService,
   blockProperties,
   currentStorageContext,
+  depositInventory,
   inventoryIdentityCount,
   itemRecord,
   pairedStoragePosition,
   positionKey,
-  publicScan
+  publicScan,
+  windowInventoryItems
 };

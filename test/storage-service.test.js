@@ -23,6 +23,7 @@ function setup(options = {}) {
     dimension: 'minecraft:overworld',
     from: { x: 1, y: 64, z: 1 },
     to: { x: 4, y: 64, z: 1 },
+    categories: [],
     createdAt: 1,
     updatedAt: 1
   };
@@ -42,7 +43,8 @@ function setup(options = {}) {
     '4,64,1': [{ slot: 0, type: 1, metadata: 0, name: 'stone', displayName: 'Stone', count: 64, stackSize: 64 }]
   };
   const transfers = [];
-  const inventoryItems = [];
+  const inventoryItems = (options.inventoryItems || []).map((item) => ({ ...item }));
+  const playerWindowSlot = (slot) => slot >= 9 && slot <= 35 ? 27 + slot - 9 : slot >= 36 && slot <= 44 ? 54 + slot - 36 : -1;
   const bot = {
     entity: { position: new Vec3(0, 64, 0), dimension: 'overworld' },
     game: { dimension: 'overworld' },
@@ -60,19 +62,41 @@ function setup(options = {}) {
       const window = {
         inventoryStart: 27,
         inventoryEnd: 63,
+        storageKey: key,
         containerItems: () => (items[key] || []).filter((item) => item.count > 0),
+        items() {
+          return [...this.containerItems(), ...inventoryItems.filter((item) => item.count > 0).map((item) => ({ ...item, slot: playerWindowSlot(item.slot) }))];
+        },
         async close() { this.closed = true; }
       };
+      Object.defineProperty(window, 'slots', {
+        get() {
+          const slots = new Array(this.inventoryEnd).fill(null);
+          for (const item of this.items()) slots[item.slot] = item;
+          return slots;
+        }
+      });
       windows.push(window);
       return window;
     },
     async transfer(request) {
-      const item = request.window.containerItems().find((entry) => entry.slot === request.sourceStart);
-      if (!item || item.count < request.count) throw new Error('Transfer source changed.');
-      item.count -= request.count;
-      const target = inventoryItems.find((entry) => entry.type === item.type && entry.metadata === item.metadata && JSON.stringify(entry.nbt || null) === JSON.stringify(item.nbt || null));
-      if (target) target.count += request.count;
-      else inventoryItems.push({ ...item, slot: 9 + inventoryItems.length, count: request.count });
+      if (request.sourceStart < request.window.inventoryStart) {
+        const item = request.window.containerItems().find((entry) => entry.slot === request.sourceStart);
+        if (!item || item.count < request.count) throw new Error('Transfer source changed.');
+        item.count -= request.count;
+        const target = inventoryItems.find((entry) => entry.type === item.type && entry.metadata === item.metadata && JSON.stringify(entry.nbt || null) === JSON.stringify(item.nbt || null));
+        if (target) target.count += request.count;
+        else inventoryItems.push({ ...item, slot: 9 + inventoryItems.length, count: request.count });
+      } else {
+        const sourceView = request.window.items().find((entry) => entry.slot === request.sourceStart);
+        const source = inventoryItems.find((entry) => playerWindowSlot(entry.slot) === request.sourceStart);
+        if (!source || !sourceView || source.count < request.count) throw new Error('Transfer source changed.');
+        source.count -= request.count;
+        const destinationItems = items[request.window.storageKey] || (items[request.window.storageKey] = []);
+        const target = destinationItems.find((entry) => entry.slot === request.destStart);
+        if (target) target.count += request.count;
+        else destinationItems.push({ ...sourceView, slot: request.destStart, count: request.count });
+      }
       transfers.push(request);
     },
     async waitForTicks() {}
@@ -97,7 +121,7 @@ function setup(options = {}) {
     activities,
     logger: { log: (message) => logs.push(message), warn: (message) => logs.push(message) }
   });
-  return { activities, blocks, bot, client, logs, service, store, transfers, windows, zone };
+  return { activities, blocks, bot, client, inventoryItems, items, logs, service, store, transfers, windows, zone };
 }
 
 async function waitForOperation(service) {
@@ -195,6 +219,78 @@ test('cancels an active fetch and releases its reservation', async () => {
   let releaseTransfer;
   bot.transfer = () => new Promise((resolve) => { releaseTransfer = resolve; });
   await service.startFetch({ zone: 'warehouse', item: 'stone', count: 32 });
+  for (let count = 0; count < 20; count += 1) {
+    if (releaseTransfer) break;
+    await new Promise((resolve) => { globalThis.setTimeout(resolve, 0); });
+  }
+  assert.equal(typeof releaseTransfer, 'function');
+  assert.equal(service.stop(), true);
+  releaseTransfer();
+  await waitForOperation(service);
+  assert.equal(service.operationStatus().phase, 'stopping');
+  assert.deepEqual(store.storageReservationSnapshot().reservations, []);
+});
+
+test('saves category policy without invalidating a current scan', async () => {
+  const { service } = setup();
+  service.start('warehouse');
+  await waitForScan(service);
+  const category = await service.saveCategory('warehouse', {
+    name: 'Building Blocks',
+    items: ['stone'],
+    containers: [{ x: 4, y: 64, z: 1 }]
+  });
+  assert.equal(category.id, 'building-blocks');
+  assert.equal(service.categories('warehouse')[0].items[0], 'stone');
+  assert.equal(service.inspect('warehouse').scan.stale, false);
+  assert.equal(await service.removeCategory('warehouse', category.id), true);
+  assert.deepEqual(service.categories('warehouse'), []);
+});
+
+test('plans, reserves, revalidates, and deposits an exact inventory variant', async () => {
+  const { inventoryItems, items, service, store, transfers } = setup({
+    inventoryItems: [{ slot: 9, type: 1, metadata: 0, name: 'stone', displayName: 'Stone', count: 40, stackSize: 64 }]
+  });
+  service.start('warehouse');
+  await waitForScan(service);
+  const planned = await service.depositPlan({ zone: 'warehouse', slot: 9, count: 32 });
+  assert.equal(planned.allocations.length, 1);
+  assert.equal(planned.allocations[0].destinations[0].kind, 'empty');
+  const started = await service.startDeposit({ zone: 'warehouse', slot: 9, count: 32 });
+  assert.equal(started.kind, 'deposit');
+  await waitForOperation(service);
+  const status = service.operationStatus();
+  assert.equal(status.phase, 'complete');
+  assert.equal(status.transferred, 32);
+  assert.equal(inventoryItems[0].count, 8);
+  assert.equal(items['4,64,1'].find((item) => item.slot === 1).count, 32);
+  assert.equal(transfers.at(-1).destStart, 1);
+  assert.deepEqual(store.storageReservationSnapshot().reservations, []);
+});
+
+test('refuses a changed deposit destination and releases its reservation', async () => {
+  const { inventoryItems, items, service, store } = setup({
+    inventoryItems: [{ slot: 9, type: 1, metadata: 0, name: 'stone', displayName: 'Stone', count: 32, stackSize: 64 }]
+  });
+  service.start('warehouse');
+  await waitForScan(service);
+  items['4,64,1'].push({ slot: 1, type: 3, metadata: 0, name: 'dirt', displayName: 'Dirt', count: 1, stackSize: 64 });
+  await service.startDeposit({ zone: 'warehouse', slot: 9, count: 32 });
+  await waitForOperation(service);
+  assert.match(service.operationStatus().failed, /no longer empty/u);
+  assert.equal(inventoryItems[0].count, 32);
+  assert.deepEqual(store.storageReservationSnapshot().reservations, []);
+});
+
+test('cancels an active deposit and releases its reservation', async () => {
+  const { bot, service, store } = setup({
+    inventoryItems: [{ slot: 9, type: 1, metadata: 0, name: 'stone', displayName: 'Stone', count: 32, stackSize: 64 }]
+  });
+  service.start('warehouse');
+  await waitForScan(service);
+  let releaseTransfer;
+  bot.transfer = () => new Promise((resolve) => { releaseTransfer = resolve; });
+  await service.startDeposit({ zone: 'warehouse', slot: 9, count: 32 });
   for (let count = 0; count < 20; count += 1) {
     if (releaseTransfer) break;
     await new Promise((resolve) => { globalThis.setTimeout(resolve, 0); });

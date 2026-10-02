@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { planWithdrawal, resolveIndexedVariant, withdrawalKey } = require('../src/main/storage-allocation');
+const { depositEmptyKey, depositStackKey, planDeposit, planWithdrawal, resolveIndexedVariant, withdrawalKey } = require('../src/main/storage-allocation');
 
 function item(overrides = {}) {
   return {
@@ -67,4 +67,81 @@ test('rejects withdrawals requiring more than the visit limit', () => {
     () => planWithdrawal({ zoneId: 'main', scan: scan(containers), selector: 'stone', count: 257, origin: { x: 0, y: 64, z: 0 } }),
     /more than 256 container visits/u
   );
+});
+
+function depositZone() {
+  return {
+    id: 'main',
+    name: 'Main',
+    categories: [
+      { id: 'blocks', name: 'Blocks', items: ['stone'], containers: [{ x: 3, y: 64, z: 0 }, { x: 5, y: 64, z: 0 }], overflow: false },
+      { id: 'tools', name: 'Tools', items: ['diamond_pickaxe'], containers: [{ x: 4, y: 64, z: 0 }], overflow: false }
+    ]
+  };
+}
+
+function depositInventory(count = 80) {
+  const variant = item({ count, slots: [{ slot: 9, count: Math.min(64, count) }, ...(count > 64 ? [{ slot: 10, count: count - 64 }] : [])] });
+  return new Map([[variant.identity, variant]]);
+}
+
+function depositScan() {
+  return {
+    complete: true,
+    stale: false,
+    containers: [
+      { position: { x: 1, y: 64, z: 0 }, slotCount: 2, items: [item({ count: 60, slots: [{ slot: 0, count: 60 }] })] },
+      { position: { x: 2, y: 64, z: 0 }, slotCount: 2, items: [] },
+      { position: { x: 3, y: 64, z: 0 }, slotCount: 1, items: [item({ count: 62, slots: [{ slot: 0, count: 62 }] })] },
+      { position: { x: 4, y: 64, z: 0 }, slotCount: 2, items: [] },
+      { position: { x: 5, y: 64, z: 0 }, slotCount: 2, items: [] }
+    ]
+  };
+}
+
+test('allocates deposits by partial, exact, category, and overflow priority', () => {
+  const plan = planDeposit({
+    zone: depositZone(),
+    scan: depositScan(),
+    inventory: depositInventory(),
+    selector: 'stone',
+    count: 80,
+    origin: { x: 0, y: 64, z: 0 }
+  });
+  assert.deepEqual(plan.allocations.flatMap((entry) => entry.slots).sort((left, right) => left.tier - right.tier || (left.kind === 'partial' ? 0 : 1) - (right.kind === 'partial' ? 0 : 1)).map((entry) => [entry.kind, entry.tier, entry.count]), [
+    ['partial', 0, 2],
+    ['partial', 1, 4],
+    ['empty', 1, 64],
+    ['empty', 2, 10]
+  ]);
+  assert.equal(plan.category.id, 'blocks');
+});
+
+test('subtracts quantity and exclusive-slot deposit reservations', () => {
+  const zone = { ...depositZone(), categories: [] };
+  const current = depositScan();
+  current.containers = current.containers.filter((entry) => entry.position.x <= 2);
+  const reservations = { reservations: [
+    { key: depositStackKey('main', { x: 1, y: 64, z: 0 }, 0, 'stone-variant'), count: 3 },
+    { key: depositEmptyKey('main', { x: 1, y: 64, z: 0 }, 1), count: 1 }
+  ] };
+  const plan = planDeposit({ zone, scan: current, inventory: depositInventory(2), selector: 'stone', count: 2, origin: { x: 0, y: 64, z: 0 }, reservations });
+  assert.deepEqual(plan.allocations.flatMap((entry) => entry.slots).map((entry) => [entry.slot, entry.count]), [[0, 1], [0, 1]]);
+  assert.deepEqual(plan.allocations.map((entry) => entry.position.x), [1, 2]);
+});
+
+test('keeps unmatched items out of unrelated categorized containers', () => {
+  const inventory = depositInventory(64);
+  const dirt = inventory.get('stone-identity');
+  inventory.clear();
+  dirt.identity = 'dirt-identity';
+  dirt.variantId = 'dirt-variant';
+  dirt.name = 'dirt';
+  dirt.displayName = 'Dirt';
+  inventory.set(dirt.identity, dirt);
+  const current = depositScan();
+  current.containers = current.containers.filter((entry) => entry.position.x >= 2);
+  const plan = planDeposit({ zone: depositZone(), scan: current, inventory, selector: 'dirt', count: 64, origin: { x: 0, y: 64, z: 0 } });
+  assert.deepEqual(plan.allocations.map((entry) => entry.position.x), [2]);
+  assert.equal(plan.category, null);
 });

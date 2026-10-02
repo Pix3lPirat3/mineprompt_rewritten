@@ -64,13 +64,18 @@ function installStorage(bot, options = {}) {
     scan: (reference) => service.start(reference),
     inspect: (reference) => service.inspect(reference),
     find: (selector, request = {}) => service.find(selector, request),
+    categories: (reference) => service.categories(reference),
+    saveCategory: (reference, request) => service.saveCategory(reference, request),
+    removeCategory: (reference, category) => service.removeCategory(reference, category),
     planFetch: (request) => service.fetchPlan(request),
     fetch: (request) => service.startFetch(request),
+    planDeposit: (request) => service.depositPlan(request),
+    deposit: (request) => service.startDeposit(request),
     status: () => service.operationStatus?.() || service.status(),
     stop: () => service.stop(),
     snapshot: () => service.summary()
   });
-  return registerCapability(runtime, 'storage', api, 'Server-scoped storage zones, exact item indexes, container scanning, and reserved item fetching.', [
+  return registerCapability(runtime, 'storage', api, 'Server-scoped storage zones, category policies, exact item indexes, container scanning, and reserved item transfers.', [
     {
       id: 'storage.zones',
       title: 'List storage zones',
@@ -125,6 +130,35 @@ function installStorage(bot, options = {}) {
       execute: ({ request }) => api.find(request.item, request)
     },
     {
+      id: 'storage.categories',
+      title: 'List storage categories',
+      capability: 'storage',
+      risk: 'read',
+      inputSchema: { type: 'object', properties: { zone: { type: 'string' } }, required: ['zone'], additionalProperties: false },
+      execute: ({ request }) => api.categories(request.zone)
+    },
+    {
+      id: 'storage.category-save',
+      title: 'Save a storage category',
+      capability: 'storage',
+      risk: 'dangerous',
+      inputSchema: {
+        type: 'object',
+        properties: { zone: { type: 'string' }, id: { type: 'string' }, name: { type: 'string' }, items: { type: 'array', items: { type: 'string' }, maxItems: 256 }, containers: { type: 'array', items: { type: 'object', additionalProperties: true }, maxItems: 512 }, overflow: { type: 'boolean' } },
+        required: ['zone', 'name'],
+        additionalProperties: false
+      },
+      execute: ({ request }) => api.saveCategory(request.zone, request)
+    },
+    {
+      id: 'storage.category-remove',
+      title: 'Remove a storage category',
+      capability: 'storage',
+      risk: 'dangerous',
+      inputSchema: { type: 'object', properties: { zone: { type: 'string' }, category: { type: 'string' } }, required: ['zone', 'category'], additionalProperties: false },
+      execute: ({ request }) => api.removeCategory(request.zone, request.category)
+    },
+    {
       id: 'storage.plan-fetch',
       title: 'Plan a storage fetch',
       capability: 'storage',
@@ -149,6 +183,32 @@ function installStorage(bot, options = {}) {
         additionalProperties: false
       },
       execute: ({ request }) => api.fetch(request)
+    },
+    {
+      id: 'storage.plan-deposit',
+      title: 'Plan a storage deposit',
+      capability: 'storage',
+      risk: 'read',
+      inputSchema: {
+        type: 'object',
+        properties: { item: { type: 'string' }, slot: { type: 'integer', minimum: 9, maximum: 44 }, count: { type: 'integer', minimum: 1 }, zone: { type: 'string' }, category: { type: 'string' } },
+        required: ['zone'],
+        additionalProperties: false
+      },
+      execute: ({ request }) => api.planDeposit(request)
+    },
+    {
+      id: 'storage.deposit',
+      title: 'Deposit storage items',
+      capability: 'storage',
+      risk: 'dangerous',
+      inputSchema: {
+        type: 'object',
+        properties: { item: { type: 'string' }, slot: { type: 'integer', minimum: 9, maximum: 44 }, count: { type: 'integer', minimum: 1 }, zone: { type: 'string' }, category: { type: 'string' } },
+        required: ['zone'],
+        additionalProperties: false
+      },
+      execute: ({ request }) => api.deposit(request)
     },
     {
       id: 'storage.stop',

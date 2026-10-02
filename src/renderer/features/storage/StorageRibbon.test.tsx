@@ -10,6 +10,7 @@ const zone = {
   dimension: 'minecraft:overworld',
   from: { x: 0, y: 64, z: 0 },
   to: { x: 8, y: 72, z: 8 },
+  categories: [],
   createdAt: 1,
   updatedAt: 2,
   scan: {
@@ -56,12 +57,41 @@ describe('storage ribbon', () => {
       };
       if (request.action === 'plan') return { ok: true, plan: { allocations: [{ position: { x: 1, y: 64, z: 1 } }], estimatedCost: 7 } };
       if (request.action === 'fetch') return { ok: true, status: { containersPlanned: 1 } };
+      if (request.action === 'plan-deposit') return { ok: true, plan: { allocations: [{ position: { x: 1, y: 64, z: 1 } }], estimatedCost: 5 } };
+      if (request.action === 'deposit') return { ok: true, status: { containersPlanned: 1 } };
       return { ok: true };
     });
     const { user } = renderWithRuntime(<StorageRibbon />, { api: { storageAction }, snapshot: {
       selectedSessionId: 'primary',
       state: { status: 'online' },
-      session: { storage: { active: null, zones: [zone] } }
+      session: {
+        storage: { active: null, zones: [zone] },
+        inventory: [{
+          slot: 9,
+          name: 'stone',
+          displayName: 'Stone',
+          displayNameHtml: null,
+          customName: null,
+          count: 32,
+          hotbarIndex: null,
+          maxDurability: 0,
+          durabilityUsed: 0,
+          durabilityRemaining: 0,
+          enchanted: false,
+          enchantments: [],
+          lore: [],
+          loreHtml: [],
+          metadata: 0,
+          stackSize: 64,
+          repairCost: 0,
+          customModel: null,
+          tooltipDisplay: { hidden: false, hiddenComponents: [] },
+          components: [],
+          componentDetails: [],
+          nbtKeys: [],
+          dataTags: []
+        }]
+      }
     } });
     await user.click(screen.getByRole('button', { name: /Warehouse/u }));
     await waitFor(() => expect(screen.getByText('Oak Planks')).toBeTruthy());
@@ -69,10 +99,17 @@ describe('storage ribbon', () => {
     await user.click(screen.getByRole('button', { name: /Oak Planks/u }));
     await user.clear(screen.getByLabelText('Fetch count'));
     await user.type(screen.getByLabelText('Fetch count'), '12');
-    await user.click(screen.getByRole('button', { name: 'Plan' }));
+    await user.click(screen.getByRole('button', { name: 'Plan fetch' }));
     expect(storageAction).toHaveBeenLastCalledWith({ sessionId: 'primary', action: 'plan', zone: 'warehouse', item: 'abc123', count: 12 });
     await user.click(screen.getByRole('button', { name: 'Fetch' }));
     expect(storageAction).toHaveBeenLastCalledWith({ sessionId: 'primary', action: 'fetch', zone: 'warehouse', item: 'abc123', count: 12 });
+    await user.click(screen.getByRole('button', { name: /Stone/u }));
+    await user.clear(screen.getByLabelText('Deposit count'));
+    await user.type(screen.getByLabelText('Deposit count'), '8');
+    await user.click(screen.getByRole('button', { name: 'Plan deposit' }));
+    expect(storageAction).toHaveBeenLastCalledWith({ sessionId: 'primary', action: 'plan-deposit', zone: 'warehouse', slot: 9, count: 8 });
+    await user.click(screen.getByRole('button', { name: 'Deposit' }));
+    expect(storageAction).toHaveBeenLastCalledWith({ sessionId: 'primary', action: 'deposit', zone: 'warehouse', slot: 9, count: 8 });
     await user.click(screen.getByRole('button', { name: 'Scan' }));
     expect(storageAction).toHaveBeenLastCalledWith({ sessionId: 'primary', action: 'scan', zone: 'warehouse' });
   });

@@ -232,17 +232,22 @@ class ToolCatalog {
     }, { additionalProperties: false }), async (runtime, input) => runtime.stashAction(input), {
       destructive: true, capability: 'inventory', approval: 'recommended', openWorld: true
     }));
-    this.register(tool('mineprompt_storage', 'Register bounded storage zones, scan loaded containers, and query exact item variants with freshness and partial-scan details.', Type.Object({
-      sessionId: SessionId,
-      action: Type.Union(['zones', 'save', 'remove', 'scan', 'inspect', 'find', 'plan', 'fetch', 'status', 'stop'].map((value) => Type.Literal(value))),
+      this.register(tool('mineprompt_storage', 'Register and categorize bounded storage zones, scan loaded containers, query exact variants, and safely plan or perform reserved fetches and deposits.', Type.Object({
+        sessionId: SessionId,
+        action: Type.Union(['zones', 'save', 'remove', 'scan', 'inspect', 'find', 'categories', 'category-save', 'category-remove', 'plan', 'fetch', 'plan-deposit', 'deposit', 'status', 'stop'].map((value) => Type.Literal(value))),
       zone: Type.Optional(Type.String({ minLength: 1, maxLength: 80 })),
       name: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
       from: Type.Optional(Position),
       to: Type.Optional(Position),
-      item: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
-      minimum: Type.Optional(Type.Integer({ minimum: 0, maximum: 2147483647 })),
-      count: Type.Optional(Type.Integer({ minimum: 1, maximum: 2147483647 })),
-      all: Type.Optional(Type.Boolean())
+        item: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+        slot: Type.Optional(Type.Integer({ minimum: 9, maximum: 44 })),
+        minimum: Type.Optional(Type.Integer({ minimum: 0, maximum: 2147483647 })),
+        count: Type.Optional(Type.Integer({ minimum: 1, maximum: 2147483647 })),
+        category: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+        items: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 128 }), { maxItems: 256 })),
+        containers: Type.Optional(Type.Array(Position, { maxItems: 512 })),
+        overflow: Type.Optional(Type.Boolean()),
+        all: Type.Optional(Type.Boolean())
     }, { additionalProperties: false }), async (runtime, input) => runtime.storageAction(input), {
       destructive: true, capability: 'world', approval: 'recommended', openWorld: true
     }));
