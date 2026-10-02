@@ -116,6 +116,7 @@ test('installs supplied application services as public capabilities and actions'
     startFetch: async (request) => request,
     depositPlan: async (request) => request,
     startDeposit: async (request) => request,
+    startAudit: () => ({ kind: 'audit' }),
     status: () => null,
     stop: () => true,
     summary: () => ({ active: null, zones: [] })
@@ -151,6 +152,7 @@ test('installs supplied application services as public capabilities and actions'
     'mining.region',
     'mining.stop',
     'navigation.stop',
+    'storage.audit',
     'storage.categories',
     'storage.category-remove',
     'storage.category-save',

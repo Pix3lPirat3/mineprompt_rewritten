@@ -71,6 +71,7 @@ function installStorage(bot, options = {}) {
     fetch: (request) => service.startFetch(request),
     planDeposit: (request) => service.depositPlan(request),
     deposit: (request) => service.startDeposit(request),
+    audit: (reference) => service.startAudit(reference),
     status: () => service.operationStatus?.() || service.status(),
     stop: () => service.stop(),
     snapshot: () => service.summary()
@@ -211,8 +212,16 @@ function installStorage(bot, options = {}) {
       execute: ({ request }) => api.deposit(request)
     },
     {
+      id: 'storage.audit',
+      title: 'Audit indexed storage',
+      capability: 'storage',
+      risk: 'dangerous',
+      inputSchema: { type: 'object', properties: { zone: { type: 'string' } }, required: ['zone'], additionalProperties: false },
+      execute: ({ request }) => api.audit(request.zone)
+    },
+    {
       id: 'storage.stop',
-      title: 'Stop a storage scan',
+      title: 'Stop a storage operation',
       capability: 'storage',
       risk: 'dangerous',
       inputSchema: { type: 'object', additionalProperties: false },

@@ -207,6 +207,8 @@ export interface StorageZone {
   dimension: string;
   from: Position;
   to: Position;
+  mode: 'bounds' | 'positions';
+  positions: Position[];
   categories: StorageCategory[];
   createdAt: number;
   updatedAt: number;
@@ -236,6 +238,7 @@ export interface StorageApi {
     fetch(request: { item: string; count: number; zone: string }): Promise<unknown>;
     planDeposit(request: { item?: string; slot?: number; count?: number; zone: string; category?: string }): Promise<unknown>;
     deposit(request: { item?: string; slot?: number; count?: number; zone: string; category?: string }): Promise<unknown>;
+    audit(reference: string): unknown;
   status(): unknown;
   stop(): boolean;
   snapshot(): Record<string, unknown>;

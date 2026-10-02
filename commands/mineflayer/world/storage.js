@@ -6,6 +6,13 @@ function coordinates(values) {
   return numbers.map(Math.floor);
 }
 
+function positionTriples(values) {
+  if (!values.length || values.length % 3 !== 0) throw new Error('Position-list storage requires one or more x y z triples.');
+  const numbers = values.map(Number);
+  if (numbers.some((value) => !Number.isFinite(value))) throw new Error('Storage positions must contain only numeric coordinates.');
+  return Array.from({ length: numbers.length / 3 }, (_, index) => ({ x: Math.floor(numbers[index * 3]), y: Math.floor(numbers[index * 3 + 1]), z: Math.floor(numbers[index * 3 + 2]) }));
+}
+
 function zoneSuggestions(storage) {
   return storage.zones({ all: true }).flatMap((zone) => [zone.id, zone.name]);
 }
@@ -17,6 +24,7 @@ function scanDescription(scan) {
 }
 
 function operationDescription(operation) {
+  if (operation.kind === 'audit') return `${operation.phase}, ${operation.containersVisited}/${operation.containersPlanned} containers, ${operation.errorCount} errors, ${operation.warningCount} warnings${operation.failed ? `, failed: ${operation.failed}` : ''}`;
   return `${operation.phase}, ${operation.transferred}/${operation.requested} ${operation.displayName}, ${operation.containersVisited}/${operation.containersPlanned} containers${operation.failed ? `, failed: ${operation.failed}` : ''}`;
 }
 
@@ -29,15 +37,15 @@ function transferRequest(args) {
 module.exports = {
   command: 'storage',
   aliases: ['warehouse'],
-  usage: 'storage <zones|add <name> x1 y1 z1 x2 y2 z2|remove <zone>|scan <zone>|inspect <zone>|find <item> [zone] [minimum]|categories <zone>|category <add|assign|unassign|overflow|remove> ...|plan <item> <count> <zone>|fetch <item> <count> <zone>|plan-deposit <item|slot:n> <count|all> <zone> [category]|deposit <item|slot:n> <count|all> <zone> [category]|status|stop>',
+  usage: 'storage <zones|add <name> x1 y1 z1 x2 y2 z2|add-list <name> x y z [x y z...]|remove <zone>|scan <zone>|inspect <zone>|find <item> [zone] [minimum]|categories <zone>|category <add|assign|unassign|overflow|remove> ...|plan <item> <count> <zone>|fetch <item> <count> <zone>|plan-deposit <item|slot:n> <count|all> <zone> [category]|deposit <item|slot:n> <count|all> <zone> [category]|audit <zone>|status|stop>',
   description: 'Register, categorize, scan, query, and transfer items through server-scoped storage zones.',
   capability: 'world',
   risk: 'dangerous',
   approval: 'recommended',
 
   autocomplete(command, args, { storage }, completion = {}) {
-    if (!args.length || args.length === 1 && !completion.trailingSpace) return ['zones', 'add', 'remove', 'scan', 'inspect', 'find', 'categories', 'category', 'plan', 'fetch', 'plan-deposit', 'deposit', 'status', 'stop'];
-    if (['remove', 'scan', 'inspect', 'categories'].includes(args[0]?.toLowerCase()) && (args.length === 1 || args.length === 2 && !completion.trailingSpace)) return zoneSuggestions(storage);
+    if (!args.length || args.length === 1 && !completion.trailingSpace) return ['zones', 'add', 'add-list', 'remove', 'scan', 'inspect', 'find', 'categories', 'category', 'plan', 'fetch', 'plan-deposit', 'deposit', 'audit', 'status', 'stop'];
+    if (['remove', 'scan', 'inspect', 'categories', 'audit'].includes(args[0]?.toLowerCase()) && (args.length === 1 || args.length === 2 && !completion.trailingSpace)) return zoneSuggestions(storage);
     if (args[0]?.toLowerCase() === 'find' && args.length >= 2) return zoneSuggestions(storage);
     if (['plan', 'fetch', 'plan-deposit', 'deposit'].includes(args[0]?.toLowerCase()) && args.length >= 3) return zoneSuggestions(storage);
     if (args[0]?.toLowerCase() === 'category' && args.length === 1) return ['add', 'assign', 'unassign', 'overflow', 'remove'];
@@ -58,6 +66,12 @@ module.exports = {
         const [x1, y1, z1, x2, y2, z2] = coordinates(args.slice(2));
         const zone = await storage.saveZone({ name: args[1], from: { x: x1, y: y1, z: z1 }, to: { x: x2, y: y2, z: z2 } });
         return sender.reply(`[Storage] Saved ${zone.name} as ${zone.id}.`);
+      }
+      if (action === 'add-list') {
+        if (!bot?.entity) throw new Error('An active connection is required.');
+        if (!args[1]) throw new Error(`Usage: ${this.usage}`);
+        const zone = await storage.saveZone({ name: args[1], positions: positionTriples(args.slice(2)) });
+        return sender.reply(`[Storage] Saved ${zone.name} with ${zone.positions.length} registered container position${zone.positions.length === 1 ? '' : 's'}.`);
       }
       if (action === 'remove') {
         if (!args[1] || args.length > 2) throw new Error(`Usage: ${this.usage}`);
@@ -141,6 +155,12 @@ module.exports = {
         const status = await storage.startDeposit(request);
         return sender.reply(`[Storage] Depositing ${status.requested} x ${status.displayName} into ${status.containersPlanned} container${status.containersPlanned === 1 ? '' : 's'}.`);
       }
+      if (action === 'audit') {
+        if (!bot?.entity) throw new Error('An active connection is required.');
+        if (!args[1] || args.length > 2) throw new Error(`Usage: ${this.usage}`);
+        const audit = storage.startAudit(args[1]);
+        return sender.reply(`[Storage] Auditing ${audit.zoneName} across ${audit.containersPlanned} container${audit.containersPlanned === 1 ? '' : 's'}.`);
+      }
       if (action === 'status') {
         const status = storage.operationStatus?.() || storage.status();
         if (!status) return sender.reply('[Storage] No operation is active.');
@@ -155,6 +175,7 @@ module.exports = {
 };
 
 module.exports.coordinates = coordinates;
+module.exports.positionTriples = positionTriples;
 module.exports.scanDescription = scanDescription;
 module.exports.operationDescription = operationDescription;
 module.exports.transferRequest = transferRequest;

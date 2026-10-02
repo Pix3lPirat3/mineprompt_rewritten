@@ -10,6 +10,8 @@ const zone = {
   dimension: 'minecraft:overworld',
   from: { x: 0, y: 64, z: 0 },
   to: { x: 8, y: 72, z: 8 },
+  mode: 'bounds' as const,
+  positions: [],
   categories: [],
   createdAt: 1,
   updatedAt: 2,
@@ -59,6 +61,7 @@ describe('storage ribbon', () => {
       if (request.action === 'fetch') return { ok: true, status: { containersPlanned: 1 } };
       if (request.action === 'plan-deposit') return { ok: true, plan: { allocations: [{ position: { x: 1, y: 64, z: 1 } }], estimatedCost: 5 } };
       if (request.action === 'deposit') return { ok: true, status: { containersPlanned: 1 } };
+      if (request.action === 'audit') return { ok: true, status: { containersPlanned: 2 } };
       return { ok: true };
     });
     const { user } = renderWithRuntime(<StorageRibbon />, { api: { storageAction }, snapshot: {
@@ -110,6 +113,8 @@ describe('storage ribbon', () => {
     expect(storageAction).toHaveBeenLastCalledWith({ sessionId: 'primary', action: 'plan-deposit', zone: 'warehouse', slot: 9, count: 8 });
     await user.click(screen.getByRole('button', { name: 'Deposit' }));
     expect(storageAction).toHaveBeenLastCalledWith({ sessionId: 'primary', action: 'deposit', zone: 'warehouse', slot: 9, count: 8 });
+    await user.click(screen.getByRole('button', { name: 'Audit' }));
+    expect(storageAction).toHaveBeenLastCalledWith({ sessionId: 'primary', action: 'audit', zone: 'warehouse' });
     await user.click(screen.getByRole('button', { name: 'Scan' }));
     expect(storageAction).toHaveBeenLastCalledWith({ sessionId: 'primary', action: 'scan', zone: 'warehouse' });
   });

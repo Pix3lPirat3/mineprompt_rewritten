@@ -225,7 +225,7 @@ test('registers, scans, and queries storage through one terminal service', async
   const calls = [];
   const storage = {
     zones: () => [],
-    saveZone: async (request) => { calls.push(['save', request]); return { id: 'main', name: request.name }; },
+    saveZone: async (request) => { calls.push(['save', request]); return { id: 'main', name: request.name, positions: request.positions || [] }; },
     start: (zone) => { calls.push(['scan', zone]); return { zoneName: 'Main', running: true }; },
     find: (item, options) => { calls.push(['find', item, options]); return [{ zoneName: 'Main', count: 64, displayName: 'Stone', variantId: 'variant', stale: false }]; },
     categories: () => [],
@@ -233,7 +233,8 @@ test('registers, scans, and queries storage through one terminal service', async
     fetchPlan: async (request) => { calls.push(['plan', request]); return { requested: request.count, variant: { displayName: 'Stone' }, allocations: [{}], estimatedCost: 7 }; },
     startFetch: async (request) => { calls.push(['fetch', request]); return { requested: request.count, displayName: 'Stone', containersPlanned: 1 }; },
     depositPlan: async (request) => { calls.push(['plan-deposit', request]); return { requested: request.count, variant: { displayName: 'Stone' }, allocations: [{}], estimatedCost: 5 }; },
-    startDeposit: async (request) => { calls.push(['deposit', request]); return { requested: request.count, displayName: 'Stone', containersPlanned: 1 }; }
+    startDeposit: async (request) => { calls.push(['deposit', request]); return { requested: request.count, displayName: 'Stone', containersPlanned: 1 }; },
+    startAudit: (zone) => { calls.push(['audit', zone]); return { zoneName: 'Main', containersPlanned: 3 }; }
   };
   const added = sender();
   await storageCommand.execute(added.value, 'storage', ['add', 'Main', '0', '64', '0', '8', '72', '8'], { bot: { entity: {} }, storage });
@@ -263,6 +264,14 @@ test('registers, scans, and queries storage through one terminal service', async
   await storageCommand.execute(deposited.value, 'storage', ['deposit', 'stone', '8', 'main'], { bot: { entity: {} }, storage });
   assert.deepEqual(calls[7], ['deposit', { item: 'stone', slot: undefined, count: 8, zone: 'main', category: undefined }]);
   assert.match(deposited.replies[0], /Depositing 8 x Stone/u);
+  const listed = sender();
+  await storageCommand.execute(listed.value, 'storage', ['add-list', 'Hidden', '1', '64', '1', '4', '64', '1'], { bot: { entity: {} }, storage });
+  assert.deepEqual(calls[8], ['save', { name: 'Hidden', positions: [{ x: 1, y: 64, z: 1 }, { x: 4, y: 64, z: 1 }] }]);
+  assert.match(listed.replies[0], /2 registered container positions/u);
+  const audited = sender();
+  await storageCommand.execute(audited.value, 'storage', ['audit', 'main'], { bot: { entity: {} }, storage });
+  assert.deepEqual(calls[9], ['audit', 'main']);
+  assert.match(audited.replies[0], /Auditing Main across 3 containers/u);
 });
 
 test('imports and previews blueprints through the shared build service', async () => {

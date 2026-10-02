@@ -204,8 +204,9 @@ class ToolCatalog {
       sessionId: SessionId,
       action: Type.Union(['once', 'consistent', 'region', 'chunk', 'stop', 'status'].map((value) => Type.Literal(value))),
       position: Type.Optional(Position),
-      from: Type.Optional(Position),
-      to: Type.Optional(Position),
+        from: Type.Optional(Position),
+        to: Type.Optional(Position),
+        positions: Type.Optional(Type.Array(Position, { minItems: 1, maxItems: 512 })),
       depth: Type.Optional(Type.Integer({ minimum: 1, maximum: 16 })),
       preset: Type.Optional(Type.String({ minLength: 1, maxLength: 48 })),
       policy: Type.Optional(MiningPolicy)
@@ -234,7 +235,7 @@ class ToolCatalog {
     }));
       this.register(tool('mineprompt_storage', 'Register and categorize bounded storage zones, scan loaded containers, query exact variants, and safely plan or perform reserved fetches and deposits.', Type.Object({
         sessionId: SessionId,
-        action: Type.Union(['zones', 'save', 'remove', 'scan', 'inspect', 'find', 'categories', 'category-save', 'category-remove', 'plan', 'fetch', 'plan-deposit', 'deposit', 'status', 'stop'].map((value) => Type.Literal(value))),
+        action: Type.Union(['zones', 'save', 'remove', 'scan', 'inspect', 'find', 'categories', 'category-save', 'category-remove', 'plan', 'fetch', 'plan-deposit', 'deposit', 'audit', 'status', 'stop'].map((value) => Type.Literal(value))),
       zone: Type.Optional(Type.String({ minLength: 1, maxLength: 80 })),
       name: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
       from: Type.Optional(Position),

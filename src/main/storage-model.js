@@ -8,6 +8,8 @@ const MAX_STORAGE_VOLUME = 262144;
 const MAX_STORAGE_CATEGORIES = 64;
 const MAX_CATEGORY_SELECTORS = 256;
 const MAX_CATEGORY_CONTAINERS = 512;
+const MAX_STORAGE_POSITIONS = 512;
+const MAX_STORAGE_POSITION_SPAN = 4096;
 
 function finiteInteger(value, label) {
   const number = Number(value);
@@ -52,11 +54,29 @@ function positionInBounds(position, bounds) {
   return position.x >= bounds.from.x && position.x <= bounds.to.x && position.y >= bounds.from.y && position.y <= bounds.to.y && position.z >= bounds.from.z && position.z <= bounds.to.z;
 }
 
+function normalizePositionList(value) {
+  if (!Array.isArray(value) || !value.length || value.length > MAX_STORAGE_POSITIONS) throw new Error(`Position-list storage zones require 1 to ${MAX_STORAGE_POSITIONS} container positions.`);
+  const positions = [];
+  const keys = new Set();
+  for (const entry of value) {
+    const position = normalizePosition(entry, 'Storage container');
+    const key = `${position.x},${position.y},${position.z}`;
+    if (keys.has(key)) continue;
+    keys.add(key);
+    positions.push(position);
+  }
+  const coordinates = (axis) => positions.map((position) => position[axis]);
+  const from = { x: Math.min(...coordinates('x')), y: Math.min(...coordinates('y')), z: Math.min(...coordinates('z')) };
+  const to = { x: Math.max(...coordinates('x')), y: Math.max(...coordinates('y')), z: Math.max(...coordinates('z')) };
+  if (Math.max(to.x - from.x, to.y - from.y, to.z - from.z) > MAX_STORAGE_POSITION_SPAN) throw new Error(`Position-list storage zones cannot span more than ${MAX_STORAGE_POSITION_SPAN} blocks.`);
+  return { positions: positions.sort((left, right) => left.x - right.x || left.y - right.y || left.z - right.z), from, to };
+}
+
 function categoryId(value) {
   return String(value || '').trim().toLowerCase().replace(/[^a-z0-9]+/gu, '-').replace(/^-+|-+$/gu, '').slice(0, 48);
 }
 
-function cleanStorageCategories(value, bounds) {
+function cleanStorageCategories(value, bounds, positions = null) {
   if (value === undefined) return [];
   if (!Array.isArray(value) || value.length > MAX_STORAGE_CATEGORIES) throw new Error(`Storage zones cannot contain more than ${MAX_STORAGE_CATEGORIES} categories.`);
   const categories = [];
@@ -79,10 +99,13 @@ function cleanStorageCategories(value, bounds) {
     const containers = (Array.isArray(input?.containers) ? input.containers : []).map((entry) => normalizePosition(entry, 'Category container'));
     if (containers.length > MAX_CATEGORY_CONTAINERS) throw new Error(`Storage categories cannot contain more than ${MAX_CATEGORY_CONTAINERS} containers.`);
     const uniqueContainers = [];
+    const categoryContainers = new Set();
     for (const position of containers) {
-      if (!positionInBounds(position, bounds)) throw new Error(`A ${name} container is outside the storage zone.`);
+      if (positions ? !positions.has(`${position.x},${position.y},${position.z}`) : !positionInBounds(position, bounds)) throw new Error(`A ${name} container is outside the storage zone.`);
       const key = `${position.x},${position.y},${position.z}`;
+      if (categoryContainers.has(key)) continue;
       if (assigned.has(key)) throw new Error(`Storage container ${key} belongs to more than one category.`);
+      categoryContainers.add(key);
       assigned.add(key);
       uniqueContainers.push(position);
     }
@@ -126,9 +149,12 @@ function storageZoneId(name, existing = []) {
 
 function cleanStorageZone(input, options = {}) {
   if (!input || typeof input !== 'object') throw new Error('A storage zone is required.');
+  if (input.mode !== undefined && !['bounds', 'positions'].includes(input.mode)) throw new Error('Storage zone mode must be bounds or positions.');
   const name = String(input.name || '').trim();
   if (!name || name.length > 64) throw new Error('Storage zone names must contain 1 to 64 characters.');
-  const bounds = normalizeBounds(input.from, input.to);
+  const usePositionList = input.mode === 'positions' || input.mode === undefined && Array.isArray(input.positions) && input.positions.length;
+  const listed = usePositionList ? normalizePositionList(input.positions) : null;
+  const bounds = listed ? { from: listed.from, to: listed.to } : normalizeBounds(input.from, input.to);
   const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
   const createdAt = Number.isFinite(Number(input.createdAt)) ? Number(input.createdAt) : now;
   const id = String(input.id || options.id || '').trim();
@@ -140,7 +166,9 @@ function cleanStorageZone(input, options = {}) {
     dimension: normalizeDimension(input.dimension),
     from: bounds.from,
     to: bounds.to,
-    categories: cleanStorageCategories(input.categories, bounds),
+    mode: listed ? 'positions' : 'bounds',
+    positions: listed?.positions || [],
+    categories: cleanStorageCategories(input.categories, bounds, listed ? new Set(listed.positions.map((position) => `${position.x},${position.y},${position.z}`)) : null),
     createdAt,
     updatedAt: now
   };
@@ -198,6 +226,8 @@ module.exports = {
   MAX_CATEGORY_CONTAINERS,
   MAX_CATEGORY_SELECTORS,
   MAX_STORAGE_CATEGORIES,
+  MAX_STORAGE_POSITIONS,
+  MAX_STORAGE_POSITION_SPAN,
   MAX_STORAGE_AXIS,
   MAX_STORAGE_VOLUME,
   categoryId,
@@ -208,6 +238,7 @@ module.exports = {
   normalizeBounds,
   normalizeDimension,
   normalizePosition,
+  normalizePositionList,
   normalizeServer,
   storageContext,
   storageVariant,

@@ -48,7 +48,7 @@ test('drops invalid and duplicate persisted storage zones', () => {
     createdAt: 100,
     updatedAt: 200
   };
-  assert.deepEqual(cleanStorageZones([input, { ...input, id: 'duplicate' }, { broken: true }]), [{ ...input, categories: [] }]);
+  assert.deepEqual(cleanStorageZones([input, { ...input, id: 'duplicate' }, { broken: true }]), [{ ...input, mode: 'bounds', positions: [], categories: [] }]);
 });
 
 test('normalizes exclusive category selectors and container assignments', () => {
@@ -75,4 +75,19 @@ test('hashes exact item variants without exposing identity payloads', () => {
   assert.equal(plain.id.length, 24);
   assert.notEqual(plain.id, named.id);
   assert.notEqual(plain.identity, named.identity);
+});
+
+test('normalizes bounded explicit container lists', () => {
+  const zone = createStorageZone({
+    name: 'Hidden',
+    server: { host: 'example.test' },
+    dimension: 'overworld',
+    positions: [{ x: 20, y: 64, z: -5 }, { x: 2, y: 70, z: 8 }, { x: 20, y: 64, z: -5 }],
+    categories: [{ name: 'Overflow', overflow: true, containers: [{ x: 2, y: 70, z: 8 }] }]
+  });
+  assert.equal(zone.mode, 'positions');
+  assert.deepEqual(zone.from, { x: 2, y: 64, z: -5 });
+  assert.deepEqual(zone.to, { x: 20, y: 70, z: 8 });
+  assert.equal(zone.positions.length, 2);
+  assert.throws(() => createStorageZone({ ...zone, categories: [{ name: 'Outside', containers: [{ x: 3, y: 70, z: 8 }] }] }), /outside the storage zone/u);
 });

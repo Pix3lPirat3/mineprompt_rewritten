@@ -187,6 +187,8 @@ export interface StorageZoneSummary {
   dimension: string;
   from: TargetPosition;
   to: TargetPosition;
+  mode: 'bounds' | 'positions';
+  positions: TargetPosition[];
   categories: StorageCategory[];
   createdAt: number;
   updatedAt: number;
@@ -207,16 +209,10 @@ export interface StorageSnapshot {
   zones: StorageZoneSummary[];
 }
 
-export interface StorageOperationStatus {
-  kind: 'fetch' | 'deposit';
+interface StorageOperationBase {
   running: boolean;
   phase: string;
   zoneId: string;
-  category: { id: string; name: string } | null;
-  variantId: string;
-  displayName: string;
-  requested: number;
-  transferred: number;
   containersPlanned: number;
   containersVisited: number;
   startPosition: TargetPosition;
@@ -224,6 +220,38 @@ export interface StorageOperationStatus {
   returned: boolean;
   settled?: boolean;
 }
+
+export interface StorageTransferStatus extends StorageOperationBase {
+  kind: 'fetch' | 'deposit';
+  category: { id: string; name: string } | null;
+  variantId: string;
+  displayName: string;
+  requested: number;
+  transferred: number;
+}
+
+export interface StorageAuditIssue {
+  severity: 'error' | 'warning';
+  code: string;
+  position: TargetPosition;
+  variantId: string | null;
+  displayName: string | null;
+  expected: string | number | null;
+  actual: string | number | null;
+  message: string;
+}
+
+export interface StorageAuditStatus extends StorageOperationBase {
+  kind: 'audit';
+  zoneName: string;
+  issueCount: number;
+  errorCount: number;
+  warningCount: number;
+  omittedIssues: number;
+  issues: StorageAuditIssue[];
+}
+
+export type StorageOperationStatus = StorageTransferStatus | StorageAuditStatus;
 
 export interface BlueprintSummary {
   id: string;
@@ -284,7 +312,7 @@ export interface StorageScanDetails {
   unknownBlocks: number;
   failures: Array<{ position: TargetPosition | null; message: string }>;
   items: StorageIndexedItem[];
-  containers: Array<{ position: TargetPosition; block: string; slotCount: number; freeSlots: number; itemCount: number; items: StorageIndexedItem[] }>;
+  containers: Array<{ position: TargetPosition; block: string; categoryId: string | null; slotCount: number; freeSlots: number; itemCount: number; items: StorageIndexedItem[] }>;
 }
 
 export interface InventoryLayout {

@@ -359,6 +359,7 @@ class BotSession {
       if (action === 'fetch') return { ok: true, status: await storage.startFetch(request) };
       if (action === 'plan-deposit') return { ok: true, plan: await storage.depositPlan(request) };
       if (action === 'deposit') return { ok: true, status: await storage.startDeposit(request) };
+      if (action === 'audit') return { ok: true, status: storage.startAudit(request.zone) };
     if (action === 'stop') return { ok: storage.stop(), status: storage.operationStatus?.() || storage.status() };
     if (action === 'save') return { ok: true, zone: await storage.saveZone(request.zoneDetails || request) };
     if (action === 'remove') return { ok: await storage.removeZone(request.zone) };

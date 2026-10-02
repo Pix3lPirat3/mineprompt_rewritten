@@ -624,6 +624,26 @@ a {
   font-size: 9px;
 }
 
+.storage-audit-issues {
+  display: grid;
+  gap: 4px;
+  max-height: 130px;
+  padding: 8px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  background: rgba(7, 11, 16, 0.62);
+}
+
+.storage-audit-issues p {
+  margin: 0;
+  color: var(--warning);
+  font-size: 9px;
+}
+
+.storage-audit-issues p[data-severity="error"] {
+  color: var(--danger);
+}
+
 .target-ribbon__filters {
   align-self: center;
 }

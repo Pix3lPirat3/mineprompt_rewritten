@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { configureItemTexture } from '../../assets';
 import { Modal } from '../../components/Modal';
 import { consoleActions, useAppDispatch, useAppSelector } from '../../store';
-import type { ItemStack, StorageIndexedItem, StorageScanDetails, StorageZoneSummary } from '../../types';
+import type { ItemStack, StorageIndexedItem, StorageOperationStatus, StorageScanDetails, StorageZoneSummary } from '../../types';
 
 type Inspection = { zone: StorageZoneSummary; scan: StorageScanDetails | null };
 
@@ -11,6 +11,17 @@ function scanLabel(zone: StorageZoneSummary) {
   if (!scan) return 'Not scanned';
   if (scan.running) return `${scan.containersScanned}/${scan.containersFound} containers`;
   return `${scan.itemCount} items, ${scan.containersScanned} containers${scan.stale ? ', stale' : ''}`;
+}
+
+function operationLabel(operation: StorageOperationStatus) {
+  if (operation.kind === 'audit') return {
+    title: operation.running ? 'Auditing' : operation.phase,
+    detail: `${operation.containersVisited}/${operation.containersPlanned} containers, ${operation.errorCount} errors, ${operation.warningCount} warnings`
+  };
+  return {
+    title: operation.running ? operation.kind === 'deposit' ? 'Depositing' : 'Fetching' : operation.phase,
+    detail: `${operation.transferred}/${operation.requested} ${operation.displayName}`
+  };
 }
 
 export function StorageRibbon() {
@@ -56,6 +67,15 @@ export function StorageRibbon() {
   const scan = async (zone: StorageZoneSummary) => {
     try {
       await window.mineprompt.storageAction({ sessionId, action: 'scan', zone: zone.id });
+    } catch (error) {
+      report(error);
+    }
+  };
+
+  const audit = async (zone: StorageZoneSummary) => {
+    try {
+      const result = await window.mineprompt.storageAction({ sessionId, action: 'audit', zone: zone.id }) as { status?: { containersPlanned: number } };
+      if (result.status) setPlanText(`Audit started across ${result.status.containersPlanned} container${result.status.containersPlanned === 1 ? '' : 's'}`);
     } catch (error) {
       report(error);
     }
@@ -111,7 +131,7 @@ export function StorageRibbon() {
       <div className="storage-ribbon__list">
         {storage.operation ? (
           <div className="storage-chip storage-chip--operation">
-            <span><strong>{storage.operation.running ? storage.operation.kind === 'deposit' ? 'Depositing' : 'Fetching' : storage.operation.phase}</strong><small>{storage.operation.transferred}/{storage.operation.requested} {storage.operation.displayName}</small></span>
+            <span><strong>{operationLabel(storage.operation).title}</strong><small>{operationLabel(storage.operation).detail}</small></span>
           </div>
         ) : null}
         {storage.zones.map((zone) => (
@@ -128,6 +148,7 @@ export function StorageRibbon() {
               <span>
                 <button type="button" onClick={() => void inspect(inspection.zone)} disabled={loading}>Refresh</button>
                 <button type="button" onClick={() => void scan(inspection.zone)} disabled={status !== 'online' || inspection.scan?.running}>Scan</button>
+                <button type="button" onClick={() => void audit(inspection.zone)} disabled={status !== 'online' || !inspection.scan?.complete || storage.operation?.running}>Audit</button>
               </span>
             </header>
             {inspection.scan?.items.length ? (
@@ -177,6 +198,12 @@ export function StorageRibbon() {
                   </div>
                 ) : null}
               </section>
+            ) : null}
+            {storage.operation?.kind === 'audit' && storage.operation.zoneId === inspection.zone.id && storage.operation.issues.length ? (
+              <div className="storage-audit-issues">
+                {storage.operation.issues.slice(0, 12).map((issue, index) => <p key={`${issue.code}:${issue.position.x}:${issue.position.y}:${issue.position.z}:${index}`} data-severity={issue.severity}>{issue.message} ({issue.position.x}, {issue.position.y}, {issue.position.z})</p>)}
+                {storage.operation.issueCount > 12 ? <small>{storage.operation.issueCount - 12} more issues are available through storage status.</small> : null}
+              </div>
             ) : null}
             {inspection.scan?.failures.length ? <p className="storage-warning">{inspection.scan.failures.length} container scans failed. Run storage inspect in the terminal for details.</p> : null}
           </div>

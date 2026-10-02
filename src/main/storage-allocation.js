@@ -67,7 +67,8 @@ function resolveInventoryVariant(inventory, selector, slot) {
   return matches[0];
 }
 
-function containerCategory(zone, position) {
+function containerCategory(zone, position, categoryId = null) {
+  if (categoryId) return (zone.categories || []).find((category) => category.id === categoryId) || null;
   const key = positionKey(position);
   return (zone.categories || []).find((category) => category.containers.some((entry) => positionKey(entry) === key)) || null;
 }
@@ -87,7 +88,7 @@ function resolveDepositCategory(zone, variant, selector) {
 function depositCandidates(zone, scan, variant, category, reservations = new Map()) {
   const candidates = [];
   for (const container of scan.containers) {
-    const assigned = containerCategory(zone, container.position);
+    const assigned = containerCategory(zone, container.position, container.categoryId);
     const exact = container.items.find((item) => item.identity === variant.identity);
     const occupied = new Set(container.items.flatMap((item) => item.slots.map((entry) => entry.slot)));
     for (const source of exact?.slots || []) {

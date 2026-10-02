@@ -176,6 +176,28 @@ test('records inaccessible containers and continues scanning', async () => {
   assert.equal(windows.every((window) => window.closed), true);
 });
 
+test('scans only registered positions in a position-list zone', async () => {
+  const { service, zone } = setup();
+  zone.mode = 'positions';
+  zone.positions = [{ x: 1, y: 64, z: 1 }, { x: 4, y: 64, z: 1 }];
+  service.start('warehouse');
+  await waitForScan(service);
+  const result = service.inspect('warehouse').scan;
+  assert.equal(result.containersFound, 2);
+  assert.deepEqual(result.containers.map((entry) => entry.position.x).sort(), [1, 4]);
+});
+
+test('preserves a category assigned through the other half of a listed chest', async () => {
+  const { service, zone } = setup();
+  zone.mode = 'positions';
+  zone.positions = [{ x: 2, y: 64, z: 1 }];
+  zone.categories = [{ id: 'wood', name: 'Wood', items: ['oak_planks'], containers: [{ x: 2, y: 64, z: 1 }], overflow: false }];
+  service.start('warehouse');
+  await waitForScan(service);
+  const result = service.inspect('warehouse').scan;
+  assert.deepEqual(result.containers.map((entry) => [entry.position.x, entry.categoryId]), [[1, 'wood']]);
+});
+
 test('reserves, revalidates, and fetches an exact item variant', async () => {
   const { service, store, transfers } = setup();
   service.start('warehouse');
@@ -238,13 +260,81 @@ test('saves category policy without invalidating a current scan', async () => {
   const category = await service.saveCategory('warehouse', {
     name: 'Building Blocks',
     items: ['stone'],
-    containers: [{ x: 4, y: 64, z: 1 }]
+    containers: [{ x: 2, y: 64, z: 1 }]
   });
   assert.equal(category.id, 'building-blocks');
   assert.equal(service.categories('warehouse')[0].items[0], 'stone');
+  assert.equal(service.inspect('warehouse').scan.containers.find((entry) => entry.position.x === 1).categoryId, 'building-blocks');
   assert.equal(service.inspect('warehouse').scan.stale, false);
   assert.equal(await service.removeCategory('warehouse', category.id), true);
   assert.deepEqual(service.categories('warehouse'), []);
+});
+
+test('audits live stock, category policy, and stack fragmentation', async () => {
+  const { items, service } = setup();
+  service.start('warehouse');
+  await waitForScan(service);
+  await service.saveCategory('warehouse', {
+    name: 'Wood',
+    items: ['oak_planks'],
+    containers: [{ x: 4, y: 64, z: 1 }]
+  });
+  items['4,64,1'][0].count = 60;
+  items['4,64,1'].push({ slot: 1, type: 1, metadata: 0, name: 'stone', displayName: 'Stone', count: 2, stackSize: 64 });
+  const started = service.startAudit('warehouse');
+  assert.equal(started.kind, 'audit');
+  await waitForOperation(service);
+  const status = service.operationStatus();
+  assert.equal(status.phase, 'complete');
+  assert.equal(status.containersVisited, 3);
+  assert.equal(status.errorCount, 1);
+  assert.equal(status.warningCount, 2);
+  assert.deepEqual(status.issues.map((issue) => issue.code).sort(), ['category-mismatch', 'fragmented-stacks', 'stock-changed']);
+});
+
+test('reports missing indexed containers and cancels a pending audit', async () => {
+  const { blocks, bot, service } = setup();
+  service.start('warehouse');
+  await waitForScan(service);
+  blocks.delete('3,64,1');
+  service.startAudit('warehouse');
+  await waitForOperation(service);
+  assert.equal(service.operationStatus().issues.some((issue) => issue.code === 'container-missing'), true);
+  blocks.set('3,64,1', block('barrel', 3, 64, 1));
+  service.start('warehouse');
+  await waitForScan(service);
+  let releaseOpen;
+  const originalOpen = bot.openContainer.bind(bot);
+  bot.openContainer = async (target) => {
+    await new Promise((resolve) => { releaseOpen = resolve; });
+    return originalOpen(target);
+  };
+  service.startAudit('warehouse');
+  for (let count = 0; count < 20; count += 1) {
+    if (releaseOpen) break;
+    await new Promise((resolve) => { globalThis.setTimeout(resolve, 0); });
+  }
+  assert.equal(service.stop(), true);
+  releaseOpen();
+  await waitForOperation(service);
+  assert.equal(service.operationStatus().phase, 'stopping');
+});
+
+test('continues an audit after a container becomes inaccessible', async () => {
+  const { bot, service } = setup();
+  service.start('warehouse');
+  await waitForScan(service);
+  const originalOpen = bot.openContainer.bind(bot);
+  bot.openContainer = async (target) => {
+    if (target.position.x === 3) throw new Error('Container is locked.');
+    return originalOpen(target);
+  };
+  service.startAudit('warehouse');
+  await waitForOperation(service);
+  const status = service.operationStatus();
+  assert.equal(status.phase, 'complete');
+  assert.equal(status.containersVisited, 3);
+  assert.equal(status.issues.some((issue) => issue.code === 'container-inaccessible'), true);
 });
 
 test('plans, reserves, revalidates, and deposits an exact inventory variant', async () => {

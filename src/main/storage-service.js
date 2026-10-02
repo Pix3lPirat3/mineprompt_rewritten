@@ -7,8 +7,11 @@ const { serializeItem } = require('./inventory-model');
 const { itemIdentity } = require('./item-identity');
 const { cancelNavigation, navigateGoal } = require('./navigation-service');
 const { isStorageBlock } = require('./stash-service');
-const { planDeposit: planDepositAllocation, planWithdrawal } = require('./storage-allocation');
+const { containerCategory, planDeposit: planDepositAllocation, planWithdrawal } = require('./storage-allocation');
 const { categoryId, normalizePosition, storageContext, storageVariant, zoneMatchesContext } = require('./storage-model');
+
+const MAX_STORAGE_AUDIT_CONTAINERS = 512;
+const MAX_STORAGE_AUDIT_ISSUES = 1024;
 
 function positionKey(position) {
   return `${Math.floor(position.x)},${Math.floor(position.y)},${Math.floor(position.z)}`;
@@ -118,6 +121,82 @@ function windowInventoryItems(window) {
     return window.slots.slice(window.inventoryStart, window.inventoryEnd).filter(Boolean);
   }
   return (window?.items?.() || []).filter((item) => item.slot >= window.inventoryStart && item.slot < window.inventoryEnd);
+}
+
+function groupedItemRecords(items, client) {
+  const grouped = new Map();
+  for (const item of items || []) mergeItem(grouped, itemRecord(item, client));
+  return grouped;
+}
+
+function auditContainer(indexed, liveItems, zone, client) {
+  const issues = [];
+  const live = groupedItemRecords(liveItems, client);
+  const expected = new Map(indexed.items.map((item) => [item.identity, item]));
+  const identities = new Set([...expected.keys(), ...live.keys()]);
+  for (const identity of identities) {
+    const before = expected.get(identity);
+    const after = live.get(identity);
+    const expectedCount = before?.count || 0;
+    const actualCount = after?.count || 0;
+    const item = after || before;
+    if (expectedCount !== actualCount) issues.push({
+      severity: 'error',
+      code: 'stock-changed',
+      position: { ...indexed.position },
+      variantId: item.variantId,
+      displayName: item.displayName,
+      expected: expectedCount,
+      actual: actualCount,
+      message: `${item.displayName} changed from ${expectedCount} to ${actualCount}.`
+    });
+    const partialStacks = (after?.slots || []).filter((slot) => slot.count < after.stackSize).length;
+    if (partialStacks > 1) issues.push({
+      severity: 'warning',
+      code: 'fragmented-stacks',
+      position: { ...indexed.position },
+      variantId: after.variantId,
+      displayName: after.displayName,
+      expected: 1,
+      actual: partialStacks,
+      message: `${after.displayName} occupies ${partialStacks} partial stacks.`
+    });
+  }
+  const category = containerCategory(zone, indexed.position, indexed.categoryId);
+  if (category && !category.overflow && category.items.length) {
+    const selectors = new Set(category.items);
+    for (const item of live.values()) {
+      const keys = [item.variantId, item.name, item.displayName].map((entry) => String(entry || '').toLowerCase());
+      if (keys.some((entry) => selectors.has(entry))) continue;
+      issues.push({
+        severity: 'warning',
+        code: 'category-mismatch',
+        position: { ...indexed.position },
+        variantId: item.variantId,
+        displayName: item.displayName,
+        expected: category.id,
+        actual: null,
+        message: `${item.displayName} does not match category ${category.name}.`
+      });
+    }
+  }
+  return issues;
+}
+
+function applyScanCategories(state, zone, bot) {
+  if (!state) return;
+  state.containerCategories.clear();
+  for (const container of state.containers) container.categoryId = containerCategory(zone, container.position)?.id || null;
+  for (const category of zone.categories || []) {
+    for (const assigned of category.containers) {
+      const block = bot?.blockAt?.(assigned);
+      const position = isStorageBlock(block) ? pairedStoragePosition(block, (value) => bot.blockAt(value)) : assigned;
+      const key = positionKey(position);
+      state.containerCategories.set(key, category.id);
+      const container = state.containers.find((entry) => positionKey(entry.position) === key);
+      if (container) container.categoryId = category.id;
+    }
+  }
 }
 
 function publicScan(state, stale) {
@@ -233,7 +312,10 @@ class StorageService {
     const categories = current ? existingCategories.map((entry) => entry.id === current.id ? category : entry) : [...existingCategories, category];
     const saved = await this.store.saveStorageZone({ ...zone, categories });
     const state = this.scans.get(zone.id);
-    if (state) state.zoneUpdatedAt = saved.updatedAt;
+    if (state) {
+      state.zoneUpdatedAt = saved.updatedAt;
+      applyScanCategories(state, saved, this.bot);
+    }
     this.onChange();
     return saved.categories.find((entry) => entry.id === category.id);
   }
@@ -246,7 +328,10 @@ class StorageService {
     if (categories.length === existingCategories.length) return false;
     const saved = await this.store.saveStorageZone({ ...zone, categories });
     const state = this.scans.get(zone.id);
-    if (state) state.zoneUpdatedAt = saved.updatedAt;
+    if (state) {
+      state.zoneUpdatedAt = saved.updatedAt;
+      applyScanCategories(state, saved, this.bot);
+    }
     this.onChange();
     return true;
   }
@@ -359,6 +444,133 @@ class StorageService {
 
   async depositPlan(request = {}) {
     return this.publicDepositPlan(await this.planDeposit(request));
+  }
+
+  startAudit(reference) {
+    const bot = this.bot;
+    if (!bot?.entity) throw new Error('An active connection is required.');
+    if (bot.currentWindow) throw new Error('Close the current container before auditing storage.');
+    if (this.active || this.operation?.running || this.activities.has('storage-audit') || this.activities.has('storage-transfer')) throw new Error('A storage operation is already active.');
+    const zone = this.resolveZone(reference);
+    const scan = this.scans.get(zone.id);
+    if (!scan?.complete) throw new Error(`${zone.name} requires a complete scan before it can be audited.`);
+    if (scan.containers.length > MAX_STORAGE_AUDIT_CONTAINERS) throw new Error(`Storage audits cannot visit more than ${MAX_STORAGE_AUDIT_CONTAINERS} containers.`);
+    const startPosition = bot.entity.position.clone();
+    const lookBlock = bot.blockAtCursor?.(32);
+    const lookPosition = lookBlock?.position?.offset?.(0.5, 0.5, 0.5) || null;
+    const state = {
+      kind: 'audit',
+      running: true,
+      phase: 'starting',
+      zoneId: zone.id,
+      zoneName: zone.name,
+      containersPlanned: scan.containers.length,
+      containersVisited: 0,
+      issueCount: 0,
+      errorCount: 0,
+      warningCount: 0,
+      omittedIssues: 0,
+      issues: [],
+      startPosition: normalizePosition(startPosition),
+      failed: null,
+      returned: false,
+      settled: false,
+      window: null,
+      startYaw: bot.entity.yaw,
+      startPitch: bot.entity.pitch
+    };
+    const stop = () => {
+      state.running = false;
+      state.phase = 'stopping';
+      cancelNavigation(bot);
+      if (state.window?.close) void Promise.resolve(state.window.close()).catch(() => {});
+    };
+    this.activities.register('storage-audit', {
+      label: 'Storage audit',
+      detail: `Auditing ${zone.name}`,
+      resources: ['movement', 'inventory'],
+      stop
+    });
+    this.operation = state;
+    void this.runAudit({ bot, zone, scan, state, startPosition, lookPosition }).catch((error) => {
+      state.failed = error.message;
+      state.phase = 'failed';
+      if (state.running) this.logger.warn(`[Storage] ${error.message}`);
+    }).finally(async () => {
+      state.running = false;
+      if (state.window?.close) {
+        try { await state.window.close(); } catch {}
+        state.window = null;
+      }
+      if (!state.returned) {
+        try {
+          await this.returnToStart(bot, startPosition, state.startYaw, state.startPitch, lookPosition);
+          state.returned = true;
+        } catch (error) {
+          if (!state.failed) state.failed = error.message;
+          this.logger.warn(`[Storage] Could not restore the starting position: ${error.message}`);
+        }
+      }
+      this.activities.finish('storage-audit');
+      state.settled = true;
+      this.onChange();
+    });
+    this.onChange();
+    return this.operationStatus();
+  }
+
+  recordAuditIssue(state, issue) {
+    state.issueCount += 1;
+    if (issue.severity === 'error') state.errorCount += 1;
+    else state.warningCount += 1;
+    if (state.issues.length < MAX_STORAGE_AUDIT_ISSUES) state.issues.push(issue);
+    else state.omittedIssues += 1;
+  }
+
+  async runAudit({ bot, zone, scan, state, startPosition, lookPosition }) {
+    for (const indexed of scan.containers) {
+      if (!state.running) return;
+      try {
+        await this.auditOneContainer({ bot, zone, indexed, state });
+      } catch (error) {
+        if (!state.running) return;
+        this.recordAuditIssue(state, { severity: 'error', code: 'container-inaccessible', position: { ...indexed.position }, variantId: null, displayName: null, expected: indexed.block, actual: null, message: error.message });
+      } finally {
+        if (state.window?.close) {
+          try { await state.window.close(); } catch {}
+          state.window = null;
+        }
+        state.containersVisited += 1;
+      }
+      if (typeof bot.waitForTicks === 'function') await bot.waitForTicks(1);
+    }
+    if (!state.running) return;
+    state.phase = 'returning';
+    await this.returnToStart(bot, startPosition, state.startYaw, state.startPitch, lookPosition);
+    state.returned = true;
+    state.phase = 'complete';
+    this.logger.log(`[Storage] Audited ${state.containersVisited} containers in ${zone.name}: ${state.errorCount} errors and ${state.warningCount} warnings.`);
+  }
+
+  async auditOneContainer({ bot, zone, indexed, state }) {
+    state.phase = 'navigating';
+    this.activities.update('storage-audit', `Auditing ${state.containersVisited}/${state.containersPlanned} containers in ${zone.name}`);
+    if (bot.entity.position.distanceTo(indexed.position) > 4.5) {
+      await navigateGoal(bot, new GoalNear(indexed.position.x, indexed.position.y, indexed.position.z, 3), { description: 'an indexed storage container' });
+    }
+    if (!state.running) return;
+    const block = bot.blockAt(indexed.position);
+    if (!isStorageBlock(block)) {
+      this.recordAuditIssue(state, { severity: 'error', code: 'container-missing', position: { ...indexed.position }, variantId: null, displayName: null, expected: indexed.block, actual: block?.name || null, message: 'The indexed storage container is no longer available.' });
+      return;
+    }
+    await bot.lookAt(block.position.offset(0.5, 0.5, 0.5), true);
+    state.phase = 'inspecting';
+    state.window = await bot.openContainer(block);
+    if (!state.running) return;
+    const liveSlotCount = Math.max(0, Number(state.window.inventoryStart) || 0);
+    if (liveSlotCount !== indexed.slotCount) this.recordAuditIssue(state, { severity: 'error', code: 'capacity-changed', position: { ...indexed.position }, variantId: null, displayName: null, expected: indexed.slotCount, actual: liveSlotCount, message: `Container capacity changed from ${indexed.slotCount} to ${liveSlotCount} slots.` });
+    for (const issue of auditContainer(indexed, state.window.containerItems?.() || [], zone, this.client)) this.recordAuditIssue(state, issue);
   }
 
   async startFetch(request = {}) {
@@ -618,6 +830,7 @@ class StorageService {
       failures: [],
       items: new Map(),
       containers: [],
+      containerCategories: new Map(),
       window: null
     };
     const stop = () => {
@@ -657,6 +870,28 @@ class StorageService {
   async discover(zone, state) {
     const bot = this.bot;
     const containers = new Map();
+    if (zone.mode === 'positions') {
+      for (const listed of zone.positions) {
+        if (!state.running) break;
+        const block = bot.blockAt(listed);
+        if (!block) {
+          state.unknownBlocks += 1;
+          continue;
+        }
+        if (!isStorageBlock(block)) {
+          state.failures.push({ position: { ...listed }, message: 'The registered position is not a supported storage container.' });
+          continue;
+        }
+        const position = pairedStoragePosition(block, (value) => bot.blockAt(value));
+        const key = positionKey(position);
+        if (!containers.has(key)) containers.set(key, position);
+        const category = containerCategory(zone, listed);
+        const currentCategory = state.containerCategories.get(key);
+        if (category && currentCategory && currentCategory !== category.id) state.failures.push({ position: { ...listed }, message: 'Paired container positions have conflicting category assignments.' });
+        else if (category) state.containerCategories.set(key, category.id);
+      }
+      return [...containers.values()];
+    }
     let visited = 0;
     for (let x = zone.from.x; x <= zone.to.x && state.running; x += 1) {
       for (let y = zone.from.y; y <= zone.to.y && state.running; y += 1) {
@@ -670,7 +905,12 @@ class StorageService {
           }
           if (!isStorageBlock(block)) continue;
           const position = pairedStoragePosition(block, (value) => bot.blockAt(value));
-          if (!containers.has(positionKey(position))) containers.set(positionKey(position), position);
+          const key = positionKey(position);
+          if (!containers.has(key)) containers.set(key, position);
+          const category = containerCategory(zone, block.position);
+          const currentCategory = state.containerCategories.get(key);
+          if (category && currentCategory && currentCategory !== category.id) state.failures.push({ position: normalizePosition(block.position), message: 'Paired container positions have conflicting category assignments.' });
+          else if (category) state.containerCategories.set(key, category.id);
         }
       }
     }
@@ -691,7 +931,7 @@ class StorageService {
       const [position] = positions.splice(nearest, 1);
       this.activities.update('storage-scan', `Scanning ${index + 1} of ${state.containersFound} containers in ${zone.name}`);
       try {
-        await this.scanContainer(position, state);
+        await this.scanContainer(position, state, zone);
       } catch (error) {
         state.failures.push({ position: { ...position }, message: error.message });
       }
@@ -705,7 +945,7 @@ class StorageService {
     this.logger.log(`[Storage] Scanned ${state.containersScanned} of ${state.containersFound} containers in ${zone.name}.`);
   }
 
-  async scanContainer(position, state) {
+  async scanContainer(position, state, zone) {
     const bot = this.bot;
     if (bot.entity.position.distanceTo(position) > 4.5) {
       await navigateGoal(bot, new GoalNear(position.x, position.y, position.z, 3), { description: 'a storage container' });
@@ -726,6 +966,7 @@ class StorageService {
     state.containers.push({
       position: normalizePosition(position),
       block: block.name,
+      categoryId: state.containerCategories.get(positionKey(position)) || containerCategory(zone, position)?.id || null,
       slotCount: Math.max(0, Number(state.window.inventoryStart) || 0),
       freeSlots: Math.max(0, (Number(state.window.inventoryStart) || 0) - occupiedSlots),
       itemCount: items.reduce((sum, item) => sum + item.count, 0),
@@ -738,7 +979,7 @@ class StorageService {
   }
 
   stop() {
-    return this.activities.stop('storage-transfer') || this.activities.stop('storage-scan');
+    return this.activities.stop('storage-transfer') || this.activities.stop('storage-audit') || this.activities.stop('storage-scan');
   }
 
   operationStatus() {
@@ -781,7 +1022,11 @@ class StorageService {
 }
 
 module.exports = {
+  MAX_STORAGE_AUDIT_CONTAINERS,
+  MAX_STORAGE_AUDIT_ISSUES,
   StorageService,
+  applyScanCategories,
+  auditContainer,
   blockProperties,
   currentStorageContext,
   depositInventory,
