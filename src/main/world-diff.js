@@ -94,6 +94,10 @@ async function analyzeBlueprint(bot, blueprint, request = {}, options = {}) {
   const occupied = entityPositions(bot);
   const stateCache = new Map();
   const records = options.records === true ? [] : null;
+  const temporaryScaffolds = new Set((Array.isArray(options.temporaryScaffolds) ? options.temporaryScaffolds : []).slice(0, 8192).flatMap((position) => {
+    const values = [Number(position?.x), Number(position?.y), Number(position?.z)];
+    return values.every(Number.isFinite) ? [`${Math.floor(values[0])},${Math.floor(values[1])},${Math.floor(values[2])}`] : [];
+  }));
   let replacements = 0;
   for (let index = 0; index < transformed.blocks.length; index += 1) {
     if (index && index % 4096 === 0) await yieldEventLoop();
@@ -101,11 +105,13 @@ async function analyzeBlueprint(bot, blueprint, request = {}, options = {}) {
     const entry = transformed.palette[paletteIndex];
     const local = positionFromIndex(index, transformed.dimensions);
     const position = targetPosition(anchor, transformed.offset, local);
+    const key = `${position.x},${position.y},${position.z}`;
     const expectedAir = entry.air || isAirState(entry.state);
     const block = bot.blockAt(new Vec3(position.x, position.y, position.z));
+    const temporaryScaffold = temporaryScaffolds.has(key) && policy.scaffolding.includes(block?.name);
     const record = { position, expected: entry.state, current: blockStateFromWorld(block, stateCache) };
     const collect = (kind) => {
-      if (records) records.push({ index, paletteIndex, kind, local, position: { ...position }, expected: entry.state, current: record.current, blockName: block?.name || null, entry });
+      if (records) records.push({ index, paletteIndex, kind, local, position: { ...position }, expected: entry.state, current: record.current, blockName: block?.name || null, entry, temporaryScaffold });
     };
     if (!block) {
       counts.unknown += 1;
@@ -131,8 +137,14 @@ async function analyzeBlueprint(bot, blueprint, request = {}, options = {}) {
       collect('unsupported');
       continue;
     }
+    if (!expectedAir && temporaryScaffold) {
+      counts.placeable += 1;
+      addSample(samples, 'placeable', record);
+      collect('placeable');
+      if (entry.item) addCount(requirements, entry.item);
+      continue;
+    }
     const currentAir = REPLACEABLE_BLOCKS.has(block.name) && ['air', 'cave_air', 'void_air'].includes(block.name);
-    const key = `${position.x},${position.y},${position.z}`;
     if (!expectedAir && currentAir) {
       if (occupied.has(key)) {
         counts.temporarilyObstructed += 1;

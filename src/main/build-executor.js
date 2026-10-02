@@ -59,7 +59,7 @@ function unsupportedOperations(compiled) {
   });
 }
 
-function validateCompiled(bot, compiled, request) {
+function validateCompiled(bot, compiled, request, options = {}) {
   const counts = compiled.analysis.counts;
   const unsafe = ['conflicting', 'temporarilyObstructed', 'unknown', 'unsupported'].filter((key) => counts[key] > 0);
   if (unsafe.length) throw new Error(`The build preview is not executable: ${unsafe.map((key) => `${counts[key]} ${key}`).join(', ')}.`);
@@ -69,12 +69,50 @@ function validateCompiled(bot, compiled, request) {
   const unsupported = unsupportedOperations(compiled);
   if (unsupported.length) throw new Error(`The build contains ${unsupported.length} placements that require unsupported exact-state handling.`);
   if (compiled.graph.counts.removals && request.confirmed !== true) throw new Error(`The build requires ${compiled.graph.counts.removals} removals. Repeat with explicit confirmation.`);
-  const missing = missingItems(bot, compiled);
+  const missing = options.skipMaterials ? [] : missingItems(bot, compiled);
   if (missing.length) throw new Error(`The build is missing ${missing.map((entry) => `${entry.missing} x ${entry.name}`).join(', ')}.`);
 }
 
 function liveState(bot, position) {
   return blockStateFromWorld(bot.blockAt(positionVector(position)));
+}
+
+function samePosition(left, right) {
+  return left.x === right.x && left.y === right.y && left.z === right.z;
+}
+
+function resumeScaffoldPlan(bot, compiled, job) {
+  const records = new Map((compiled.analysis.records || []).map((record) => [positionKey(record.position), record]));
+  const plannedCleanup = new Set(compiled.graph.operations.filter((operation) => operation.kind === 'scaffold-remove').map((operation) => positionKey(operation.position)));
+  const operations = [];
+  const positions = [];
+  const seen = new Set();
+  for (const position of job.temporaryScaffolds) {
+    const key = positionKey(position);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    const observed = liveState(bot, position);
+    if (isAirState(observed || '')) continue;
+    const record = records.get(key);
+    if (record?.kind === 'correct' && observed === record.expected) continue;
+    const block = bot.blockAt(positionVector(position));
+    if (!block?.name || !job.policy.scaffolding.includes(block.name)) throw new Error(`Temporary scaffold ${key} changed to ${block?.name || 'an unloaded block'}.`);
+    positions.push({ ...position });
+    if (plannedCleanup.has(key)) continue;
+    operations.push({
+      id: `resume-scaffold-remove:${key}`,
+      kind: 'scaffold-remove',
+      position: { ...position },
+      current: observed,
+      expected: 'minecraft:air',
+      item: null,
+      dependencies: [],
+      blocked: [],
+      instruction: null
+    });
+  }
+  operations.sort((left, right) => right.position.y - left.position.y || left.id.localeCompare(right.id));
+  return { operations, positions };
 }
 
 function activeConnection(getClient) {
@@ -91,13 +129,14 @@ function publicStatus(active, jobs) {
 }
 
 class BuildExecutor {
-  constructor({ compile, getClient, store, activities, logger, owner = '', onChange = () => {}, now = Date.now }) {
+  constructor({ compile, getClient, store, activities, storage = null, logger, owner = '', onChange = () => {}, now = Date.now }) {
     if (typeof compile !== 'function' || typeof getClient !== 'function') throw new TypeError('Build compilation and client access are required.');
     if (!store || !activities) throw new TypeError('Build persistence and activity management are required.');
     this.compile = compile;
     this.getClient = getClient;
     this.store = store;
     this.activities = activities;
+    this.storage = storage;
     this.logger = logger || { warn() {} };
     this.owner = String(owner || 'builder');
     this.onChange = onChange;
@@ -123,6 +162,8 @@ class BuildExecutor {
       const context = currentStorageContext(client);
       if (!context) throw new Error('The connected server identity is unavailable.');
       const compiled = await this.compile(reference, request);
+      validateCompiled(client.bot, compiled, request, { skipMaterials: true });
+      await this.prepareMaterials(client.bot, compiled);
       validateCompiled(client.bot, compiled, request);
       return await this.launch(compiled, request, context);
     } finally {
@@ -141,7 +182,9 @@ class BuildExecutor {
       const context = currentStorageContext(client);
       if (!context || context.server.host !== job.server.host || context.server.port !== job.server.port || context.dimension !== job.dimension) throw new Error('The build job belongs to another server or dimension.');
       const request = { anchor: job.anchor, rotation: job.rotation, mirror: job.mirror, policy: job.policy, confirmed: true };
-      const compiled = await this.compile(job.blueprintHash, request);
+      const compiled = await this.compile(job.blueprintHash, request, { temporaryScaffolds: job.temporaryScaffolds });
+      validateCompiled(client.bot, compiled, request, { skipMaterials: true });
+      await this.prepareMaterials(client.bot, compiled);
       validateCompiled(client.bot, compiled, request);
       return await this.launch(compiled, request, context, job);
     } finally {
@@ -149,16 +192,33 @@ class BuildExecutor {
     }
   }
 
+  async prepareMaterials(bot, compiled) {
+    const missing = missingItems(bot, compiled);
+    if (!missing.length || compiled.analysis.policy.materials === 'inventory') return;
+    if (!this.storage || typeof this.storage.startFetch !== 'function' || typeof this.storage.waitForTransfer !== 'function') throw new Error('Storage-backed build materials are not configured.');
+    const zones = this.storage.zones();
+    const requestedZone = compiled.analysis.policy.storageZone;
+    const zone = requestedZone ? zones.find((entry) => entry.id === requestedZone || entry.name.toLowerCase() === requestedZone.toLowerCase()) : zones.length === 1 ? zones[0] : null;
+    if (!zone) throw new Error(requestedZone ? `Storage zone ${requestedZone} is not available for this build.` : 'Choose a storage zone when more than one zone is available.');
+    for (const entry of missing) {
+      await this.storage.startFetch({ zone: zone.id, item: entry.name, count: entry.missing });
+      const result = await this.storage.waitForTransfer();
+      if (!result?.settled || result.failed || result.transferred < entry.missing) throw new Error(result?.failed || `Storage fetched only ${result?.transferred || 0} of ${entry.missing} required ${entry.name}.`);
+    }
+  }
+
   async launch(compiled, request, context, previous = null) {
     const now = this.now();
     const baseCount = previous ? previous.completedCount + previous.skippedCount : 0;
+    const recovery = previous ? resumeScaffoldPlan(activeConnection(this.getClient).bot, compiled, previous) : { operations: [], positions: [] };
     let job = previous
       ? updateBuildJob(previous, {
           status: 'running',
           phase: 'starting',
-          operationCount: baseCount + compiled.graph.operations.length,
+          operationCount: baseCount + recovery.operations.length + compiled.graph.operations.length,
           latestError: null,
           unresolvedSamples: [],
+          temporaryScaffolds: recovery.positions,
           metrics: { finishedAt: null, startedAt: previous.metrics.startedAt || now }
         }, now)
       : createBuildJob({
@@ -179,7 +239,7 @@ class BuildExecutor {
         }, now);
     const controller = new AbortController();
     const state = { desiredStatus: null };
-    const active = { job, compiled, controller, state, promise: null };
+    const active = { job, compiled, cleanupOperations: recovery.operations, controller, state, promise: null };
     const stop = () => {
       state.desiredStatus ||= 'stopped';
       controller.abort(new Error(state.desiredStatus === 'paused' ? 'Build paused.' : 'Build stopped.'));
@@ -243,6 +303,18 @@ class BuildExecutor {
     const plannedStances = stanceMap(compiled);
     const outcomes = new Map();
     let batch = 0;
+    for (const operation of active.cleanupOperations) {
+      signal.throwIfAborted();
+      try {
+        await this.executeWithRetry(active, operation, null);
+        this.completeOperation(active, operation);
+        await this.save(active, active.job);
+      } catch (error) {
+        if (signal.aborted) throw error;
+        await this.recordFailure(active, operation, error.message, false);
+        throw error;
+      }
+    }
     for (const id of compiled.graph.order) {
       signal.throwIfAborted();
       const operation = operations.get(id);
@@ -256,16 +328,7 @@ class BuildExecutor {
       try {
         await this.executeWithRetry(active, operation, plannedStances.get(id));
         outcomes.set(id, 'done');
-        active.job = updateBuildJob(active.job, {
-          phase: 'building',
-          completedCount: active.job.completedCount + 1,
-          completedSamples: [...active.job.completedSamples, operation.position],
-          temporaryScaffolds: operation.kind === 'scaffold-place'
-            ? [...active.job.temporaryScaffolds, operation.position]
-            : operation.kind === 'scaffold-remove'
-              ? active.job.temporaryScaffolds.filter((position) => position.x !== operation.position.x || position.y !== operation.position.y || position.z !== operation.position.z)
-              : active.job.temporaryScaffolds
-        }, this.now());
+        this.completeOperation(active, operation);
       } catch (error) {
         if (signal.aborted) throw error;
         outcomes.set(id, 'failed');
@@ -297,6 +360,19 @@ class BuildExecutor {
     if (incomplete.length) throw new Error(`Final build verification found ${incomplete.map(([key, count]) => `${count} ${key}`).join(', ')}.`);
     const status = active.job.unresolvedSamples.length ? 'failed' : 'complete';
     await this.save(active, { status, phase: status, metrics: { finishedAt: this.now() } });
+  }
+
+  completeOperation(active, operation) {
+    active.job = updateBuildJob(active.job, {
+      phase: 'building',
+      completedCount: active.job.completedCount + 1,
+      completedSamples: [...active.job.completedSamples, operation.position],
+      temporaryScaffolds: operation.kind === 'scaffold-place'
+        ? [...active.job.temporaryScaffolds, operation.position]
+        : operation.kind === 'scaffold-remove'
+          ? active.job.temporaryScaffolds.filter((position) => !samePosition(position, operation.position))
+          : active.job.temporaryScaffolds
+    }, this.now());
   }
 
   async recordFailure(active, operation, message, skipped) {
@@ -375,7 +451,8 @@ class BuildExecutor {
   async placeBlock(bot, operation) {
     const current = bot.blockAt(positionVector(operation.position));
     const observed = blockStateFromWorld(current);
-    const removal = operation.dependencies.includes(`remove:${positionKey(operation.position)}`);
+    const key = positionKey(operation.position);
+    const removal = operation.dependencies.some((dependency) => (dependency.startsWith('remove:') || dependency.startsWith('scaffold-remove:')) && dependency.endsWith(`:${key}`));
     if (!removal && observed !== operation.current) throw new Error(`Placement target ${positionKey(operation.position)} changed from ${operation.current} to ${observed}.`);
     if (!current?.name || !REPLACEABLE_BLOCKS.has(current.name)) throw new Error(`Placement target ${operation.position.x}, ${operation.position.y}, ${operation.position.z} is occupied by ${current?.name || 'an unloaded block'}.`);
     const item = (bot.inventory?.items?.() || []).find((entry) => entry.name === operation.item && Number(entry.count) > 0);
@@ -406,7 +483,7 @@ class BuildExecutor {
   }
 
   stop() {
-    if (!this.active) return false;
+    if (!this.active) return this.starting && this.storage ? this.storage.stop() : false;
     this.active.state.desiredStatus = 'stopped';
     return this.activities.stop(BUILD_ACTIVITY_ID);
   }

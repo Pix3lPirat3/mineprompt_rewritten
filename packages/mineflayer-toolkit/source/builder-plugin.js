@@ -78,6 +78,7 @@ function installBuilder(bot, options = {}) {
     getClient: () => client,
     store,
     activities: runtime.activities,
+    storage: options.storage || null,
     logger: runtime.logger,
     owner: options.owner || bot.username || 'builder',
     onChange: () => runtime.emit('builderChange')

@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Vec3 } = require('vec3');
 const { analyzeBlueprint, diffBlueprint, entrySupportedByRegistry } = require('../src/main/world-diff');
+const { compilePlacementGraph } = require('../src/main/placement-compiler');
 
 function worldBlock(name, x, stateId, options = {}) {
   return {
@@ -120,4 +121,26 @@ test('collects internal compiler records without exposing them in previews', asy
   const preview = await diffBlueprint(bot, blueprint(), { anchor: { x: 0, y: 64, z: 0 } });
   assert.equal(Object.hasOwn(preview, 'records'), false);
   assert.equal(Object.hasOwn(preview, 'transformed'), false);
+});
+
+test('treats an owned temporary scaffold as a recoverable placement target', async () => {
+  const source = blueprint();
+  source.dimensions = { x: 1, y: 1, z: 1 };
+  source.blocks = [0];
+  const target = worldBlock('dirt', 0, 3);
+  const footing = worldBlock('stone', 0, 1);
+  footing.position = new Vec3(0, 63, 0);
+  const bot = {
+    version: '1.21.11',
+    entity: { id: 1, position: new Vec3(2, 64, 0) },
+    entities: {},
+    inventory: { items: () => [{ name: 'stone', count: 1 }] },
+    blockAt: (position) => position.y === 63 ? footing : position.x === 0 && position.y === 64 ? target : worldBlock('air', position.x, 0)
+  };
+  const analysis = await analyzeBlueprint(bot, source, { anchor: { x: 0, y: 64, z: 0 }, policy: { scaffolding: ['dirt'] } }, { records: true, temporaryScaffolds: [{ x: 0, y: 64, z: 0 }] });
+  assert.equal(analysis.records[0].kind, 'placeable');
+  assert.equal(analysis.records[0].temporaryScaffold, true);
+  const graph = compilePlacementGraph(bot, analysis);
+  const placement = graph.operations.find((operation) => operation.kind === 'place');
+  assert.deepEqual(placement.dependencies, ['scaffold-remove:0,64,0']);
 });

@@ -234,6 +234,7 @@ class StorageService {
     this.scans = new Map();
     this.active = null;
     this.operation = null;
+    this.operationPromise = null;
   }
 
   get client() {
@@ -492,7 +493,7 @@ class StorageService {
       stop
     });
     this.operation = state;
-    void this.runAudit({ bot, zone, scan, state, startPosition, lookPosition }).catch((error) => {
+    const operationPromise = this.runAudit({ bot, zone, scan, state, startPosition, lookPosition }).catch((error) => {
       state.failed = error.message;
       state.phase = 'failed';
       if (state.running) this.logger.warn(`[Storage] ${error.message}`);
@@ -515,6 +516,8 @@ class StorageService {
       state.settled = true;
       this.onChange();
     });
+    this.operationPromise = operationPromise;
+    void operationPromise;
     this.onChange();
     return this.operationStatus();
   }
@@ -647,7 +650,7 @@ class StorageService {
       throw error;
     }
     this.operation = state;
-    void run({ bot, plan, state, startPosition, startYaw: bot.entity.yaw, startPitch: bot.entity.pitch, lookPosition })
+    const operationPromise = run({ bot, plan, state, startPosition, startYaw: bot.entity.yaw, startPitch: bot.entity.pitch, lookPosition })
       .catch((error) => {
         state.failed = error.message;
         state.phase = 'failed';
@@ -673,8 +676,19 @@ class StorageService {
         state.settled = true;
         this.onChange();
       });
+    this.operationPromise = operationPromise;
+    void operationPromise;
     this.onChange();
     return this.operationStatus();
+  }
+
+  async waitForOperation() {
+    if (this.operationPromise) await this.operationPromise;
+    return this.operationStatus();
+  }
+
+  waitForTransfer() {
+    return this.waitForOperation();
   }
 
   async runFetch({ bot, plan, state, startPosition, startYaw, startPitch, lookPosition }) {

@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const { Vec3 } = require('vec3');
 const { ActivityManager } = require('../src/main/activity-manager');
 const { BuildExecutor } = require('../src/main/build-executor');
+const { createBuildJob } = require('../src/main/build-job');
 const { normalizeBuildPolicy } = require('../src/main/build-policy');
 
 function key(position) {
@@ -27,15 +28,16 @@ function harness(options = {}) {
   blocks.set('0,63,0', block('stone', { x: 0, y: 63, z: 0 }));
   blocks.set('1,63,0', block('stone', { x: 1, y: 63, z: 0 }));
   const target = { x: 1, y: 64, z: 0 };
+  let itemCount = options.itemCount ?? 2;
   const bot = {
     entity: { position: new Vec3(0, 64, 0), dimension: 'overworld' },
     game: { dimension: 'overworld' },
     lastOptions: { host: 'build.test', port: 25565 },
     controlState: {},
-    inventory: { items: () => [{ name: 'stone', count: 2, slot: 36 }] },
+    inventory: { items: () => itemCount > 0 ? [{ name: 'stone', count: itemCount, slot: 36 }] : [] },
     pathfinder: { bestHarvestTool: () => null },
     blockAt(position) {
-      return blocks.get(key(position)) || block('air', position);
+      return blocks.get(key(position)) || (position.y === 63 ? block('stone', position) : block('air', position));
     },
     async equip() {},
     setControlState(control, value) { this.controlState[control] = value; },
@@ -46,7 +48,7 @@ function harness(options = {}) {
     async dig(value) { blocks.set(key(value.position), block('air', value.position)); },
     clearControlStates() {}
   };
-  const policy = normalizeBuildPolicy({ placementDelay: 0, retryLimit: options.retryLimit ?? 0, verifyBatchSize: 1 });
+  const policy = normalizeBuildPolicy({ placementDelay: 0, retryLimit: options.retryLimit ?? 0, verifyBatchSize: 1, materials: options.materials, storageZone: options.storageZone });
   const operation = {
     id: 'place:1,64,0',
     kind: 'place',
@@ -95,6 +97,20 @@ function harness(options = {}) {
     }
   };
   const activities = new ActivityManager();
+  const fetches = [];
+  const storage = options.withStorage ? {
+    zones: () => [{ id: 'warehouse', name: 'Warehouse' }],
+    async startFetch(request) {
+      fetches.push(request);
+      itemCount += request.count;
+      return { running: true };
+    },
+    async waitForTransfer() {
+      const requested = fetches.at(-1)?.count || 0;
+      return { settled: true, failed: null, transferred: requested };
+    },
+    stop: () => true
+  } : null;
   const executor = new BuildExecutor({
     compile: async () => blocks.get('1,64,0')?.name === 'stone'
       ? {
@@ -106,9 +122,10 @@ function harness(options = {}) {
     getClient: () => ({ bot }),
     store,
     activities,
+    storage,
     owner: 'test'
   });
-  return { activities, blocks, bot, compiled, data, executor, operation, target };
+  return { activities, blocks, bot, compiled, data, executor, fetches, operation, target };
 }
 
 test('executes and verifies a survival placement', async () => {
@@ -116,7 +133,7 @@ test('executes and verifies a survival placement', async () => {
   const started = await value.executor.start('test', { anchor: value.target });
   assert.equal(started.status, 'running');
   await value.executor.waitForIdle();
-  assert.equal(value.blocks.get('1,64,0').name, 'stone');
+  assert.equal(value.blocks.get('1,64,0').name, 'stone', value.data.buildJobs[0].latestError || 'No build error was recorded.');
   assert.equal(value.data.buildJobs[0].status, 'complete');
   assert.equal(value.data.buildJobs[0].completedCount, 1);
   assert.equal(value.data.buildJobs[0].metrics.verified, 1);
@@ -140,6 +157,14 @@ test('requires confirmation before executing removals', async () => {
   assert.equal(value.data.buildJobs.length, 0);
 });
 
+test('fetches missing build materials from one configured storage zone', async () => {
+  const value = harness({ itemCount: 0, materials: 'storage', storageZone: 'warehouse', withStorage: true });
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.deepEqual(value.fetches, [{ zone: 'warehouse', item: 'stone', count: 1 }]);
+  assert.equal(value.data.buildJobs[0].status, 'complete');
+});
+
 test('refuses to dig a removal target that changed after planning', async () => {
   const value = harness();
   value.blocks.set('1,64,0', block('granite', value.target));
@@ -155,4 +180,45 @@ test('refuses to dig a removal target that changed after planning', async () => 
   await value.executor.waitForIdle();
   assert.equal(value.blocks.get('1,64,0').name, 'granite');
   assert.match(value.data.buildJobs[0].latestError, /changed from minecraft:dirt to minecraft:granite/u);
+});
+
+test('resumes by removing an owned scaffold before permanent placement', async () => {
+  const value = harness();
+  value.blocks.set('1,64,0', block('dirt', value.target));
+  const cleanup = {
+    id: 'scaffold-remove:1,64,0',
+    kind: 'scaffold-remove',
+    position: value.target,
+    current: 'minecraft:dirt',
+    expected: 'minecraft:air',
+    item: null,
+    dependencies: [],
+    blocked: [],
+    instruction: null
+  };
+  value.operation.current = 'minecraft:dirt';
+  value.operation.dependencies = [cleanup.id];
+  value.compiled.graph.operations = [cleanup, value.operation];
+  value.compiled.graph.order = [cleanup.id, value.operation.id];
+  value.compiled.graph.counts.operations = 2;
+  value.compiled.analysis.records = [{ position: value.target, expected: 'minecraft:stone', kind: 'placeable', temporaryScaffold: true }];
+  const job = createBuildJob({
+    owner: 'test',
+    blueprintHash: 'a'.repeat(64),
+    blueprintId: 'a'.repeat(16),
+    blueprintName: 'Test build',
+    server: { host: 'build.test', port: 25565 },
+    dimension: 'overworld',
+    anchor: value.target,
+    policy: value.compiled.analysis.policy,
+    status: 'paused',
+    operationCount: 2,
+    temporaryScaffolds: [value.target]
+  });
+  value.data.buildJobs.push(job);
+  await value.executor.resume(job.id);
+  await value.executor.waitForIdle();
+  assert.equal(value.blocks.get('1,64,0').name, 'stone', value.data.buildJobs[0].latestError || 'No build error was recorded.');
+  assert.equal(value.data.buildJobs[0].status, 'complete');
+  assert.deepEqual(value.data.buildJobs[0].temporaryScaffolds, []);
 });

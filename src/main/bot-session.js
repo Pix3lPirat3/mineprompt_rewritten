@@ -119,6 +119,7 @@ class BotSession {
       getClient: () => this.client,
       store: this.store,
       activities: this.activities,
+      storage: this.storage,
       logger: this.logger,
       owner: this.id,
       onChange: () => this.publishSnapshot()

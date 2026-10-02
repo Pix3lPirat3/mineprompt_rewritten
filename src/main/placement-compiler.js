@@ -183,10 +183,10 @@ function compilePlacementGraph(bot, analysis) {
   }));
   for (const record of actionable) {
     let removal = null;
-    if (record.kind === 'replaceable') {
+    if (record.kind === 'replaceable' || record.temporaryScaffold) {
       removal = {
-        id: `remove:${positionKey(record.position)}`,
-        kind: 'remove',
+        id: `${record.temporaryScaffold ? 'scaffold-remove' : 'remove'}:${positionKey(record.position)}`,
+        kind: record.temporaryScaffold ? 'scaffold-remove' : 'remove',
         position: { ...record.position },
         current: record.current,
         expected: record.entry.state,

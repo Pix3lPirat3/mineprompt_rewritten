@@ -236,6 +236,8 @@ export interface StorageApi {
     removeCategory(reference: string, category: string): Promise<boolean>;
     planFetch(request: { item: string; count: number; zone: string }): Promise<unknown>;
     fetch(request: { item: string; count: number; zone: string }): Promise<unknown>;
+    waitForTransfer(): Promise<unknown>;
+    waitForOperation(): Promise<unknown>;
     planDeposit(request: { item?: string; slot?: number; count?: number; zone: string; category?: string }): Promise<unknown>;
     deposit(request: { item?: string; slot?: number; count?: number; zone: string; category?: string }): Promise<unknown>;
     audit(reference: string): unknown;

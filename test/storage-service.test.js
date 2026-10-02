@@ -125,10 +125,8 @@ function setup(options = {}) {
 }
 
 async function waitForOperation(service) {
-  for (let count = 0; count < 50 && service.operation && !service.operation.settled; count += 1) {
-    await new Promise((resolve) => { globalThis.setTimeout(resolve, 0); });
-  }
-  if (service.operation && !service.operation.settled) throw new Error('Storage operation did not finish.');
+  const operation = await service.waitForTransfer();
+  if (operation && !operation.settled) throw new Error('Storage operation did not finish.');
 }
 
 async function waitForScan(service) {

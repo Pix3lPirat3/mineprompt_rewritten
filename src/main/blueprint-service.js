@@ -5,14 +5,15 @@ const { analyzeBlueprint, diffBlueprint } = require('./world-diff');
 const { BuildExecutor } = require('./build-executor');
 
 class BlueprintService {
-  constructor({ library, getClient, store = null, activities = null, logger = null, owner = '', onChange = () => {} }) {
+  constructor({ library, getClient, store = null, activities = null, storage = null, logger = null, owner = '', onChange = () => {} }) {
     this.library = library;
     this.getClient = getClient;
     this.executor = store && activities ? new BuildExecutor({
-      compile: (reference, request) => this.compile(reference, request),
+      compile: (reference, request, options) => this.compile(reference, request, options),
       getClient,
       store,
       activities,
+      storage,
       logger,
       owner,
       onChange
@@ -43,9 +44,9 @@ class BlueprintService {
     return diffBlueprint(this.getClient()?.bot, this.library.resolve(reference), request);
   }
 
-  async compile(reference, request = {}) {
+  async compile(reference, request = {}, options = {}) {
     const bot = this.getClient()?.bot;
-    const analysis = await analyzeBlueprint(bot, this.library.resolve(reference), request, { records: true });
+    const analysis = await analyzeBlueprint(bot, this.library.resolve(reference), request, { records: true, temporaryScaffolds: options.temporaryScaffolds });
     const graph = compilePlacementGraph(bot, analysis);
     const stances = compileStancePlan(bot, graph, request.stances);
     return { analysis, graph, stances };

@@ -42,6 +42,7 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
   const runtime = useAppSelector((state) => state.runtime);
   const blueprints = runtime.session.blueprints?.blueprints || [];
   const build = runtime.session.blueprints?.build || { active: null, jobs: [] };
+  const storageZones = runtime.session.storage?.zones || [];
   const [selectedId, setSelectedId] = useState(blueprints[0]?.id || '');
   const selected = useMemo(() => blueprints.find((entry) => entry.id === selectedId) || blueprints[0] || null, [blueprints, selectedId]);
   const [details, setDetails] = useState<BlueprintDetails | null>(null);
@@ -53,6 +54,8 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
   const [anchor, setAnchor] = useState(initialPosition);
   const [rotation, setRotation] = useState(0);
   const [mirror, setMirror] = useState('none');
+  const [materialSource, setMaterialSource] = useState('inventory');
+  const [storageZone, setStorageZone] = useState(storageZones[0]?.id || '');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [pendingRemove, setPendingRemove] = useState('');
@@ -69,7 +72,7 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
   useEffect(() => {
     setPlan(null);
     setPendingBuild(false);
-  }, [anchor.x, anchor.y, anchor.z, rotation, mirror]);
+  }, [anchor.x, anchor.y, anchor.z, rotation, mirror, materialSource, storageZone]);
 
   const loadDetails = async () => {
     if (!selected) return;
@@ -140,7 +143,8 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
         blueprint: selected.id,
         anchor,
         rotation,
-        mirror
+        mirror,
+        policy: { materials: materialSource, storageZone: storageZone || undefined }
       });
       setPreview(result.preview as BlueprintPreview);
     } catch (caught) {
@@ -161,7 +165,8 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
         blueprint: selected.id,
         anchor,
         rotation,
-        mirror
+        mirror,
+        policy: { materials: materialSource, storageZone: storageZone || undefined }
       });
       setPlan(result.plan as BlueprintPlan);
     } catch (caught) {
@@ -182,7 +187,8 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
         blueprint: selected.id,
         anchor,
         rotation,
-        mirror
+        mirror,
+        policy: { materials: materialSource, storageZone: storageZone || undefined }
       });
       const nextPlan = result.plan as BlueprintPlan;
       setPlan(nextPlan);
@@ -197,6 +203,7 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
         anchor,
         rotation,
         mirror,
+        policy: { materials: materialSource, storageZone: storageZone || undefined },
         confirmed: pendingBuild
       });
       setPendingBuild(false);
@@ -270,6 +277,8 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
                 </div>
                 <label><span>Rotation</span><select value={rotation} onChange={(event) => setRotation(Number(event.target.value))}><option value="0">0</option><option value="90">90</option><option value="180">180</option><option value="270">270</option></select></label>
                 <label><span>Mirror</span><select value={mirror} onChange={(event) => setMirror(event.target.value)}><option value="none">None</option><option value="x">X</option><option value="z">Z</option></select></label>
+                <label><span>Materials</span><select value={materialSource} onChange={(event) => setMaterialSource(event.target.value)}><option value="inventory">Inventory</option><option value="storage">Storage</option><option value="both">Inventory and storage</option></select></label>
+                {materialSource !== 'inventory' ? <label><span>Storage zone</span><select value={storageZone} onChange={(event) => setStorageZone(event.target.value)}><option value="">Select zone</option>{storageZones.map((zone) => <option key={zone.id} value={zone.id}>{zone.name}</option>)}</select></label> : null}
                 <button className="primary" type="button" disabled={busy || runtime.state.status !== 'online'} onClick={() => void previewBlueprint()}>Compare with world</button>
                 <button type="button" disabled={busy || runtime.state.status !== 'online'} onClick={() => void planBlueprint()}>Compile plan</button>
                 <button className={pendingBuild ? 'danger' : 'primary'} type="button" disabled={busy || runtime.state.status !== 'online' || Boolean(build.active)} onClick={() => void startBlueprint()}>{pendingBuild ? 'Confirm build and removals' : 'Start build'}</button>
