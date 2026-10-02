@@ -61,6 +61,13 @@ function fixture(settings = {}, options = {}) {
   const activities = {
     register: (id, activity) => runningActivities.set(id, activity),
     finish: (id) => runningActivities.delete(id),
+    stop: (id) => {
+      const activity = runningActivities.get(id);
+      if (!activity) return false;
+      runningActivities.delete(id);
+      activity.stop();
+      return true;
+    },
     stopAll: () => {
       for (const activity of runningActivities.values()) activity.stop();
       runningActivities.clear();
@@ -344,4 +351,31 @@ test('schedules bounded reconnect attempts after an unexpected end', async () =>
   context.scheduled[0]();
   await new Promise((resolve) => { setTimeout(resolve, 0); });
   assert.equal(context.commands.filter((entry) => entry[0] === 'set').length, 2);
+});
+
+test('invalidates a pending reconnect when a new connection starts', async () => {
+  const context = fixture({ automaticReconnectEnabled: true, reconnectAttempts: 2 });
+  const bot = await context.client.startClient({ username: 'Alex', host: 'old.example.test', port: 25565 });
+  bot.emit('end', 'network lost');
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+  const staleReconnect = context.scheduled[0];
+  await context.client.startClient({ username: 'Alex', host: 'new.example.test', port: 25565 });
+  assert.equal(context.scheduled.length, 0);
+  staleReconnect();
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+  assert.equal(context.bot.options.host, 'new.example.test');
+  assert.equal(context.commands.filter((entry) => entry[0] === 'set').length, 2);
+});
+
+test('invalidates a pending reconnect after a manual disconnect', async () => {
+  const context = fixture({ automaticReconnectEnabled: true, reconnectAttempts: 2 });
+  const bot = await context.client.startClient({ username: 'Alex', host: 'localhost', port: 25565 });
+  bot.emit('end', 'network lost');
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+  const staleReconnect = context.scheduled[0];
+  await context.client.disconnect();
+  staleReconnect();
+  await new Promise((resolve) => { setTimeout(resolve, 0); });
+  assert.equal(context.client.bot, null);
+  assert.equal(context.commands.filter((entry) => entry[0] === 'set').length, 1);
 });

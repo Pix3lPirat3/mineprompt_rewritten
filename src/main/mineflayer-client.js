@@ -90,6 +90,7 @@ class MineflayerClient {
 
   async startClient(options, { reconnect = false } = {}) {
     if (!options || typeof options !== 'object') throw new TypeError('Connection options are required.');
+    this.activities.stop('reconnect');
     if (this.bot) await this.disconnect('Starting a new connection');
     if (!reconnect) this.reconnectAttempt = 0;
     this.manualDisconnect = false;
@@ -281,7 +282,7 @@ class MineflayerClient {
       this.interface.stopRuntime();
       this.logger.info(`[Connection] Disconnected${reason ? `: ${reason}` : '.'}`);
       this.onSnapshot();
-      if (reconnect) void this.scheduleReconnect();
+      if (reconnect) void this.scheduleReconnect(attempt);
     });
   }
 
@@ -354,16 +355,20 @@ class MineflayerClient {
     });
   }
 
-  async scheduleReconnect() {
-    const enabled = await this.store.getSetting('automaticReconnectEnabled');
-    const maximum = Number(await this.store.getSetting('reconnectAttempts') ?? 3);
-    if (enabled !== true || !this.lastConnectionOptions || this.reconnectAttempt >= maximum) return;
+  async scheduleReconnect(connectionAttempt = this.connectionAttempt) {
+    const [enabled, configuredMaximum] = await Promise.all([
+      this.store.getSetting('automaticReconnectEnabled'),
+      this.store.getSetting('reconnectAttempts')
+    ]);
+    const maximum = Number(configuredMaximum ?? 3);
+    if (enabled !== true || this.manualDisconnect || this.bot || this.connectionAttempt !== connectionAttempt || !this.lastConnectionOptions || this.reconnectAttempt >= maximum) return;
     this.reconnectAttempt += 1;
     const delay = Math.min(30000, 1000 * 2 ** (this.reconnectAttempt - 1));
     this.interface.setStatus('reconnecting');
     this.logger.info(`[Connection] Reconnecting in ${delay / 1000} seconds (${this.reconnectAttempt}/${maximum}).`);
     const handle = this.schedule(() => {
       this.activities.finish('reconnect');
+      if (this.manualDisconnect || this.bot || this.connectionAttempt !== connectionAttempt) return;
       this.startClient(this.lastConnectionOptions, { reconnect: true }).catch((error) => {
         this.logger.error(`[Connection] Reconnect failed: ${error.message}`);
         void this.scheduleReconnect();
