@@ -19,15 +19,17 @@ const { WorkflowRunner } = require('./workflow-runtime');
 const { DebugEvaluator } = require('./debug-evaluator');
 const { resolveMiningPolicy } = require('./mining-presets');
 const { SnapshotPublisher } = require('./snapshot-publisher');
+const { loadEngine } = require('./engine-loader');
 const { Vec3 } = require('vec3');
 const { installToolkit } = require('../../packages/mineflayer-toolkit');
 
 class BotSession {
-  constructor({ id, rootPath, privateCommandsPath, store, logger, emit }) {
+  constructor({ id, rootPath, privateCommandsPath, store, logger, emit, engine = null }) {
     this.id = String(id);
     this.store = store;
     this.logger = logger;
     this.emit = emit;
+    this.engine = loadEngine(engine || {});
     this.snapshotPublisher = new SnapshotPublisher({
       capture: () => this.snapshot(),
       publish: (snapshot) => this.emit('session-snapshot', snapshot),
@@ -61,7 +63,12 @@ class BotSession {
       onSnapshot: () => this.publishSnapshot(),
       onInventoryEvent: (event) => this.inventoryPipeline.receive(event),
       playerActions: this.playerActions,
-      sessionId: this.id
+      sessionId: this.id,
+      edition: this.engine.edition,
+      createBotImpl: this.engine.createBot,
+      pathfinderPlugin: this.engine.pathfinder,
+      MovementsClass: this.engine.Movements,
+      chatFactory: this.engine.chatFactory
     });
     this.connections = new ConnectionService({ client: this.client, store, logger, interfaceState: this.interface });
     const inventoryChanged = () => {
@@ -366,6 +373,13 @@ class BotSession {
     const extensions = this.client.bot?.mineprompt?.summary() || { apiVersion: null, revision: 0, capabilities: [], actionCount: 0, tasks: { active: [] } };
     return {
       id: this.id,
+      engine: {
+        id: this.engine.id,
+        profile: this.engine.profile,
+        name: this.engine.name,
+        edition: this.engine.edition,
+        revision: this.engine.revision
+      },
       state: this.interface.snapshot(),
       activities: this.activities.snapshot(),
       session: { ...this.client.snapshot(), targets: this.targets.snapshot() },

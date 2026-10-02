@@ -5,7 +5,7 @@
   "private": true,
   "author": "pix3lpirat3",
   "version": "2.0.0-beta.22",
-  "description": "A secure cross-platform command client for Minecraft Java Edition.",
+  "description": "A secure cross-platform command client for Mineflayer bots.",
   "workspaces": [
     "packages/*"
   ],
@@ -28,6 +28,7 @@
     "test": "node --test test/*.test.js && vitest run",
     "test:package": "npm run package && node scripts/package-smoke.js",
     "test:desktop": "node scripts/desktop-smoke.js",
+    "test:engines:live": "node scripts/engine-live-test.js",
     "test:release": "npm run test:package && npm run test:desktop"
   },
   "engines": {

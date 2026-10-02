@@ -41,7 +41,7 @@ class ConnectionService {
 
   async connect(input, reply = (message) => this.logger.log(message)) {
     if (this.client.bot) throw new Error(`Already connected as ${this.client.bot.username || 'a client'}. Disconnect first.`);
-    const details = validateConnection(input);
+    const details = validateConnection({ ...input, port: input?.port ?? (this.client.edition === 'bedrock' ? 19132 : 25565) });
     const cachePrefix = details.username.toUpperCase().replace(/[^A-Z0-9@._-]/gu, '_').slice(0, 64) || 'ACCOUNT';
     const cacheHash = crypto.createHash('sha256').update(details.username.toLowerCase()).digest('hex').slice(0, 8);
     const connectionOptions = {

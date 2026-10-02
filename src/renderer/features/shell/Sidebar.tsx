@@ -41,6 +41,7 @@ export function Sidebar({ open }: SidebarProps) {
         session.state.status === next.state.status &&
         session.state.username === next.state.username &&
         session.state.displayName === next.state.displayName &&
+        session.engine?.id === next.engine?.id &&
         session.session.server?.host === next.session.server?.host &&
         session.session.server?.port === next.session.server?.port;
     })
@@ -86,7 +87,7 @@ export function Sidebar({ open }: SidebarProps) {
               <article className={session.id === runtime.selectedSessionId ? 'selected' : ''} data-session-id={session.id} data-status={session.state.status} key={session.id}>
                 <button type="button" className="sidebar-list__main" onClick={() => void window.mineprompt.selectSession(session.id)}>
                   <img src={playerHead(session.state.username, runtime.externalPlayerHeadsEnabled)} alt="" />
-                  <span><strong>{session.state.displayName || session.state.username || 'Bot session'}</strong><small>{session.state.status}{session.session.server ? `, ${session.session.server.host}` : ''}</small></span>
+                  <span><strong>{session.state.displayName || session.state.username || 'Bot session'}</strong><small>{session.state.status}{session.session.server ? `, ${session.session.server.host}` : ''}{session.engine ? `, ${session.engine.name}` : ''}</small></span>
                 </button>
                 <button type="button" className="sidebar-list__edit" onClick={(event) => setMenu({ session, account, x: event.clientX, y: event.clientY })}>Manage</button>
               </article>

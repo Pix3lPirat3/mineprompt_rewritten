@@ -272,12 +272,33 @@ export interface InventoryPipelineDiagnostics {
 
 export interface BotSession {
   id: string;
+  engine?: EngineProfile;
   state: SessionState;
   activities: Activity[];
   session: BotSnapshot;
   commands: CommandDescriptor[];
   diagnostics?: { inventory: InventoryPipelineDiagnostics | null; snapshots?: Record<string, number | boolean> | null };
   process: { isolated: boolean; pid: number | null; status: 'starting' | 'running' | 'failed' };
+}
+
+export interface EngineProfile {
+  id: string;
+  profile: string;
+  name: string;
+  kind?: 'bundled' | 'packages' | 'umbrella';
+  edition: 'java' | 'bedrock';
+  revision: string | null;
+  installed?: boolean;
+  verified?: boolean;
+  installedAt?: string;
+  source?: string;
+  sources?: Array<Record<string, unknown>>;
+  warnings?: string[];
+}
+
+export interface EngineSnapshot {
+  profiles: EngineProfile[];
+  catalog: EngineProfile[];
 }
 
 export interface WorkflowStep {
@@ -366,6 +387,7 @@ export interface ApplicationSnapshot {
   session: BotSnapshot;
   logs: LogEntry[];
   commands: CommandDescriptor[];
+  engines: EngineSnapshot;
 }
 
 export interface LogEntry {
@@ -435,6 +457,12 @@ export interface MinePromptApi {
   saveMiningPreset(preset: Partial<MiningPreset> & { name: string; policy: MiningPolicy; activate?: boolean }): Promise<{ ok: boolean; preset: MiningPreset }>;
   removeMiningPreset(id: string): Promise<{ ok: boolean }>;
   selectMiningPreset(id: string | null): Promise<{ ok: boolean; activeMiningPresetId: string | null }>;
+  engineList(): Promise<EngineSnapshot>;
+  engineResearch(request?: { owner?: string }): Promise<{ pulls: Array<Record<string, unknown>> }>;
+  enginePlan(request: Record<string, unknown>): Promise<Record<string, unknown>>;
+  engineInstall(request: Record<string, unknown>): Promise<{ ok: boolean; profile: EngineProfile }>;
+  engineUse(request: { profile: string; sessionId?: string; makeDefault?: boolean }): Promise<{ ok: boolean; sessionId: string; engine: EngineProfile }>;
+  engineRemove(request: { profile: string }): Promise<{ ok: boolean; id: string }>;
   checkForUpdate(): Promise<Record<string, unknown>>;
   openReleases(): Promise<void>;
   exportDiagnostics(): Promise<{ ok: boolean; canceled?: boolean }>;

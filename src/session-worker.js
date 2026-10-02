@@ -43,7 +43,8 @@ async function initialize(message) {
     privateCommandsPath: message.privateCommandsPath,
     store: new ProcessStore({ read: () => storeSnapshot, request: storeRequest }),
     logger,
-    emit: (channel, payload) => send({ type: 'event', channel, payload })
+    emit: (channel, payload) => send({ type: 'event', channel, payload }),
+    engine: message.engine
   });
   await session.ready;
   send({ type: 'ready' });

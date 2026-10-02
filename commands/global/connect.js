@@ -6,10 +6,10 @@ const { authenticationMode } = require('../../src/main/connection-service');
 module.exports = {
   command: 'connect',
   aliases: ['conn'],
-  description: 'Connect to a Minecraft Java server.',
+  description: 'Connect with the selected Minecraft engine.',
   usage: 'connect --username <name> --host <server> [--port 25565] [--version <version>] [--auth microsoft|offline] [--fake-host <host>]',
 
-  async execute(sender, command, args, { connections }) {
+  async execute(sender, command, args, { client, connections }) {
     let values;
     try {
       ({ values } = parseArgs({
@@ -31,7 +31,7 @@ module.exports = {
 
     const username = values.username?.trim();
     const host = values.host?.trim();
-    const port = Number(values.port ?? 25565);
+    const port = Number(values.port ?? (client.edition === 'bedrock' ? 19132 : 25565));
     if (!username) return sender.reply('[Connect] A username is required (-u or --username).');
     if (!host || /\s|\//u.test(host) || /^[^:]+:\d+$/u.test(host)) return sender.reply('[Connect] Enter a hostname or IP address without a protocol or port.');
     if (!Number.isInteger(port) || port < 1 || port > 65535) return sender.reply('[Connect] Port must be an integer from 1 to 65535.');

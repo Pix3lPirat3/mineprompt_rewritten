@@ -12,7 +12,8 @@ const HOST_METHOD_NAMES = Object.freeze([
   'capabilities', 'capabilityAction', 'recipes', 'craft', 'saveWorkflow', 'removeWorkflow', 'runWorkflow', 'stopWorkflow',
   'saveProfile', 'removeProfile', 'saveServer', 'removeServer', 'savePreferences', 'saveMiningPreset', 'removeMiningPreset',
   'selectMiningPreset', 'diagnostics', 'uiState', 'reportRendererIssue', 'reportRendererState', 'relationshipsList',
-  'relationshipAdd', 'relationshipRemove', 'tools', 'callTool', 'openAiTools'
+  'relationshipAdd', 'relationshipRemove', 'tools', 'callTool', 'openAiTools',
+  'engineList', 'engineResearch', 'enginePlan', 'engineInstall', 'engineUse', 'engineRemove'
 ]);
 
 function installRequestMethods(prototype, names) {

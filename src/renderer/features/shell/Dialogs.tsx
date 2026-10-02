@@ -2,7 +2,7 @@ import { useMemo, useState, type FormEvent } from 'react';
 import { shallowEqual } from 'react-redux';
 import { Modal } from '../../components/Modal';
 import { consoleActions, uiActions, useAppDispatch, useAppSelector } from '../../store';
-import type { Preferences } from '../../types';
+import type { EngineProfile, Preferences } from '../../types';
 import type { DialogTarget } from './Sidebar';
 import { WorkflowStudio } from '../automation/WorkflowStudio';
 import { MiningPolicyEditor } from '../mining/MiningPolicyEditor';
@@ -20,13 +20,35 @@ function FormError({ value }: { value: string }) {
   return value ? <p className="form-error" role="alert">{value}</p> : null;
 }
 
+function ConnectionEngineFields({ profiles, currentId, serverPort }: { profiles: EngineProfile[]; currentId: string; serverPort?: number }) {
+  const [engineId, setEngineId] = useState(currentId);
+  const initialEngine = profiles.find((engine) => engine.id === currentId);
+  const defaultPort = (edition?: string) => edition === 'bedrock' ? 19132 : 25565;
+  const [port, setPort] = useState(String(serverPort || defaultPort(initialEngine?.edition)));
+  const options = profiles.length ? profiles : [{ id: 'stable', profile: 'stable', name: 'Stable', edition: 'java' as const, revision: null }];
+  return (
+    <>
+      <label><span>Engine</span><select name="engineProfileId" value={engineId} onChange={(event) => {
+        const previous = profiles.find((engine) => engine.id === engineId);
+        const next = profiles.find((engine) => engine.id === event.target.value);
+        if (!serverPort && Number(port) === defaultPort(previous?.edition)) setPort(String(defaultPort(next?.edition)));
+        setEngineId(event.target.value);
+      }}>{options.map((engine) => <option value={engine.id} key={engine.id}>{engine.name} ({engine.edition})</option>)}</select></label>
+      <label><span>Port</span><input name="port" type="number" min="1" max="65535" value={port} onChange={(event) => setPort(event.target.value)} required /></label>
+    </>
+  );
+}
+
 export function Dialogs({ target, close }: DialogsProps) {
   const runtime = useAppSelector((state) => ({
     accounts: state.runtime.accounts,
     servers: state.runtime.servers,
     preferences: state.runtime.preferences,
     commands: state.runtime.commands,
-    status: state.runtime.state.status
+    status: state.runtime.state.status,
+    sessions: state.runtime.sessions,
+    selectedSessionId: state.runtime.selectedSessionId,
+    engines: state.runtime.engines
   }), shallowEqual);
   const dispatch = useAppDispatch();
   const [error, setError] = useState('');
@@ -40,6 +62,8 @@ export function Dialogs({ target, close }: DialogsProps) {
   if (target.kind === 'connect') {
     const account = target.account || runtime.accounts[0];
     const server = target.server;
+    const currentEngine = runtime.sessions.find((session) => session.id === runtime.selectedSessionId)?.engine;
+    const selectedEngine = runtime.engines.profiles.find((engine) => engine.id === currentEngine?.id) || runtime.engines.profiles.find((engine) => engine.id === 'stable') || runtime.engines.profiles[0];
     const submit = async (event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
       setError('');
@@ -51,7 +75,8 @@ export function Dialogs({ target, close }: DialogsProps) {
           host: values.get('host'),
           port: Number(values.get('port')),
           version: values.get('version'),
-          fakeHost: values.get('fakeHost')
+          fakeHost: values.get('fakeHost'),
+          engineProfileId: values.get('engineProfileId')
         });
         close();
       } catch (caught) {
@@ -64,7 +89,7 @@ export function Dialogs({ target, close }: DialogsProps) {
           <label className="wide"><span>Account name or email</span><input name="username" defaultValue={account?.username || ''} required autoComplete="username" /></label>
           <label><span>Authentication</span><select name="auth" defaultValue={account?.authentication === false ? 'offline' : 'microsoft'}><option value="microsoft">Microsoft</option><option value="offline">Offline</option></select></label>
           <label className="wide"><span>Server address</span><input name="host" defaultValue={server?.host || ''} required spellCheck={false} /></label>
-          <label><span>Port</span><input name="port" type="number" min="1" max="65535" defaultValue={server?.port || 25565} required /></label>
+          <ConnectionEngineFields profiles={runtime.engines.profiles} currentId={selectedEngine?.id || 'stable'} serverPort={server?.port} />
           <label><span>Version</span><input name="version" defaultValue={server?.version || ''} placeholder="Automatic" spellCheck={false} /></label>
           <label className="wide"><span>Handshake address</span><input name="fakeHost" defaultValue={server?.fakeHost || ''} placeholder="Optional" spellCheck={false} /></label>
           <FormError value={error} />

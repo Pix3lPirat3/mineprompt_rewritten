@@ -111,13 +111,14 @@ class ToolCatalog {
     }, { additionalProperties: false }), async (runtime, input) => runtime.uiState(input), { readOnly: true, capability: 'debug' }));
     this.register(tool('mineprompt_diagnostics', 'Read bounded application, subprocess, runtime log, and renderer incident diagnostics with saved account and server identifiers redacted.', EmptyInput,
       async (runtime) => runtime.diagnostics(), { readOnly: true, capability: 'debug' }));
-    this.register(tool('mineprompt_connect', 'Connect a new bot session to a Minecraft Java server.', Type.Object({
+    this.register(tool('mineprompt_connect', 'Connect a new bot session using the selected Java or Bedrock engine profile.', Type.Object({
       username: Type.String({ minLength: 1, maxLength: 254 }),
       auth: Type.Union([Type.Literal('microsoft'), Type.Literal('offline')]),
       host: Type.String({ minLength: 1, maxLength: 253 }),
       port: Type.Optional(Type.Integer({ minimum: 1, maximum: 65535 })),
       version: Type.Optional(Type.String({ maxLength: 32 })),
-      fakeHost: Type.Optional(Type.String({ maxLength: 253 }))
+      fakeHost: Type.Optional(Type.String({ maxLength: 253 })),
+      engineProfileId: Type.Optional(Type.String({ minLength: 1, maxLength: 80 }))
     }, { additionalProperties: false }), async (runtime, input) => runtime.connect(Object.fromEntries(Object.entries(input).filter(([, value]) => value !== null))), { openWorld: true }));
     this.register(tool('mineprompt_disconnect', 'Disconnect a bot session.', Type.Object({ sessionId: SessionId }, { additionalProperties: false }),
       async (runtime, input) => runtime.disconnect(input.sessionId), { destructive: true, idempotent: true }));
@@ -127,6 +128,32 @@ class ToolCatalog {
       sessionId: SessionId,
       scope: Type.Union([Type.Literal('commands'), Type.Literal('renderer'), Type.Literal('all')])
     }, { additionalProperties: false }), async (runtime, input) => runtime.reload(input), { idempotent: true, capability: 'debug' }));
+    this.register(tool('mineprompt_engines', 'List isolated Mineflayer engine profiles, research public PrismarineJS pull requests, or prepare a deterministic installation plan.', Type.Object({
+      action: Type.Union(['list', 'research', 'plan'].map((value) => Type.Literal(value))),
+      owner: Type.Optional(Type.String({ minLength: 1, maxLength: 39 })),
+      name: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+      preset: Type.Optional(Type.Union([Type.Literal('bedrock'), Type.Literal('bedrock-experimental')])),
+      pulls: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 256 }), { minItems: 1, maxItems: 32 }))
+    }, { additionalProperties: false }), async (runtime, input) => {
+      if (input.action === 'list') return runtime.engineList();
+      if (input.action === 'research') return runtime.engineResearch(input);
+      return runtime.enginePlan(input);
+    }, { readOnly: true, capability: 'engines.read', openWorld: true }));
+    this.register(tool('mineprompt_engine_manage', 'Install, select, or remove an isolated Mineflayer engine profile. Installation may run third-party package code and requires explicit acknowledgement.', Type.Object({
+      action: Type.Union(['install', 'use', 'remove'].map((value) => Type.Literal(value))),
+      name: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+      preset: Type.Optional(Type.Union([Type.Literal('bedrock'), Type.Literal('bedrock-experimental')])),
+      pulls: Type.Optional(Type.Array(Type.String({ minLength: 1, maxLength: 256 }), { minItems: 1, maxItems: 32 })),
+      profile: Type.Optional(Type.String({ minLength: 1, maxLength: 80 })),
+      sessionId: SessionId,
+      makeDefault: Type.Optional(Type.Boolean()),
+      acknowledgeUnsafe: Type.Optional(Type.Boolean()),
+      timeout: Type.Optional(Type.Integer({ minimum: 30000, maximum: 3600000 }))
+    }, { additionalProperties: false }), async (runtime, input) => {
+      if (input.action === 'install') return runtime.engineInstall(input);
+      if (input.action === 'use') return runtime.engineUse(input);
+      return runtime.engineRemove(input);
+    }, { destructive: true, capability: 'engines.manage', approval: 'required', openWorld: true }));
     this.register(tool('mineprompt_capabilities', 'List installed Mineflayer capability plugins and their live structured action manifests for a bot session.', Type.Object({ sessionId: SessionId }, { additionalProperties: false }),
       async (runtime, input) => runtime.capabilities(input), { readOnly: true, capability: 'status', openWorld: true }));
     this.register(tool('mineprompt_capability_action', 'Execute an installed capability action. Inspect mineprompt_capabilities first, then provide an action id and a JSON object matching its input schema.', Type.Object({

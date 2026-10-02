@@ -1,6 +1,6 @@
 # MinePrompt
 
-MinePrompt is a desktop command client for Minecraft Java Edition. It connects through [mineflayer](https://github.com/PrismarineJS/mineflayer) and provides a focused terminal for chat, movement, inventory work, navigation, and repeatable automation.
+MinePrompt is a desktop command client for Mineflayer bots. It supports Minecraft Java Edition through the bundled stable engine and opt-in experimental engine profiles for testing pull requests or Bedrock integration. The application provides a focused terminal for chat, movement, inventory work, navigation, and repeatable automation.
 
 The current 2.0 beta replaces the original renderer-owned runtime with a security-focused Electron architecture. Minecraft connections, commands, and storage run outside the web page; the interface can access them only through a small, validated preload API.
 
@@ -8,6 +8,7 @@ The current 2.0 beta replaces the original renderer-owned runtime with a securit
 
 - Microsoft and offline-mode connections
 - Simultaneous bot sessions with a fast session switcher
+- Isolated, exact-revision engine profiles for public PrismarineJS pull requests and experimental Bedrock support
 - One supervised utility process per bot with crash isolation and fleet status
 - A headless host shared by terminal, desktop, plugin, and agent clients
 - Dynamic MCP and strict OpenAI tool schemas generated from the live command registry
@@ -38,6 +39,8 @@ Download the current build from [GitHub Releases](https://github.com/Pix3lPirat3
 The application is not code-signed. Windows SmartScreen or macOS Gatekeeper may require manual confirmation. Release downloads include SHA-256 checksums and GitHub build provenance.
 
 Packaged downloads include their runtime and do not require Node.js or npm.
+
+Installing an experimental engine profile is a development feature and requires Node.js, npm, Git, and network access on that machine. The bundled stable engine has no such requirement.
 
 ## Development requirements
 
@@ -95,6 +98,29 @@ account remove Alex
 ```
 
 Profiles can also be created and edited from the sidebar. Selecting one opens a connection form without requiring terminal syntax.
+
+## Experimental engines
+
+Engine profiles let developers test exact public pull request revisions without changing MinePrompt's bundled dependencies. Each profile is installed under the application-data directory, verified in an isolated process, and listed in the connection form. Multiple pull requests for the same package are merged onto an exact base revision when they do not conflict. MinePrompt shows GitHub conflict and check warnings before installation.
+
+```text
+engine research Pix3lPirat3
+engine plan preview PrismarineJS/mineflayer#4051 PrismarineJS/mineflayer#4140 PrismarineJS/mineflayer-pathfinder#388
+engine install preview PrismarineJS/mineflayer#4051 PrismarineJS/mineflayer#4140 PrismarineJS/mineflayer-pathfinder#388 confirm
+engine use preview
+engine list
+engine remove preview confirm
+```
+
+Bedrock integration is available as an experimental preset built from the pinned [mineflayer-bedrock-integration](https://github.com/Pix3lPirat3/mineflayer-bedrock-integration) umbrella repository:
+
+```text
+engine plan bedrock
+engine install bedrock confirm
+engine use bedrock-experimental
+```
+
+Disconnect a session before changing its engine. New sessions can choose any installed engine in the connection form. Experimental installations fetch and run third-party dependency code, so the final `confirm` argument is mandatory. The stable engine remains available at all times, and removing an engine never changes the application package.
 
 ## Inventory and containers
 

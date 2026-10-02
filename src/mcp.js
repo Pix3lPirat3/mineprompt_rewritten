@@ -53,7 +53,7 @@ function createMcpServer(facade) {
       const value = await facade.runtime.callTool(request.params.name, request.params.arguments || {}, {
         type: 'agent',
         client: server.getClientVersion()?.name || 'mcp',
-        capabilities: ['relationships.read', 'relationships.write', 'relationships.override', 'players.control', 'inventory', 'debug']
+        capabilities: ['relationships.read', 'relationships.write', 'relationships.override', 'players.control', 'inventory', 'debug', 'engines.read', 'engines.manage']
       });
       return {
         content: [{ type: 'text', text: JSON.stringify(value ?? { ok: true }, null, 2) }],

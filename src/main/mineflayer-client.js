@@ -51,6 +51,7 @@ class MineflayerClient {
     cancelSchedule = clearTimeout,
     playerActions = null,
     sessionId = null,
+    edition = 'java',
     installPlugins = () => {}
   }) {
     this.logger = logger;
@@ -68,6 +69,7 @@ class MineflayerClient {
     this.cancelSchedule = cancelSchedule;
     this.playerActions = playerActions;
     this.sessionId = sessionId;
+    this.edition = edition;
     this.installPlugins = installPlugins;
     this.bot = null;
     this.chatMessageClass = null;
@@ -99,7 +101,9 @@ class MineflayerClient {
     const { accountUsername, ...connectionOptions } = options;
     let bot;
     try {
-      bot = this.createBot(connectionOptions);
+      bot = this.createBot(this.edition === 'bedrock'
+        ? { ...connectionOptions, edition: 'bedrock', offline: connectionOptions.auth === 'offline' }
+        : connectionOptions);
     } catch (error) {
       this.interface.setFailure(error.message);
       throw error;

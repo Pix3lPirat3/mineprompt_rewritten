@@ -7,9 +7,16 @@ const { SESSION_METHOD_NAMES, installRequestMethods } = require('./transport-met
 
 const STORE_METHODS = new Set(STORE_METHOD_NAMES);
 
-function emptySession(id) {
+function emptySession(id, engine = null) {
   return {
     id,
+    engine: engine ? {
+      id: engine.id,
+      profile: engine.profile,
+      name: engine.name,
+      edition: engine.edition,
+      revision: engine.revision
+    } : { id: 'stable', profile: 'stable', name: 'Stable', edition: 'java', revision: null },
     state: {
       status: 'disconnected',
       username: null,
@@ -50,7 +57,7 @@ function emptySession(id) {
 }
 
 class ProcessSession {
-  constructor({ id, rootPath, privateCommandsPath, store, logger, emit, spawn }) {
+  constructor({ id, rootPath, privateCommandsPath, store, logger, emit, spawn, engine = null }) {
     this.id = String(id);
     this.rootPath = rootPath;
     this.privateCommandsPath = privateCommandsPath;
@@ -58,8 +65,9 @@ class ProcessSession {
     this.logger = logger;
     this.emit = emit;
     this.spawn = spawn;
+    this.engine = engine;
     this.pending = new Map();
-    this.cached = emptySession(this.id);
+    this.cached = emptySession(this.id, engine);
     this.closed = false;
     this.closing = false;
     this.child = null;
@@ -95,7 +103,8 @@ class ProcessSession {
             id: this.id,
             rootPath: this.rootPath,
             privateCommandsPath: this.privateCommandsPath,
-            store: this.store.snapshot()
+            store: this.store.snapshot(),
+            engine: this.engine
           });
         } catch (error) {
           failed(error);

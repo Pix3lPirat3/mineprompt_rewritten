@@ -151,10 +151,25 @@ function fixture(settings = {}, options = {}) {
       const index = scheduled.indexOf(callback);
       if (index >= 0) scheduled.splice(index, 1);
     },
+    edition: options.edition,
     installPlugins: options.installPlugins
   });
   return { client, get bot() { return bot; }, log, state, commands, inventoryEvents, scheduled, runningActivities };
 }
+
+test('passes Bedrock connection options to an experimental engine', async () => {
+  const context = fixture({}, { edition: 'bedrock' });
+  await context.client.startClient({
+    username: 'BedrockPlayer',
+    auth: 'offline',
+    host: 'localhost',
+    port: 19132
+  });
+  assert.equal(context.bot.options.edition, 'bedrock');
+  assert.equal(context.bot.options.offline, true);
+  assert.equal(context.bot.options.port, 19132);
+  context.client.bot = null;
+});
 
 test('tracks a complete connection lifecycle', async () => {
   const plugins = [];

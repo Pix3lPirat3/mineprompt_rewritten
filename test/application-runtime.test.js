@@ -43,7 +43,10 @@ test('runs global commands through the application runtime', async (context) => 
     await fs.rm(userDataPath, { recursive: true, force: true });
   });
 
-  assert.equal(runtime.snapshot().commands.length, 13);
+  assert.equal(runtime.snapshot().commands.length, 14);
+  assert.equal((await runtime.execute('engine list')).ok, true);
+  assert.equal((await runtime.complete('engine ')).includes('use'), true);
+  assert.equal((await runtime.execute('engine use stable')).ok, true);
   assert.equal((await runtime.execute('account add "Test Player" offline')).ok, true);
   assert.equal((await runtime.execute('settings resource-packs accept')).ok, true);
   assert.equal((await runtime.execute('friends add Builder')).ok, true);

@@ -58,7 +58,8 @@ export function createInitialSnapshot(): ApplicationSnapshot {
       server: null,
       targets: { cursorBlock: null, cursorEntity: null, entities: [] }
     },
-    commands: []
+    commands: [],
+    engines: { profiles: [], catalog: [] }
   };
 }
 

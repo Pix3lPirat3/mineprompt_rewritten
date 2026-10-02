@@ -32,6 +32,12 @@ function fixture() {
     uiState: async (...args) => { calls.push(['ui-state', ...args]); return { renderer: {} }; },
     diagnostics: async (...args) => { calls.push(['diagnostics', ...args]); return { rendererIssues: [] }; },
     reload: async (...args) => { calls.push(['reload', ...args]); return { ok: true }; },
+    engineList: async () => { calls.push(['engines']); return { profiles: [] }; },
+    engineResearch: async (...args) => { calls.push(['engine-research', ...args]); return { pulls: [] }; },
+    enginePlan: async (...args) => { calls.push(['engine-plan', ...args]); return { id: 'preview' }; },
+    engineInstall: async (...args) => { calls.push(['engine-install', ...args]); return { ok: true }; },
+    engineUse: async (...args) => { calls.push(['engine-use', ...args]); return { ok: true }; },
+    engineRemove: async (...args) => { calls.push(['engine-remove', ...args]); return { ok: true }; },
     capabilities: async (...args) => { calls.push(['capabilities', ...args]); return { actions: [{ id: 'trees.inspect' }] }; },
     capabilityAction: async (...args) => { calls.push(['capability-action', ...args]); return { ok: true }; },
     playerAction: async (...args) => { calls.push(['player', ...args]); return { ok: true }; },
@@ -61,6 +67,8 @@ test('generates MCP and strict OpenAI tools from one catalog', () => {
   assert.equal(listed.some((entry) => entry.name === 'mineprompt_capabilities'), true);
   assert.equal(listed.some((entry) => entry.name === 'mineprompt_capability_action'), true);
   assert.equal(listed.some((entry) => entry.name === 'mineprompt_stash'), true);
+  assert.equal(listed.find((entry) => entry.name === 'mineprompt_engines').annotations.readOnlyHint, true);
+  assert.equal(listed.find((entry) => entry.name === 'mineprompt_engine_manage').approval, 'required');
   assert.equal(listed.find((entry) => entry.name === 'mineprompt_ui_state').annotations.readOnlyHint, true);
   assert.equal(listed.find((entry) => entry.name === 'mineprompt_diagnostics').annotations.readOnlyHint, true);
   assert.equal(listed.find((entry) => entry.name === 'mineprompt_inventory_inspect').annotations.readOnlyHint, true);
@@ -98,6 +106,8 @@ test('validates agent input and executes dynamic command tools', async () => {
   await catalog.call('mineprompt_ui_state', { sessionId: 'primary', maximumIssues: 5 }, { type: 'agent' });
   await catalog.call('mineprompt_diagnostics', {}, { type: 'agent' });
   await catalog.call('mineprompt_reload', { sessionId: 'primary', scope: 'commands' }, { type: 'agent' });
+  await catalog.call('mineprompt_engines', { action: 'list' }, { type: 'agent' });
+  await catalog.call('mineprompt_engine_manage', { action: 'use', profile: 'stable' }, { type: 'agent' });
   await catalog.call('mineprompt_capabilities', { sessionId: 'primary' }, { type: 'agent' });
   await catalog.call('mineprompt_capability_action', { sessionId: 'primary', actionId: 'trees.inspect', inputJson: '{"target":"nearest"}' }, { type: 'agent' });
   await catalog.call('mineprompt_debug_evaluate', { sessionId: 'primary', code: 'bot.inventory.slots[36]', acknowledgeUnsafe: true }, { type: 'agent' });
@@ -107,6 +117,8 @@ test('validates agent input and executes dynamic command tools', async () => {
   assert.equal(calls.some((entry) => entry[0] === 'ui-state' && entry[1].maximumIssues === 5), true);
   assert.equal(calls.some((entry) => entry[0] === 'diagnostics'), true);
   assert.equal(calls.some((entry) => entry[0] === 'reload' && entry[1].scope === 'commands'), true);
+  assert.equal(calls.some((entry) => entry[0] === 'engines'), true);
+  assert.equal(calls.some((entry) => entry[0] === 'engine-use' && entry[1].profile === 'stable'), true);
   assert.equal(calls.some((entry) => entry[0] === 'capabilities'), true);
   assert.equal(calls.some((entry) => entry[0] === 'capability-action' && entry[1].input.target === 'nearest'), true);
   await assert.rejects(catalog.call('mineprompt_capability_action', { actionId: 'trees.inspect', inputJson: '[]' }), /JSON object/u);

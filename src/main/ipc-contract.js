@@ -32,7 +32,13 @@ const IPC_REQUESTS = Object.freeze([
   ['savePreferences', 'save-preferences', 'savePreferences'],
   ['saveMiningPreset', 'save-mining-preset', 'saveMiningPreset'],
   ['removeMiningPreset', 'remove-mining-preset', 'removeMiningPreset'],
-  ['selectMiningPreset', 'select-mining-preset', 'selectMiningPreset']
+  ['selectMiningPreset', 'select-mining-preset', 'selectMiningPreset'],
+  ['engineList', 'engine-list', 'engineList'],
+  ['engineResearch', 'engine-research', 'engineResearch'],
+  ['enginePlan', 'engine-plan', 'enginePlan'],
+  ['engineInstall', 'engine-install', 'engineInstall'],
+  ['engineUse', 'engine-use', 'engineUse'],
+  ['engineRemove', 'engine-remove', 'engineRemove']
 ].map(([api, channel, method]) => Object.freeze({ api, channel: `mineprompt:${channel}`, method })));
 
 function createIpcRequests(invoke) {
