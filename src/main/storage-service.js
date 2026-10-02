@@ -605,6 +605,7 @@ class StorageService {
       kind: 'deposit',
       label: 'Storage deposit',
       detail: `Depositing ${plan.requested} x ${plan.variant.displayName}`,
+      parentActivity: request.parentActivity,
       run: (context) => this.runDeposit(context)
     });
   }

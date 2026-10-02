@@ -4,6 +4,7 @@ const { GoalNear } = require('mineflayer-pathfinder').goals;
 const { Vec3 } = require('vec3');
 const { createBuildJob, updateBuildJob } = require('./build-job');
 const { isAirState } = require('./blueprint-model');
+const { itemIdentity } = require('./item-identity');
 const { basicStanceSafe, candidateStances, lineOfSight, positionDistance, positionKey } = require('./placement-compiler');
 const { EXECUTABLE_PLACEMENT_MODES, executablePlacementMode } = require('./placement-strategy');
 const { cancelNavigation, navigateGoal } = require('./navigation-service');
@@ -79,6 +80,28 @@ function itemAdditionalCapacity(bot, itemName, reserveSlots = MATERIAL_RESERVE_S
   const partial = items.filter((item) => item.name === itemName).reduce((sum, item) => sum + Math.max(0, stackSize - (Number(item.count) || 0)), 0);
   const emptySlots = typeof bot.inventory?.emptySlotCount === 'function' ? bot.inventory.emptySlotCount() : 36;
   return partial + Math.max(0, emptySlots - reserveSlots) * stackSize;
+}
+
+function inventoryVariantSnapshot(bot, allowedNames) {
+  const allowed = allowedNames instanceof Set ? allowedNames : new Set(allowedNames || []);
+  const variants = new Map();
+  for (const item of bot.inventory?.items?.() || []) {
+    if (!allowed.has(item.name)) continue;
+    const identity = itemIdentity(item);
+    const current = variants.get(identity) || { identity, name: item.name, count: 0, slot: item.slot };
+    current.count += Number(item.count) || 0;
+    if (!Number.isInteger(current.slot) && Number.isInteger(item.slot)) current.slot = item.slot;
+    variants.set(identity, current);
+  }
+  return variants;
+}
+
+function surplusInventory(bot, baseline, allowedNames) {
+  const current = inventoryVariantSnapshot(bot, allowedNames);
+  return [...current.values()].flatMap((entry) => {
+    const count = entry.count - (baseline.get(entry.identity)?.count || 0);
+    return count > 0 && Number.isInteger(entry.slot) ? [{ ...entry, count }] : [];
+  }).sort((left, right) => left.name.localeCompare(right.name) || left.identity.localeCompare(right.identity));
 }
 
 function unsupportedOperations(compiled) {
@@ -261,7 +284,8 @@ class BuildExecutor {
         }, now);
     const controller = new AbortController();
     const state = { desiredStatus: null };
-    const active = { job, compiled, cleanupOperations: recovery.operations, controller, state, storageZone, promise: null };
+    const materialNames = new Set([...requiredItems(compiled).keys(), ...compiled.analysis.policy.scaffolding]);
+    const active = { job, compiled, cleanupOperations: recovery.operations, controller, state, storageZone, materialNames, materialBaseline: inventoryVariantSnapshot(activeConnection(this.getClient).bot, materialNames), promise: null };
     const stop = () => {
       state.desiredStatus ||= 'stopped';
       controller.abort(new Error(state.desiredStatus === 'paused' ? 'Build paused.' : 'Build stopped.'));
@@ -383,6 +407,12 @@ class BuildExecutor {
       .map((key) => [key, Number(verification.analysis.counts[key]) || 0])
       .filter(([, count]) => count > 0);
     if (incomplete.length) throw new Error(`Final build verification found ${incomplete.map(([key, count]) => `${count} ${key}`).join(', ')}.`);
+    try {
+      await this.depositSurplus(active);
+    } catch (error) {
+      active.job = await this.save(active, { latestError: `Material cleanup: ${error.message}` });
+      this.logger.warn(`[Build] ${active.job.latestError}`);
+    }
     const status = active.job.unresolvedSamples.length ? 'failed' : 'complete';
     await this.save(active, { status, phase: status, metrics: { finishedAt: this.now() } });
   }
@@ -395,7 +425,11 @@ class BuildExecutor {
     if (available > 0) return;
     if (!active.storageZone) throw new Error(`No ${operation.item} remains in inventory.`);
     const demand = pendingItemDemand(active.compiled, index, operation.item);
-    const capacity = itemAdditionalCapacity(bot, operation.item);
+    let capacity = itemAdditionalCapacity(bot, operation.item);
+    if (capacity < 1) {
+      await this.depositSurplus(active);
+      capacity = itemAdditionalCapacity(bot, operation.item);
+    }
     const count = Math.min(MATERIAL_BATCH_LIMIT, demand, capacity);
     if (count < 1) throw new Error(`Inventory capacity is unavailable for ${operation.item}; free additional slots before resuming.`);
     active.job = await this.save(active, { phase: 'materials' });
@@ -405,6 +439,24 @@ class BuildExecutor {
     active.controller.signal.throwIfAborted();
     if (!result?.settled || result.failed || result.transferred < count) throw new Error(result?.failed || `Storage fetched only ${result?.transferred || 0} of ${count} requested ${operation.item}.`);
     if ((inventoryCounts(bot).get(operation.item) || 0) < 1) throw new Error(`Storage reported ${operation.item} as transferred, but none is present in inventory.`);
+  }
+
+  async depositSurplus(active) {
+    if (!active.storageZone || !this.storage || typeof this.storage.startDeposit !== 'function') return 0;
+    let transferred = 0;
+    for (let attempts = 0; attempts < 256; attempts += 1) {
+      const surplus = surplusInventory(activeConnection(this.getClient).bot, active.materialBaseline, active.materialNames);
+      const next = surplus[0];
+      if (!next) return transferred;
+      active.job = await this.save(active, { phase: 'cleanup' });
+      this.activities.update(BUILD_ACTIVITY_ID, `${active.job.blueprintName}: returning ${next.count} x ${next.name}`);
+      await this.storage.startDeposit({ zone: active.storageZone, slot: next.slot, count: next.count, parentActivity: BUILD_ACTIVITY_ID });
+      const result = await this.storage.waitForTransfer();
+      active.controller.signal.throwIfAborted();
+      if (!result?.settled || result.failed || result.transferred < next.count) throw new Error(result?.failed || `Storage deposited only ${result?.transferred || 0} of ${next.count} surplus ${next.name}.`);
+      transferred += result.transferred;
+    }
+    throw new Error('Material cleanup exceeded its bounded variant limit.');
   }
 
   completeOperation(active, operation) {
@@ -576,10 +628,12 @@ module.exports = {
   BuildExecutor,
   EXECUTABLE_PLACEMENT_MODES,
   inventoryCounts,
+  inventoryVariantSnapshot,
   itemAdditionalCapacity,
   missingItems,
   pendingItemDemand,
   requiredItems,
+  surplusInventory,
   unsupportedOperations,
   validateCompiled
 };

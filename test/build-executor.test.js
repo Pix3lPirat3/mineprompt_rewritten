@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Vec3 } = require('vec3');
 const { ActivityManager } = require('../src/main/activity-manager');
-const { BuildExecutor, itemAdditionalCapacity, pendingItemDemand, requiredItems } = require('../src/main/build-executor');
+const { BuildExecutor, inventoryVariantSnapshot, itemAdditionalCapacity, pendingItemDemand, requiredItems, surplusInventory } = require('../src/main/build-executor');
 const { createBuildJob } = require('../src/main/build-job');
 const { normalizeBuildPolicy } = require('../src/main/build-policy');
 const { blockStateFromWorld } = require('../src/main/world-diff');
@@ -126,17 +126,25 @@ function harness(options = {}) {
     }
   };
   const activities = new ActivityManager();
+  const deposits = [];
   const fetches = [];
+  let transfer = null;
   const storage = options.withStorage ? {
     zones: () => [{ id: 'warehouse', name: 'Warehouse' }],
     async startFetch(request) {
       fetches.push(request);
       itemCount += request.count;
+      transfer = { kind: 'fetch', count: request.count };
+      return { running: true };
+    },
+    async startDeposit(request) {
+      deposits.push(request);
+      transfer = { kind: 'deposit', count: request.count };
       return { running: true };
     },
     async waitForTransfer() {
-      const requested = fetches.at(-1)?.count || 0;
-      return { settled: true, failed: null, transferred: requested };
+      if (transfer?.kind === 'deposit') itemCount = Math.max(0, itemCount - transfer.count);
+      return { settled: true, failed: null, transferred: transfer?.count || 0 };
     },
     stop: () => true
   } : null;
@@ -154,7 +162,7 @@ function harness(options = {}) {
     storage,
     owner: 'test'
   });
-  return { activities, blocks, bot, compiled, data, executor, fetches, lookCalls, operation, placementCalls, target };
+  return { activities, blocks, bot, compiled, data, deposits, executor, fetches, lookCalls, operation, placementCalls, target };
 }
 
 test('executes and verifies a survival placement', async () => {
@@ -187,10 +195,19 @@ test('requires confirmation before executing removals', async () => {
 });
 
 test('fetches missing build materials from one configured storage zone', async () => {
-  const value = harness({ itemCount: 0, materials: 'storage', storageZone: 'warehouse', withStorage: true });
+  const value = harness({ itemCount: 0, materials: 'storage', storageZone: 'warehouse', withStorage: true, consumeItems: true });
   await value.executor.start('test', { anchor: value.target });
   await value.executor.waitForIdle();
   assert.deepEqual(value.fetches, [{ zone: 'warehouse', item: 'stone', count: 1, parentActivity: 'builder' }]);
+  assert.deepEqual(value.deposits, []);
+  assert.equal(value.data.buildJobs[0].status, 'complete');
+});
+
+test('returns only surplus tracked variants after a storage-backed build', async () => {
+  const value = harness({ itemCount: 0, materials: 'storage', storageZone: 'warehouse', withStorage: true });
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.deepEqual(value.deposits, [{ zone: 'warehouse', slot: 36, count: 1, parentActivity: 'builder' }]);
   assert.equal(value.data.buildJobs[0].status, 'complete');
 });
 
@@ -300,6 +317,21 @@ test('bounds pending material demand and preserves inventory reserve slots', () 
     inventory: { items: () => [{ name: 'oak_door', count: 60 }], emptySlotCount: () => 3 }
   };
   assert.equal(itemAdditionalCapacity(bot, 'oak_door'), 68);
+});
+
+test('calculates component-exact surplus without including unrelated items', () => {
+  let items = [
+    { name: 'stone', type: 1, metadata: 0, count: 3, slot: 36 },
+    { name: 'dirt', type: 2, metadata: 0, count: 5, slot: 37 }
+  ];
+  const bot = { inventory: { items: () => items } };
+  const allowed = new Set(['stone']);
+  const baseline = inventoryVariantSnapshot(bot, allowed);
+  items = [
+    { name: 'stone', type: 1, metadata: 0, count: 5, slot: 36 },
+    { name: 'dirt', type: 2, metadata: 0, count: 12, slot: 37 }
+  ];
+  assert.deepEqual(surplusInventory(bot, baseline, allowed).map(({ name, count, slot }) => ({ name, count, slot })), [{ name: 'stone', count: 2, slot: 36 }]);
 });
 
 test('executes exact axis placement instructions', async () => {
