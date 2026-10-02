@@ -12,6 +12,7 @@ const { RendererDiagnostics } = require('./renderer-diagnostics');
 const { ToolCatalog } = require('./tool-catalog');
 const { SnapshotPublisher } = require('./snapshot-publisher');
 const { EngineManager } = require('./engine-manager');
+const { EngineController } = require('./engine-controller');
 const { parseCommandLine } = require('./command-line');
 
 const REMOTE_CAPABILITIES = new Set(['status', 'chat', 'movement', 'inventory', 'combat', 'world']);
@@ -30,6 +31,16 @@ class ApplicationRuntime {
     this.toolCatalog = new ToolCatalog(this);
     this.sessions = new Map();
     this.selectedSessionId = null;
+    this.engineController = new EngineController({
+      manager: this.engines,
+      store: this.store,
+      sessions: this.sessions,
+      selectedSessionId: () => this.selectedSessionId,
+      selectSession: (sessionId) => { this.selectedSessionId = sessionId; },
+      createSession: (sessionId, profileId) => this.createSession(sessionId, profileId),
+      publishSnapshot: () => this.publishSnapshot(),
+      logger: this.logger
+    });
     this.snapshotPublisher = new SnapshotPublisher({
       capture: () => this.snapshot(),
       publish: (snapshot) => this.emit('snapshot', snapshot),
@@ -80,18 +91,7 @@ class ApplicationRuntime {
 
   commandDescriptors() {
     const commands = this.selectedSession()?.commandDescriptors?.() || [];
-    return [...commands, {
-      command: 'engine',
-      aliases: ['runtime'],
-      category: 'application',
-      capability: null,
-      description: 'Research, install, verify, select, and remove isolated Mineflayer engine profiles.',
-      usage: 'engine <list|catalog|research|plan|install|use|remove>',
-      requiresConnection: false,
-      toolName: 'command_engine',
-      risk: 'dangerous',
-      approval: 'required'
-    }];
+    return [...commands, this.engineController.descriptor()];
   }
 
   async sessionRequest(sessionId, method, ...args) {
@@ -104,12 +104,12 @@ class ApplicationRuntime {
   execute(input, sessionId = this.selectedSessionId, origin = { type: 'terminal' }) {
     let parsed;
     try { parsed = parseCommandLine(input); } catch {}
-    if (['engine', 'runtime'].includes(parsed?.name?.toLowerCase())) return this.executeEngineCommand(parsed.args, sessionId, origin);
+    if (['engine', 'runtime'].includes(parsed?.name?.toLowerCase())) return this.engineController.execute(parsed.args, sessionId);
     return this.sessionRequest(sessionId, 'execute', input, origin || { type: 'terminal' });
   }
 
   complete(input, sessionId = this.selectedSessionId) {
-    if (/^\s*(?:engine|runtime)(?:\s|$)/iu.test(String(input || ''))) return Promise.resolve(this.completeEngineCommand(input));
+    if (/^\s*(?:engine|runtime)(?:\s|$)/iu.test(String(input || ''))) return Promise.resolve(this.engineController.complete(input));
     return this.sessionRequest(sessionId, 'complete', input);
   }
 
@@ -177,91 +177,27 @@ class ApplicationRuntime {
   }
 
   engineList() {
-    return { profiles: this.engines.list(), catalog: this.engines.catalog() };
+    return this.engineController.list();
   }
 
   engineResearch(request = {}) {
-    return this.engines.research(request.owner || 'Pix3lPirat3').then((pulls) => ({ pulls }));
+    return this.engineController.research(request);
   }
 
   enginePlan(request = {}) {
-    if (request.preset) return this.engines.planPreset(request.preset);
-    return this.engines.planPackages({ name: request.name, pulls: request.pulls });
+    return this.engineController.plan(request);
   }
 
-  async engineInstall(request = {}) {
-    const plan = await this.enginePlan(request);
-    const existing = this.engines.list().find((profile) => profile.id === plan.id);
-    if (existing) return { ok: true, profile: { ...existing, reused: true } };
-    const active = [...this.sessions.values()].find((session) => session.snapshot().engine?.profile === plan.profile);
-    if (active) throw new Error(`Session ${active.id} is using ${plan.profile}. Select another engine before updating it.`);
-    const profile = await this.engines.install(plan, { acknowledgeUnsafe: request.acknowledgeUnsafe === true, timeout: request.timeout });
-    this.publishSnapshot();
-    return { ok: true, profile };
+  engineInstall(request = {}) {
+    return this.engineController.install(request);
   }
 
-  async engineUse(request = {}) {
-    const profile = this.engines.resolve(request.profile);
-    const sessionId = request.sessionId || this.selectedSessionId;
-    const session = this.sessions.get(sessionId);
-    if (!session) throw new Error('The bot session no longer exists.');
-    if (session.snapshot().state.status !== 'disconnected') throw new Error('Disconnect the bot before changing its engine profile.');
-    await session.close();
-    this.sessions.delete(sessionId);
-    const replacement = this.createSession(sessionId, profile.id);
-    await replacement.ready;
-    this.selectedSessionId = sessionId;
-    if (request.makeDefault !== false) await this.store.setSetting('defaultEngineProfileId', profile.profile);
-    this.publishSnapshot();
-    return { ok: true, sessionId, engine: replacement.snapshot().engine };
+  engineUse(request = {}) {
+    return this.engineController.use(request);
   }
 
-  async engineRemove(request = {}) {
-    const profile = this.engines.resolve(request.profile);
-    const active = [...this.sessions.values()].find((session) => session.snapshot().engine?.id === profile.id);
-    if (active) throw new Error(`Engine profile ${profile.id} is in use by session ${active.id}.`);
-    const result = await this.engines.remove(profile.id);
-    if (this.store.snapshot().settings.defaultEngineProfileId === profile.profile) await this.store.setSetting('defaultEngineProfileId', 'stable');
-    this.publishSnapshot();
-    return result;
-  }
-
-  async executeEngineCommand(args = [], sessionId = this.selectedSessionId) {
-    const action = String(args[0] || 'list').toLowerCase();
-    try {
-      let value;
-      if (action === 'list' || action === 'catalog') value = this.engineList();
-      else if (action === 'research') value = await this.engineResearch({ owner: args[1] || 'Pix3lPirat3' });
-      else if (action === 'plan') value = ['bedrock', 'bedrock-experimental'].includes(String(args[1] || '').toLowerCase())
-        ? await this.enginePlan({ preset: args[1] })
-        : await this.enginePlan({ name: args[1], pulls: args.slice(2) });
-      else if (action === 'install') {
-        const confirmed = args.at(-1)?.toLowerCase() === 'confirm';
-        const values = confirmed ? args.slice(1, -1) : args.slice(1);
-        value = ['bedrock', 'bedrock-experimental'].includes(String(values[0] || '').toLowerCase())
-          ? await this.engineInstall({ preset: values[0], acknowledgeUnsafe: confirmed })
-          : await this.engineInstall({ name: values[0], pulls: values.slice(1), acknowledgeUnsafe: confirmed });
-      } else if (action === 'use') value = await this.engineUse({ profile: args[1], sessionId });
-      else if (action === 'remove') {
-        if (args.at(-1)?.toLowerCase() !== 'confirm') throw new Error('Removing an engine profile requires confirm.');
-        value = await this.engineRemove({ profile: args[1] });
-      } else throw new Error('Usage: engine <list|catalog|research [owner]|plan <name|bedrock> [pulls...]|install <name|bedrock> [pulls...] confirm|use <profile>|remove <profile> confirm>.');
-      this.logger.log(`[Engines] ${JSON.stringify(value, null, 2)}`);
-      return { ok: true, value };
-    } catch (error) {
-      this.logger.error(`[Engines] ${error.message}`);
-      return { ok: false, error: error.message };
-    }
-  }
-
-  completeEngineCommand(input) {
-    let parsed;
-    try { parsed = parseCommandLine(input); } catch { return []; }
-    if (parsed.args.length === 0 || parsed.args.length === 1 && !/\s$/u.test(String(input))) return ['list', 'catalog', 'research', 'plan', 'install', 'use', 'remove'];
-    const action = parsed.args[0]?.toLowerCase();
-    if (action === 'use' || action === 'remove') return this.engines.list().map((profile) => profile.id);
-    if (action === 'plan' || action === 'install') return ['bedrock', 'bedrock-experimental'];
-    return [];
+  engineRemove(request = {}) {
+    return this.engineController.remove(request);
   }
 
   async reload(request = {}) {
