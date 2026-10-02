@@ -31,6 +31,24 @@ test('prevents activities from competing for exclusive resources', () => {
   assert.deepEqual(manager.snapshot()[0].resources, ['movement', 'world']);
 });
 
+test('allows bounded child work to share and retain parent resources', () => {
+  const manager = new ActivityManager();
+  manager.register('builder', { resources: ['movement', 'inventory', 'world'], stop() {} });
+  manager.register('storage', { parent: 'builder', resources: ['movement', 'inventory'], stop() {} });
+  assert.equal(manager.snapshot().find((entry) => entry.id === 'storage').parent, 'builder');
+  assert.throws(() => manager.register('mine', { resources: ['movement'], stop() {} }), /movement is already in use by builder/u);
+  manager.stop('builder');
+  assert.throws(() => manager.register('mine', { resources: ['movement'], stop() {} }), /movement is already in use by storage/u);
+  manager.stop('storage');
+  manager.register('mine', { resources: ['movement'], stop() {} });
+  assert.equal(manager.has('mine'), true);
+});
+
+test('rejects a child whose parent is not active', () => {
+  const manager = new ActivityManager();
+  assert.throws(() => manager.register('child', { parent: 'missing', resources: ['movement'], stop() {} }), /Parent activity missing is not active/u);
+});
+
 test('supports independent activity subscribers', () => {
   const manager = new ActivityManager();
   const revisions = [];

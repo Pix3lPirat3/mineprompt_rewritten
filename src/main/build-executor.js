@@ -12,6 +12,8 @@ const { blockStateFromWorld, REPLACEABLE_BLOCKS } = require('./world-diff');
 const { abortableDelay } = require('./workflow-runtime');
 
 const BUILD_ACTIVITY_ID = 'builder';
+const MATERIAL_BATCH_LIMIT = 64;
+const MATERIAL_RESERVE_SLOTS = 2;
 
 function positionVector(position) {
   return new Vec3(position.x, position.y, position.z);
@@ -54,6 +56,29 @@ function missingItems(bot, compiled) {
     const missing = Math.max(0, count - (available.get(name) || 0));
     return missing ? [{ name, count, available: available.get(name) || 0, missing }] : [];
   });
+}
+
+function pendingItemDemand(compiled, startIndex, itemName) {
+  const operations = operationMap(compiled);
+  const grouped = new Set();
+  let count = 0;
+  for (const id of compiled.graph.order.slice(startIndex)) {
+    const operation = operations.get(id);
+    if (!operation || !['place', 'scaffold-place'].includes(operation.kind) || operation.item !== itemName) continue;
+    const singleItemGroup = operation.groupId && (operation.groupId.startsWith('vertical:') || operation.groupId.startsWith('horizontal:'));
+    if (singleItemGroup && grouped.has(operation.groupId)) continue;
+    if (singleItemGroup) grouped.add(operation.groupId);
+    count += 1;
+  }
+  return count;
+}
+
+function itemAdditionalCapacity(bot, itemName, reserveSlots = MATERIAL_RESERVE_SLOTS) {
+  const stackSize = Math.max(1, Number(bot.registry?.itemsByName?.[itemName]?.stackSize) || 64);
+  const items = bot.inventory?.items?.() || [];
+  const partial = items.filter((item) => item.name === itemName).reduce((sum, item) => sum + Math.max(0, stackSize - (Number(item.count) || 0)), 0);
+  const emptySlots = typeof bot.inventory?.emptySlotCount === 'function' ? bot.inventory.emptySlotCount() : 36;
+  return partial + Math.max(0, emptySlots - reserveSlots) * stackSize;
 }
 
 function unsupportedOperations(compiled) {
@@ -166,10 +191,9 @@ class BuildExecutor {
       const context = currentStorageContext(client);
       if (!context) throw new Error('The connected server identity is unavailable.');
       const compiled = await this.compile(reference, request);
-      validateCompiled(client.bot, compiled, request, { skipMaterials: true });
-      await this.prepareMaterials(client.bot, compiled);
-      validateCompiled(client.bot, compiled, request);
-      return await this.launch(compiled, request, context);
+      const storageZone = this.resolveStorageZone(compiled);
+      validateCompiled(client.bot, compiled, request, { skipMaterials: Boolean(storageZone) });
+      return await this.launch(compiled, request, context, null, storageZone);
     } finally {
       this.starting = false;
     }
@@ -187,31 +211,25 @@ class BuildExecutor {
       if (!context || context.server.host !== job.server.host || context.server.port !== job.server.port || context.dimension !== job.dimension) throw new Error('The build job belongs to another server or dimension.');
       const request = { anchor: job.anchor, rotation: job.rotation, mirror: job.mirror, policy: job.policy, confirmed: true };
       const compiled = await this.compile(job.blueprintHash, request, { temporaryScaffolds: job.temporaryScaffolds });
-      validateCompiled(client.bot, compiled, request, { skipMaterials: true });
-      await this.prepareMaterials(client.bot, compiled);
-      validateCompiled(client.bot, compiled, request);
-      return await this.launch(compiled, request, context, job);
+      const storageZone = this.resolveStorageZone(compiled);
+      validateCompiled(client.bot, compiled, request, { skipMaterials: Boolean(storageZone) });
+      return await this.launch(compiled, request, context, job, storageZone);
     } finally {
       this.starting = false;
     }
   }
 
-  async prepareMaterials(bot, compiled) {
-    const missing = missingItems(bot, compiled);
-    if (!missing.length || compiled.analysis.policy.materials === 'inventory') return;
+  resolveStorageZone(compiled) {
+    if (compiled.analysis.policy.materials === 'inventory') return null;
     if (!this.storage || typeof this.storage.startFetch !== 'function' || typeof this.storage.waitForTransfer !== 'function') throw new Error('Storage-backed build materials are not configured.');
     const zones = this.storage.zones();
     const requestedZone = compiled.analysis.policy.storageZone;
     const zone = requestedZone ? zones.find((entry) => entry.id === requestedZone || entry.name.toLowerCase() === requestedZone.toLowerCase()) : zones.length === 1 ? zones[0] : null;
     if (!zone) throw new Error(requestedZone ? `Storage zone ${requestedZone} is not available for this build.` : 'Choose a storage zone when more than one zone is available.');
-    for (const entry of missing) {
-      await this.storage.startFetch({ zone: zone.id, item: entry.name, count: entry.missing });
-      const result = await this.storage.waitForTransfer();
-      if (!result?.settled || result.failed || result.transferred < entry.missing) throw new Error(result?.failed || `Storage fetched only ${result?.transferred || 0} of ${entry.missing} required ${entry.name}.`);
-    }
+    return zone.id;
   }
 
-  async launch(compiled, request, context, previous = null) {
+  async launch(compiled, request, context, previous = null, storageZone = null) {
     const now = this.now();
     const baseCount = previous ? previous.completedCount + previous.skippedCount : 0;
     const recovery = previous ? resumeScaffoldPlan(activeConnection(this.getClient).bot, compiled, previous) : { operations: [], positions: [] };
@@ -243,12 +261,13 @@ class BuildExecutor {
         }, now);
     const controller = new AbortController();
     const state = { desiredStatus: null };
-    const active = { job, compiled, cleanupOperations: recovery.operations, controller, state, promise: null };
+    const active = { job, compiled, cleanupOperations: recovery.operations, controller, state, storageZone, promise: null };
     const stop = () => {
       state.desiredStatus ||= 'stopped';
       controller.abort(new Error(state.desiredStatus === 'paused' ? 'Build paused.' : 'Build stopped.'));
       const bot = this.getClient()?.bot;
       cancelNavigation(bot);
+      this.storage?.stop?.();
       if (bot?.targetDigBlock) void bot.stopDigging().catch(() => {});
     };
     this.activities.register(BUILD_ACTIVITY_ID, {
@@ -319,8 +338,9 @@ class BuildExecutor {
         throw error;
       }
     }
-    for (const id of compiled.graph.order) {
+    for (let index = 0; index < compiled.graph.order.length; index += 1) {
       signal.throwIfAborted();
+      const id = compiled.graph.order[index];
       const operation = operations.get(id);
       if (!operation) continue;
       const blockedBy = operation.dependencies.find((dependency) => outcomes.get(dependency) === 'failed');
@@ -330,6 +350,7 @@ class BuildExecutor {
         continue;
       }
       try {
+        await this.ensureMaterial(active, operation, index);
         await this.executeWithRetry(active, operation, plannedStances.get(id));
         outcomes.set(id, 'done');
         this.completeOperation(active, operation);
@@ -364,6 +385,26 @@ class BuildExecutor {
     if (incomplete.length) throw new Error(`Final build verification found ${incomplete.map(([key, count]) => `${count} ${key}`).join(', ')}.`);
     const status = active.job.unresolvedSamples.length ? 'failed' : 'complete';
     await this.save(active, { status, phase: status, metrics: { finishedAt: this.now() } });
+  }
+
+  async ensureMaterial(active, operation, index) {
+    if (!['place', 'scaffold-place'].includes(operation.kind) || !operation.item) return;
+    const bot = activeConnection(this.getClient).bot;
+    if (liveState(bot, operation.position) === operation.expected) return;
+    const available = inventoryCounts(bot).get(operation.item) || 0;
+    if (available > 0) return;
+    if (!active.storageZone) throw new Error(`No ${operation.item} remains in inventory.`);
+    const demand = pendingItemDemand(active.compiled, index, operation.item);
+    const capacity = itemAdditionalCapacity(bot, operation.item);
+    const count = Math.min(MATERIAL_BATCH_LIMIT, demand, capacity);
+    if (count < 1) throw new Error(`Inventory capacity is unavailable for ${operation.item}; free additional slots before resuming.`);
+    active.job = await this.save(active, { phase: 'materials' });
+    this.activities.update(BUILD_ACTIVITY_ID, `${active.job.blueprintName}: fetching ${count} x ${operation.item}`);
+    await this.storage.startFetch({ zone: active.storageZone, item: operation.item, count, parentActivity: BUILD_ACTIVITY_ID });
+    const result = await this.storage.waitForTransfer();
+    active.controller.signal.throwIfAborted();
+    if (!result?.settled || result.failed || result.transferred < count) throw new Error(result?.failed || `Storage fetched only ${result?.transferred || 0} of ${count} requested ${operation.item}.`);
+    if ((inventoryCounts(bot).get(operation.item) || 0) < 1) throw new Error(`Storage reported ${operation.item} as transferred, but none is present in inventory.`);
   }
 
   completeOperation(active, operation) {
@@ -535,7 +576,9 @@ module.exports = {
   BuildExecutor,
   EXECUTABLE_PLACEMENT_MODES,
   inventoryCounts,
+  itemAdditionalCapacity,
   missingItems,
+  pendingItemDemand,
   requiredItems,
   unsupportedOperations,
   validateCompiled

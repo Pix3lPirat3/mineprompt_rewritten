@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Vec3 } = require('vec3');
 const { ActivityManager } = require('../src/main/activity-manager');
-const { BuildExecutor, requiredItems } = require('../src/main/build-executor');
+const { BuildExecutor, itemAdditionalCapacity, pendingItemDemand, requiredItems } = require('../src/main/build-executor');
 const { createBuildJob } = require('../src/main/build-job');
 const { normalizeBuildPolicy } = require('../src/main/build-policy');
 const { blockStateFromWorld } = require('../src/main/world-diff');
@@ -41,7 +41,10 @@ function harness(options = {}) {
     lastOptions: { host: 'build.test', port: 25565 },
     controlState: {},
     inventory: { items: () => itemCount > 0 ? [{ name: itemName, count: itemCount, slot: 36 }] : [] },
-    pathfinder: { bestHarvestTool: () => null },
+    pathfinder: {
+      bestHarvestTool: () => null,
+      async goto(goal) { bot.entity.position = new Vec3(goal.x, goal.y, goal.z); }
+    },
     blockAt(position) {
       return blocks.get(key(position)) || (position.y === 63 ? block('stone', position) : block('air', position));
     },
@@ -66,6 +69,7 @@ function harness(options = {}) {
         }
       });
       blocks.set(key(position), block(options.placeAs || 'stone', position, options.placeProperties));
+      if (options.consumeItems) itemCount = Math.max(0, itemCount - 1);
       if (options.delayPlaceExtras) deferredExtras = options.placeExtras || [];
       else for (const extra of options.placeExtras || []) blocks.set(key(extra.position), block(extra.name, extra.position, extra.properties));
     },
@@ -186,8 +190,31 @@ test('fetches missing build materials from one configured storage zone', async (
   const value = harness({ itemCount: 0, materials: 'storage', storageZone: 'warehouse', withStorage: true });
   await value.executor.start('test', { anchor: value.target });
   await value.executor.waitForIdle();
-  assert.deepEqual(value.fetches, [{ zone: 'warehouse', item: 'stone', count: 1 }]);
+  assert.deepEqual(value.fetches, [{ zone: 'warehouse', item: 'stone', count: 1, parentActivity: 'builder' }]);
   assert.equal(value.data.buildJobs[0].status, 'complete');
+});
+
+test('fetches one bounded batch for consecutive pending placements', async () => {
+  const value = harness({ itemCount: 0, materials: 'storage', storageZone: 'warehouse', withStorage: true, consumeItems: true });
+  const operations = [value.operation];
+  for (const z of [1, 2]) {
+    operations.push({
+      ...structuredClone(value.operation),
+      id: `place:1,64,${z}`,
+      position: { x: 1, y: 64, z },
+      instruction: { ...structuredClone(value.operation.instruction), supportPosition: { x: 1, y: 63, z } }
+    });
+  }
+  value.compiled.graph.operations = operations;
+  value.compiled.graph.order = operations.map((operation) => operation.id);
+  value.compiled.graph.counts.operations = operations.length;
+  value.compiled.stances.stances[0].operations = operations.map((operation) => operation.id);
+  value.compiled.analysis.counts.placeable = operations.length;
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.deepEqual(value.fetches, [{ zone: 'warehouse', item: 'stone', count: 3, parentActivity: 'builder' }]);
+  assert.equal(value.data.buildJobs[0].status, 'complete', value.data.buildJobs[0].latestError || 'No build error was recorded.');
+  assert.equal(value.blocks.get('1,64,2').name, 'stone');
 });
 
 test('refuses to dig a removal target that changed after planning', async () => {
@@ -256,6 +283,23 @@ test('counts one item for paired block items but two paired containers', () => {
     { kind: 'place', item: 'chest', groupId: 'container:2,64,0' }
   ] } };
   assert.deepEqual(Object.fromEntries(requiredItems(compiled)), { oak_door: 1, chest: 2 });
+});
+
+test('bounds pending material demand and preserves inventory reserve slots', () => {
+  const operations = [
+    { id: 'door-low', kind: 'place', item: 'oak_door', groupId: 'vertical:0,64,0' },
+    { id: 'door-high', kind: 'place', item: 'oak_door', groupId: 'vertical:0,64,0' },
+    { id: 'door-two', kind: 'place', item: 'oak_door', groupId: 'vertical:2,64,0' },
+    { id: 'stone', kind: 'place', item: 'stone', groupId: null }
+  ];
+  const compiled = { graph: { operations, order: operations.map((operation) => operation.id) } };
+  assert.equal(pendingItemDemand(compiled, 0, 'oak_door'), 2);
+  assert.equal(pendingItemDemand(compiled, 2, 'oak_door'), 1);
+  const bot = {
+    registry: { itemsByName: { oak_door: { stackSize: 64 } } },
+    inventory: { items: () => [{ name: 'oak_door', count: 60 }], emptySlotCount: () => 3 }
+  };
+  assert.equal(itemAdditionalCapacity(bot, 'oak_door'), 68);
 });
 
 test('executes exact axis placement instructions', async () => {

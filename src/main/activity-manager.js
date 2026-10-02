@@ -10,18 +10,20 @@ class ActivityManager {
     this.revision = 0;
   }
 
-  register(id, { label, detail = '', resources = [], stop }) {
+  register(id, { label, detail = '', resources = [], parent = null, stop }) {
     if (!id || typeof stop !== 'function') throw new TypeError('An activity id and stop function are required.');
+    if (parent && !this.activities.has(parent)) throw new Error(`Parent activity ${parent} is not active.`);
     const requested = [...new Set(resources.map(String).filter(Boolean))];
-    const conflict = requested.map((resource) => ({ resource, owner: this.resources.get(resource) })).find((entry) => entry.owner && entry.owner !== id);
+    const conflict = requested.map((resource) => ({ resource, owner: this.resources.get(resource) })).find((entry) => entry.owner && entry.owner !== id && entry.owner !== parent);
     if (conflict) throw new Error(`${conflict.resource} is already in use by ${conflict.owner}.`);
     this.stop(id);
-    for (const resource of requested) this.resources.set(resource, id);
+    for (const resource of requested) if (this.resources.get(resource) !== parent) this.resources.set(resource, id);
     this.activities.set(id, {
       id,
       label: String(label || id),
       detail: String(detail || ''),
       resources: requested,
+      ...(parent ? { parent } : {}),
       startedAt: Date.now(),
       stop
     });
@@ -79,7 +81,10 @@ class ActivityManager {
 
   release(activity) {
     for (const resource of activity.resources) {
-      if (this.resources.get(resource) === activity.id) this.resources.delete(resource);
+      if (this.resources.get(resource) !== activity.id) continue;
+      const child = [...this.activities.values()].find((entry) => entry.parent === activity.id && entry.resources.includes(resource));
+      if (child) this.resources.set(resource, child.id);
+      else this.resources.delete(resource);
     }
   }
 

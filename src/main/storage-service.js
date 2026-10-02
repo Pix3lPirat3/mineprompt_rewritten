@@ -588,6 +588,7 @@ class StorageService {
       kind: 'fetch',
       label: 'Storage fetch',
       detail: `Fetching ${plan.requested} x ${plan.variant.displayName}`,
+      parentActivity: request.parentActivity,
       run: (context) => this.runFetch(context)
     });
   }
@@ -608,7 +609,7 @@ class StorageService {
     });
   }
 
-  async startTransfer({ bot, plan, kind, label, detail, run }) {
+  async startTransfer({ bot, plan, kind, label, detail, parentActivity = null, run }) {
     const lease = await this.store.reserveStorage({ owner: this.owner, ttlMs: 120000, entries: plan.reservationEntries });
     const startPosition = bot.entity.position.clone();
     const lookBlock = bot.blockAtCursor?.(32);
@@ -643,6 +644,7 @@ class StorageService {
         label,
         detail,
         resources: ['movement', 'inventory'],
+        parent: parentActivity,
         stop
       });
     } catch (error) {
