@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const { setImmediate: nextTurn } = require('node:timers/promises');
 const { Vec3 } = require('vec3');
 const { ActivityManager } = require('../src/main/activity-manager');
-const { StashService } = require('../src/main/stash-service');
+const { StashService, collectedItems, inventoryCounts } = require('../src/main/stash-service');
 
 async function completed(activities) {
   for (let attempt = 0; attempt < 50 && activities.has('stash'); attempt += 1) await nextTurn();
@@ -81,4 +81,12 @@ test('requires confirmation before depositing the full existing inventory', () =
   const value = fixture();
   assert.throws(() => value.service.start({ mode: 'inventory', selector: 'all' }), /requires confirmation/u);
   assert.equal(value.activities.has('stash'), false);
+});
+
+test('tracks collected component variants independently', () => {
+  const first = { type: 1, metadata: 0, count: 2, components: [{ type: 'custom_name', data: 'First' }] };
+  const second = { type: 1, metadata: 0, count: 4, components: [{ type: 'custom_name', data: 'Second' }] };
+  const before = inventoryCounts({ inventory: { items: () => [first] } });
+  const after = inventoryCounts({ inventory: { items: () => [{ ...first, count: 3 }, second] } });
+  assert.deepEqual(collectedItems(before, after).map((entry) => entry.count).sort((left, right) => left - right), [1, 4]);
 });

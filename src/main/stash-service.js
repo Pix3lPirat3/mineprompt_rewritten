@@ -2,6 +2,7 @@
 
 const { GoalNear } = require('mineflayer-pathfinder').goals;
 const { cancelNavigation, navigateGoal } = require('./navigation-service');
+const { itemIdentity } = require('./item-identity');
 
 const STORAGE_BLOCKS = new Set(['barrel', 'chest', 'trapped_chest']);
 
@@ -14,16 +15,15 @@ function positionValue(position) {
   return { x: Math.floor(position.x), y: Math.floor(position.y), z: Math.floor(position.z) };
 }
 
-function itemKey(item) {
-  let nbt = '';
-  try { nbt = JSON.stringify(item?.nbt ?? null); } catch { nbt = ''; }
-  return `${item?.type}:${item?.metadata ?? 0}:${nbt}`;
+function itemKey(item, cache = null) {
+  return itemIdentity(item, cache);
 }
 
 function inventoryCounts(bot) {
   const counts = new Map();
+  const cache = new WeakMap();
   for (const item of bot.inventory?.items?.() || []) {
-    const key = itemKey(item);
+    const key = itemKey(item, cache);
     const current = counts.get(key);
     if (current) current.count += Number(item.count) || 0;
     else counts.set(key, { key, count: Number(item.count) || 0, item });

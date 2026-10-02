@@ -1,6 +1,7 @@
 'use strict';
 
 const { serializeItem } = require('./inventory-model');
+const { itemsMatch } = require('./item-identity');
 
 const INVENTORY_ACTIONS = new Set(['inspect', 'equip', 'select', 'use', 'swing', 'drop']);
 const CONTAINER_ACTIONS = new Set(['inspect', 'take', 'deposit', 'transfer', 'click', 'move', 'trade', 'workstation', 'close']);
@@ -9,10 +10,6 @@ const QUANTITIES = new Set(['one', 'half', 'stack', 'all']);
 
 function itemName(item) {
   return item.displayName || item.name;
-}
-
-function itemMatches(left, right) {
-  return left.type === right.type && left.metadata === right.metadata && JSON.stringify(left.nbt ?? null) === JSON.stringify(right.nbt ?? null);
 }
 
 class InventoryService {
@@ -191,7 +188,8 @@ class InventoryService {
     if (quantity === 'one') return 1;
     if (quantity === 'half') return Math.ceil(item.count / 2);
     if (quantity === 'stack') return item.count;
-    return matchingItems.filter((entry) => itemMatches(entry, item)).reduce((total, entry) => total + entry.count, 0);
+    const cache = new WeakMap();
+    return matchingItems.filter((entry) => itemsMatch(entry, item, cache)).reduce((total, entry) => total + entry.count, 0);
   }
 
   async drop(request, bot) {
@@ -208,16 +206,20 @@ class InventoryService {
     }
     const item = this.findItem('inventory', request.target, bot);
     const count = this.quantity(request, item, bot.inventory.items());
-    const sourceEnd = quantity === 'all' ? bot.inventory.inventoryEnd : item.slot + 1;
-    const sourceStart = quantity === 'all' ? bot.inventory.inventoryStart : item.slot;
+    if (quantity === 'all') {
+      const cache = new WeakMap();
+      const matches = bot.inventory.items().filter((entry) => itemsMatch(entry, item, cache));
+      for (const entry of matches) await this.move(bot, bot.inventory, entry, entry.count, -999, null);
+      return { message: `[Inventory] Dropped ${count} x ${itemName(item)}.` };
+    }
     await bot.transfer({
       window: bot.inventory,
       itemType: item.type,
       metadata: item.metadata,
       nbt: item.nbt,
       count,
-      sourceStart,
-      sourceEnd,
+      sourceStart: item.slot,
+      sourceEnd: item.slot + 1,
       destStart: -999
     });
     return { message: `[Inventory] Dropped ${count} x ${itemName(item)}.` };
@@ -391,14 +393,20 @@ class InventoryService {
     const sourceItems = this.items(sourceScope, bot);
     const count = this.quantity(request, item, sourceItems);
     const allMatching = String(request.quantity || 'stack').toLowerCase() === 'all';
+    if (allMatching) {
+      const cache = new WeakMap();
+      const matches = sourceItems.filter((entry) => itemsMatch(entry, item, cache));
+      for (const entry of matches) await bot.clickWindow(this.windowSlot(sourceScope, entry.slot, window), 0, 1);
+      return { message: `[Container] ${direction === 'take' ? 'Took' : 'Deposited'} ${count} x ${itemName(item)}.` };
+    }
     const options = {
       window,
       itemType: item.type,
       metadata: item.metadata,
       nbt: item.nbt,
       count,
-      sourceStart: allMatching ? (direction === 'take' ? 0 : window.inventoryStart) : this.windowSlot(sourceScope, item.slot, window),
-      sourceEnd: allMatching ? (direction === 'take' ? window.inventoryStart : window.inventoryEnd) : this.windowSlot(sourceScope, item.slot, window) + 1,
+      sourceStart: this.windowSlot(sourceScope, item.slot, window),
+      sourceEnd: this.windowSlot(sourceScope, item.slot, window) + 1,
       destStart: direction === 'take' ? window.inventoryStart : 0,
       destEnd: direction === 'take' ? window.inventoryEnd : window.inventoryStart
     };

@@ -78,6 +78,18 @@ test('transfers container items and rejects stale views', async () => {
   assert.equal(context.calls.some((call) => call[0] === 'close' && call[1] === 4), true);
 });
 
+test('bulk transfers only exact component variants from their source slots', async () => {
+  const context = fixture();
+  const slots = Array(46).fill(null);
+  slots[0] = { slot: 0, name: 'diamond', displayName: 'First Diamond', count: 2, type: 1, metadata: 0, components: [{ type: 'custom_name', data: 'First' }] };
+  slots[1] = { slot: 1, name: 'diamond', displayName: 'Second Diamond', count: 5, type: 1, metadata: 0, components: [{ type: 'custom_name', data: 'Second' }] };
+  slots[2] = { slot: 2, name: 'diamond', displayName: 'First Diamond', count: 3, type: 1, metadata: 0, components: [{ type: 'custom_name', data: 'First' }] };
+  context.bot.currentWindow = windowFixture(4, 9, 46, slots);
+  const result = await context.service.execute({ scope: 'container', action: 'take', target: '0', quantity: 'all', connectionId: 7, windowId: 4 });
+  assert.match(result.message, /5 x First Diamond/u);
+  assert.deepEqual(context.calls.filter((call) => call[0] === 'click'), [['click', 0, 0, 1], ['click', 2, 0, 1]]);
+});
+
 test('equips an inventory item before swinging the requested arm', async () => {
   const context = fixture();
   const result = await context.service.execute({ scope: 'inventory', action: 'swing', target: '36', arm: 'left', showHand: true });
