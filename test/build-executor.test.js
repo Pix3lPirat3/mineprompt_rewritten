@@ -4,7 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Vec3 } = require('vec3');
 const { ActivityManager } = require('../src/main/activity-manager');
-const { BuildExecutor, inventoryVariantSnapshot, itemAdditionalCapacity, pendingItemDemand, requiredItems, surplusInventory } = require('../src/main/build-executor');
+const { BuildExecutor, builderMovements, inventoryVariantSnapshot, itemAdditionalCapacity, orderScaffoldCleanup, pendingItemDemand, requiredItems, surplusInventory } = require('../src/main/build-executor');
 const { createBuildJob } = require('../src/main/build-job');
 const { normalizeBuildPolicy } = require('../src/main/build-policy');
 const { blockStateFromWorld } = require('../src/main/world-diff');
@@ -34,6 +34,7 @@ function harness(options = {}) {
   const itemName = options.itemName || 'stone';
   const controlCalls = [];
   const lookCalls = [];
+  const navigationGoals = [];
   const placementCalls = [];
   let deferredExtras = [];
   const bot = {
@@ -44,7 +45,7 @@ function harness(options = {}) {
     inventory: { items: () => itemCount > 0 ? [{ name: itemName, count: itemCount, slot: 36 }] : [] },
     pathfinder: {
       bestHarvestTool: () => null,
-      async goto(goal) { bot.entity.position = new Vec3(goal.x + 0.5, goal.y, goal.z + 0.5); }
+      async goto(goal) { navigationGoals.push({ x: goal.x, y: goal.y, z: goal.z }); bot.entity.position = new Vec3(goal.x + 0.5, goal.y, goal.z + 0.5); }
     },
     blockAt(position) {
       return blocks.get(key(position)) || (position.y === 63 ? block('stone', position) : block('air', position));
@@ -60,6 +61,7 @@ function harness(options = {}) {
     setControlState(control, value) { this.controlState[control] = value; controlCalls.push({ control, value }); },
     async _placeBlockWithOptions(reference, face, placementOptions) {
       const position = reference.position.plus(face);
+      options.onPlace?.(position);
       placementCalls.push({
         reference: { x: reference.position.x, y: reference.position.y, z: reference.position.z },
         face: { x: face.x, y: face.y, z: face.z },
@@ -169,7 +171,7 @@ function harness(options = {}) {
     storage,
     owner: 'test'
   });
-  return { activities, blocks, bot, compiled, controlCalls, data, deposits, executor, fetches, lookCalls, operation, placementCalls, target };
+  return { activities, blocks, bot, compiled, controlCalls, data, deposits, executor, fetches, lookCalls, navigationGoals, operation, placementCalls, target };
 }
 
 function configurePairedChest(value) {
@@ -223,6 +225,26 @@ test('executes and verifies a survival placement', async () => {
   assert.equal(value.data.buildJobs[0].completedCount, 1);
   assert.equal(value.data.buildJobs[0].metrics.verified, 1);
   assert.equal(value.activities.has('builder'), false);
+});
+
+test('navigates to the exact stance cell across block-center coordinates', async () => {
+  const value = harness();
+  value.bot.entity.position = new Vec3(0.5, 64, -0.5);
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.deepEqual(value.navigationGoals, [{ x: 0, y: 64, z: 0 }]);
+  assert.equal(value.data.buildJobs[0].status, 'complete');
+});
+
+test('disables untracked world edits during builder navigation', () => {
+  const movements = { canDig: true, allow1by1towers: true, allowParkour: true, scafoldingBlocks: [1, 2], customCost: 7 };
+  const safe = builderMovements({ pathfinder: { movements } });
+  assert.equal(safe.canDig, false);
+  assert.equal(safe.allow1by1towers, false);
+  assert.equal(safe.allowParkour, false);
+  assert.deepEqual(safe.scafoldingBlocks, []);
+  assert.equal(safe.customCost, 7);
+  assert.deepEqual(movements.scafoldingBlocks, [1, 2]);
 });
 
 test('fails a job when exact state verification does not match', async () => {
@@ -337,6 +359,88 @@ test('resumes by removing an owned scaffold before permanent placement', async (
   await value.executor.waitForIdle();
   assert.equal(value.blocks.get('1,64,0').name, 'stone', value.data.buildJobs[0].latestError || 'No build error was recorded.');
   assert.equal(value.data.buildJobs[0].status, 'complete');
+  assert.deepEqual(value.data.buildJobs[0].temporaryScaffolds, []);
+});
+
+test('orders interrupted access tower cleanup from safe elevated stances', () => {
+  const value = harness();
+  const columns = [{ x: 1, z: 0 }, { x: 0, z: 0 }, { x: 0, z: 1 }];
+  const entries = [];
+  for (const y of [64, 65]) {
+    for (const column of columns) {
+      const position = { x: column.x, y, z: column.z };
+      value.blocks.set(key(position), block('dirt', position));
+      entries.push({
+        position,
+        operation: {
+          id: `resume-scaffold-remove:${key(position)}`,
+          kind: 'scaffold-remove',
+          position,
+          current: 'minecraft:dirt',
+          expected: 'minecraft:air',
+          dependencies: [],
+          blocked: [],
+          instruction: null
+        }
+      });
+    }
+  }
+  value.blocks.set('1,66,0', block('stone', { x: 1, y: 66, z: 0 }));
+  const ordered = orderScaffoldCleanup(value.bot, entries);
+  assert.equal(ordered.length, 6);
+  assert.deepEqual(ordered.slice(0, 3).map((operation) => operation.position.y), [65, 65, 65]);
+  assert.deepEqual(ordered.slice(3).map((operation) => operation.position.y), [64, 64, 64]);
+});
+
+test('commits scaffold ownership through a durable placement intent', async () => {
+  let value;
+  let persistedIntent = null;
+  value = harness({
+    onPlace() {
+      persistedIntent = structuredClone(value.data.buildJobs[0]?.temporaryBlocks || []);
+    }
+  });
+  value.operation.kind = 'scaffold-place';
+  const cleanup = {
+    id: `scaffold-remove:${key(value.target)}`,
+    kind: 'scaffold-remove',
+    position: value.target,
+    current: value.operation.expected,
+    expected: 'minecraft:air',
+    dependencies: [value.operation.id],
+    blocked: [],
+    instruction: null
+  };
+  value.compiled.graph.operations = [value.operation, cleanup];
+  value.compiled.graph.order = [value.operation.id, cleanup.id];
+  value.compiled.graph.counts.operations = 2;
+  value.compiled.stances.stances[0].operations = [value.operation.id, cleanup.id];
+  const complete = {
+    analysis: { ...value.compiled.analysis, counts: { correct: 1, ignoredAir: 0, placeable: 0, replaceable: 0, conflicting: 0, temporarilyObstructed: 0, unknown: 0, unsupported: 0 } },
+    graph: { operations: [], order: [], cyclic: [], counts: { operations: 0, removals: 0, blocked: 0 } },
+    stances: { stances: [], uncovered: [], counts: { blocked: 0 } }
+  };
+  let compilations = 0;
+  value.executor.compile = async () => compilations++ ? complete : value.compiled;
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.deepEqual(persistedIntent, [{ position: value.target, intermediate: 'minecraft:stone', expected: 'minecraft:air' }]);
+  assert.deepEqual(value.data.buildJobs[0].temporaryBlocks, []);
+  assert.deepEqual(value.data.buildJobs[0].temporaryScaffolds, []);
+  assert.equal(value.data.buildJobs[0].status, 'complete');
+});
+
+test('does not claim an unowned matching scaffold block', async () => {
+  const value = harness();
+  value.operation.kind = 'scaffold-place';
+  value.executor.compile = async () => {
+    value.blocks.set(key(value.target), block('stone', value.target));
+    return value.compiled;
+  };
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.equal(value.data.buildJobs[0].status, 'failed');
+  assert.match(value.data.buildJobs[0].latestError, /not owned by this build/u);
   assert.deepEqual(value.data.buildJobs[0].temporaryScaffolds, []);
 });
 

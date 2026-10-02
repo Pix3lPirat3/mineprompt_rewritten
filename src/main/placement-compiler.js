@@ -10,7 +10,8 @@ const MAX_STANCE_OPERATIONS = 4096;
 const MAX_STANCES = 4096;
 const PLAN_SAMPLE_LIMIT = 128;
 const MAX_SCAFFOLD_HEIGHT = 64;
-const MAX_SCAFFOLD_BLOCKS = 8192;
+const MAX_SCAFFOLD_BLOCKS = 4096;
+const MAX_GROUND_SCAFFOLD_HEIGHT = 6;
 const MAX_ORIENTATION_YAW_ERROR = Math.PI / 9;
 const MAX_ORIENTATION_PITCH_ERROR = Math.PI / 6;
 const PASSABLE_BLOCKS = new Set(['air', 'cave_air', 'void_air', 'grass', 'short_grass', 'tall_grass', 'fern', 'large_fern', 'dead_bush', 'snow', 'vine']);
@@ -108,7 +109,8 @@ function worldBlock(bot, position) {
   try { return bot?.blockAt?.(new Vec3(position.x, position.y, position.z)) || null; } catch { return null; }
 }
 
-function isExistingSupport(bot, analysisByPosition, position) {
+function isExistingSupport(bot, analysisByPosition, position, assumedAir = new Set()) {
+  if (assumedAir.has(positionKey(position))) return false;
   const record = analysisByPosition.get(positionKey(position));
   if (record) {
     if (record.kind === 'replaceable' && isAirState(record.entry.state)) return false;
@@ -357,48 +359,116 @@ function compilePlacementGraph(bot, analysis) {
   const scaffoldMaterial = String(analysis.policy?.scaffolding?.[0] || '').trim().toLowerCase();
   const scaffoldUsers = new Map();
   const scaffoldPlacements = new Map();
+  const scaffoldTowers = [];
   const finalSolid = new Set(analysis.records.filter((record) => !isAirState(record.entry.state)).map((record) => positionKey(record.position)));
+  const assumedAir = new Set(analysis.temporaryScaffolds || []);
   const scaffoldMaterialAvailable = scaffoldMaterial && (!bot.registry || Boolean(bot.registry.blocksByName?.[scaffoldMaterial] && bot.registry.itemsByName?.[scaffoldMaterial]));
-  const ensureScaffoldColumn = (target) => {
+  const traceScaffoldColumn = (target) => {
     const column = [];
     let position = { ...target };
     for (let depth = 0; depth < MAX_SCAFFOLD_HEIGHT; depth += 1) {
-      if (isExistingSupport(bot, analysisByPosition, position) || scaffoldPlacements.has(positionKey(position))) break;
+      if (isExistingSupport(bot, analysisByPosition, position, assumedAir) || scaffoldPlacements.has(positionKey(position))) break;
       const key = positionKey(position);
       const record = analysisByPosition.get(key);
       if (finalSolid.has(key) || record && !['placeable', 'replaceable', 'ignoredAir'].includes(record.kind)) return null;
       const live = worldBlock(bot, position);
-      if (!record && (!live?.name || !PASSABLE_BLOCKS.has(live.name))) return null;
+      if (!record && !assumedAir.has(key) && (!live?.name || !PASSABLE_BLOCKS.has(live.name))) return null;
       column.push({ ...position });
       position = offsetPosition(position, DIRECTIONS.down);
     }
-    if (!isExistingSupport(bot, analysisByPosition, position) && !scaffoldPlacements.has(positionKey(position))) return null;
-    let dependency = scaffoldPlacements.get(positionKey(position))?.id || null;
-    for (const cell of column.reverse()) {
-      const key = positionKey(cell);
-      let scaffold = scaffoldPlacements.get(key);
-      if (!scaffold) {
-        const record = analysisByPosition.get(key);
-        const removalDependency = record?.kind === 'replaceable' ? `remove:${key}` : null;
-        scaffold = {
-          id: `scaffold-place:${key}`,
-          kind: 'scaffold-place',
-          position: { ...cell },
-          current: record?.current || 'minecraft:air',
-          expected: `minecraft:${scaffoldMaterial}`,
-          item: scaffoldMaterial,
-          dependencies: [...(dependency ? [dependency] : []), ...(removalDependency ? [removalDependency] : [])].sort(),
-          groupId: `scaffold:${positionKey(target)}`,
-          blocked: [],
-          requiresScaffold: false,
-          instruction: placementInstruction({ position: cell, expected: `minecraft:${scaffoldMaterial}`, groupId: null }, dependency ? offsetPosition(cell, DIRECTIONS.down) : position, { kind: 'scaffold' })
-        };
-        scaffoldPlacements.set(key, scaffold);
-        operations.push(scaffold);
-      }
+    if (!isExistingSupport(bot, analysisByPosition, position, assumedAir) && !scaffoldPlacements.has(positionKey(position))) return null;
+    return { cells: column.reverse(), base: { ...position } };
+  };
+  const ensureScaffoldCell = (cell, support, dependencies, groupIdValue) => {
+    const key = positionKey(cell);
+    let scaffold = scaffoldPlacements.get(key);
+    if (!scaffold) {
+      const record = analysisByPosition.get(key);
+      const removalDependency = record?.kind === 'replaceable' ? `remove:${key}` : null;
+      scaffold = {
+        id: `scaffold-place:${key}`,
+        kind: 'scaffold-place',
+        position: { ...cell },
+        current: record?.current || 'minecraft:air',
+        expected: `minecraft:${scaffoldMaterial}`,
+        item: scaffoldMaterial,
+        dependencies: [...new Set([...dependencies, ...(removalDependency ? [removalDependency] : [])])].sort(),
+        groupId: groupIdValue,
+        blocked: [],
+        requiresScaffold: false,
+        instruction: placementInstruction({ position: cell, expected: `minecraft:${scaffoldMaterial}`, groupId: null }, support, { kind: 'scaffold' })
+      };
+      scaffoldPlacements.set(key, scaffold);
+      operations.push(scaffold);
+    } else {
+      scaffold.dependencies = [...new Set([...scaffold.dependencies, ...dependencies])].sort();
+    }
+    return scaffold;
+  };
+  const ensureSingleScaffoldColumn = (trace, target) => {
+    let dependency = scaffoldPlacements.get(positionKey(trace.base))?.id || null;
+    for (const cell of trace.cells) {
+      const support = offsetPosition(cell, DIRECTIONS.down);
+      const scaffold = ensureScaffoldCell(cell, support, dependency ? [dependency] : [], `scaffold:${positionKey(target)}`);
       dependency = scaffold.id;
     }
-    return dependency;
+    return dependency || scaffoldPlacements.get(positionKey(target))?.id || null;
+  };
+  const accessShapes = [DIRECTIONS.north, DIRECTIONS.south, DIRECTIONS.west, DIRECTIONS.east].flatMap((first) => {
+    const turns = first.x ? [DIRECTIONS.north, DIRECTIONS.south] : [DIRECTIONS.west, DIRECTIONS.east];
+    return turns.map((turn) => ({ first, turn }));
+  });
+  const ensureScaffoldAccess = (target) => {
+    const supportTrace = traceScaffoldColumn(target);
+    if (!supportTrace) return null;
+    if (supportTrace.cells.length <= MAX_GROUND_SCAFFOLD_HEIGHT) {
+      const id = ensureSingleScaffoldColumn(supportTrace, target);
+      return id ? { ids: [id], stance: null } : null;
+    }
+    const candidates = [];
+    for (const shape of accessShapes) {
+      const firstTarget = offsetPosition(target, shape.first);
+      const secondTarget = offsetPosition(firstTarget, shape.turn);
+      const firstTrace = traceScaffoldColumn(firstTarget);
+      const secondTrace = traceScaffoldColumn(secondTarget);
+      if (!firstTrace || !secondTrace) continue;
+      const levels = supportTrace.cells.map((cell) => cell.y);
+      if (firstTrace.cells.length !== levels.length || secondTrace.cells.length !== levels.length) continue;
+      if (!firstTrace.cells.every((cell, index) => cell.y === levels[index]) || !secondTrace.cells.every((cell, index) => cell.y === levels[index])) continue;
+      candidates.push({ firstTrace, secondTrace, firstTarget, secondTarget, score: positionDistance(bot.entity?.position || target, firstTrace.cells[0]) });
+    }
+    const selected = candidates.sort((left, right) => left.score - right.score || positionKey(left.firstTarget).localeCompare(positionKey(right.firstTarget)) || positionKey(left.secondTarget).localeCompare(positionKey(right.secondTarget)))[0];
+    if (!selected) return null;
+    const groupIdValue = `scaffold-tower:${positionKey(target)}`;
+    const columns = { support: [], first: [], second: [] };
+    for (let index = 0; index < supportTrace.cells.length; index += 1) {
+      const supportCell = supportTrace.cells[index];
+      const firstCell = selected.firstTrace.cells[index];
+      const secondCell = selected.secondTrace.cells[index];
+      const supportBelow = offsetPosition(supportCell, DIRECTIONS.down);
+      const firstBelow = offsetPosition(firstCell, DIRECTIONS.down);
+      const secondBelow = offsetPosition(secondCell, DIRECTIONS.down);
+      const firstDependencies = [scaffoldPlacements.get(positionKey(firstBelow))?.id, scaffoldPlacements.get(positionKey(secondBelow))?.id].filter(Boolean);
+      const first = ensureScaffoldCell(firstCell, firstBelow, firstDependencies, groupIdValue);
+      const secondDependencies = [scaffoldPlacements.get(positionKey(secondBelow))?.id, first.id].filter(Boolean);
+      const second = ensureScaffoldCell(secondCell, secondBelow, secondDependencies, groupIdValue);
+      const supportDependencies = [scaffoldPlacements.get(positionKey(supportBelow))?.id, second.id].filter(Boolean);
+      const support = ensureScaffoldCell(supportCell, supportBelow, supportDependencies, groupIdValue);
+      if (index > 0) {
+        first.requiredStances = [{ x: secondCell.x, y: secondCell.y, z: secondCell.z }];
+        second.requiredStances = [{ x: firstCell.x, y: firstCell.y + 1, z: firstCell.z }];
+        support.requiredStances = [{ x: secondCell.x, y: secondCell.y + 1, z: secondCell.z }];
+      }
+      columns.support.push(support.position);
+      columns.first.push(first.position);
+      columns.second.push(second.position);
+    }
+    scaffoldTowers.push(columns);
+    const accessTop = columns.first.at(-1);
+    return {
+      ids: [columns.support, columns.first, columns.second].map((column) => scaffoldPlacements.get(positionKey(column.at(-1)))?.id).filter(Boolean),
+      stance: { x: accessTop.x, y: accessTop.y + 1, z: accessTop.z }
+    };
   };
   for (const operation of placements.values()) {
     if (!operation.requiresScaffold || operation.blocked.length) continue;
@@ -407,20 +477,39 @@ function compilePlacementGraph(bot, analysis) {
       continue;
     }
     const supportPosition = offsetPosition(operation.position, DIRECTIONS.down);
-    const scaffoldId = ensureScaffoldColumn(supportPosition);
-    if (!scaffoldId) {
+    const scaffoldAccess = ensureScaffoldAccess(supportPosition);
+    if (!scaffoldAccess?.ids.length) {
       operation.blocked.push({ code: 'scaffold-path-missing', message: `No scaffold column can reach within ${MAX_SCAFFOLD_HEIGHT} blocks.` });
       continue;
     }
-    operation.dependencies.push(scaffoldId);
+    operation.dependencies.push(...scaffoldAccess.ids);
+    operation.dependencies = [...new Set(operation.dependencies)];
     operation.dependencies.sort();
     operation.instruction = placementInstruction(operation, supportPosition, { kind: 'scaffold' });
-    const users = scaffoldUsers.get(scaffoldId) || new Set();
-    users.add(operation.id);
-    scaffoldUsers.set(scaffoldId, users);
+    if (scaffoldAccess.stance) operation.requiredStances = [scaffoldAccess.stance];
+    for (const scaffoldId of scaffoldAccess.ids) {
+      const users = scaffoldUsers.get(scaffoldId) || new Set();
+      users.add(operation.id);
+      scaffoldUsers.set(scaffoldId, users);
+    }
   }
   if (scaffoldPlacements.size > MAX_SCAFFOLD_BLOCKS) throw new Error(`Placement plans cannot use more than ${MAX_SCAFFOLD_BLOCKS} scaffold blocks.`);
   const scaffoldRemovals = new Map();
+  const cleanupDependencies = new Map();
+  const cleanupStances = new Map();
+  for (const tower of scaffoldTowers) {
+    let previous = null;
+    for (let index = tower.support.length - 1; index >= 0; index -= 1) {
+      for (const column of [tower.support, tower.first, tower.second]) {
+        const id = `scaffold-remove:${positionKey(column[index])}`;
+        if (previous) cleanupDependencies.set(id, new Set([previous]));
+        previous = id;
+      }
+      cleanupStances.set(`scaffold-remove:${positionKey(tower.support[index])}`, [{ x: tower.first[index].x, y: tower.first[index].y + 1, z: tower.first[index].z }]);
+      cleanupStances.set(`scaffold-remove:${positionKey(tower.first[index])}`, [{ x: tower.second[index].x, y: tower.second[index].y + 1, z: tower.second[index].z }]);
+      cleanupStances.set(`scaffold-remove:${positionKey(tower.second[index])}`, [{ x: tower.first[index].x, y: tower.first[index].y, z: tower.first[index].z }]);
+    }
+  }
   for (const scaffold of [...scaffoldPlacements.values()].sort((left, right) => right.position.y - left.position.y || left.id.localeCompare(right.id))) {
     const key = positionKey(scaffold.position);
     const above = scaffoldRemovals.get(positionKey(offsetPosition(scaffold.position, DIRECTIONS.up)));
@@ -432,11 +521,12 @@ function compilePlacementGraph(bot, analysis) {
       current: scaffold.expected,
       expected: 'minecraft:air',
       item: null,
-      dependencies: [...directUsers, ...(above ? [above.id] : [])].sort(),
+      dependencies: [...new Set([...directUsers, ...(above ? [above.id] : []), ...(cleanupDependencies.get(`scaffold-remove:${key}`) || [])])].sort(),
       groupId: scaffold.groupId,
       blocked: [],
       requiresScaffold: false,
-      instruction: null
+      instruction: null,
+      requiredStances: cleanupStances.get(`scaffold-remove:${key}`) || null
     };
     scaffoldRemovals.set(key, removal);
     operations.push(removal);
@@ -458,6 +548,7 @@ function compilePlacementGraph(bot, analysis) {
     operations: operations.sort(compareOperations),
     order: topology.ordered,
     cyclic: topology.cyclic,
+    assumedAir: [...assumedAir].sort(),
     counts: {
       operations: operations.length,
       removals: operations.filter((operation) => operation.kind === 'remove').length,
@@ -470,22 +561,23 @@ function compilePlacementGraph(bot, analysis) {
   };
 }
 
-function stanceBlockName(bot, position) {
+function stanceBlockName(bot, position, options = {}) {
+  if (typeof options.blockNameAt === 'function') return options.blockNameAt(position);
   return worldBlock(bot, position)?.name || null;
 }
 
-function stanceCellClear(bot, position) {
-  const name = stanceBlockName(bot, position);
+function stanceCellClear(bot, position, options = {}) {
+  const name = stanceBlockName(bot, position, options);
   return Boolean(name && PASSABLE_BLOCKS.has(name));
 }
 
-function safeFooting(bot, position) {
-  const name = stanceBlockName(bot, offsetPosition(position, DIRECTIONS.down));
+function safeFooting(bot, position, options = {}) {
+  const name = stanceBlockName(bot, offsetPosition(position, DIRECTIONS.down), options);
   return Boolean(name && !PASSABLE_BLOCKS.has(name) && !HAZARD_BLOCKS.has(name) && !['water', 'lava'].includes(name));
 }
 
-function basicStanceSafe(bot, position) {
-  return stanceCellClear(bot, position) && stanceCellClear(bot, offsetPosition(position, DIRECTIONS.up)) && safeFooting(bot, position);
+function basicStanceSafe(bot, position, options = {}) {
+  return stanceCellClear(bot, position, options) && stanceCellClear(bot, offsetPosition(position, DIRECTIONS.up), options) && safeFooting(bot, position, options);
 }
 
 function angularDistance(left, right) {
@@ -520,19 +612,37 @@ function operationPlacements(operation) {
   return Array.isArray(operation.groupPlacements) ? operation.groupPlacements : [operation];
 }
 
+function removalPoint(stance, target) {
+  const deltaX = stance.x - target.x;
+  const deltaZ = stance.z - target.z;
+  const point = { x: target.x + 0.5, y: target.y + 0.95, z: target.z + 0.5 };
+  if (Math.abs(deltaX) >= Math.abs(deltaZ) && deltaX) point.x = deltaX > 0 ? target.x + 1 : target.x;
+  else if (deltaZ) point.z = deltaZ > 0 ? target.z + 1 : target.z;
+  return point;
+}
+
 function operationStanceSafe(bot, position, operation, options = {}) {
   const reach = Math.max(1, Math.min(6, Number(options.reach) || 4.5));
-  if (!basicStanceSafe(bot, position) || !hasEscape(bot, position)) return false;
-  return operationPlacements(operation).every((placement) => placementAimValid(position, placement, reach) && lineOfSight(bot, position, placement.position));
+  const removing = operation.kind === 'remove' || operation.kind === 'scaffold-remove';
+  const escapeOptions = removing ? {
+    ...options,
+    blockNameAt: (candidate) => positionKey(candidate) === positionKey(operation.position) ? 'air' : stanceBlockName(bot, candidate, options)
+  } : options;
+  if (!basicStanceSafe(bot, position, options) || !hasEscape(bot, position, escapeOptions)) return false;
+  const eye = { x: position.x + 0.5, y: position.y + 1.62, z: position.z + 0.5 };
+  return operationPlacements(operation).every((placement) => {
+    const point = removing ? removalPoint(position, placement.position) : null;
+    return (!point || positionDistance(eye, point) <= reach) && placementAimValid(position, placement, reach) && lineOfSight(bot, position, placement.position, options, point);
+  });
 }
 
-function hasEscape(bot, position) {
-  return [DIRECTIONS.north, DIRECTIONS.south, DIRECTIONS.west, DIRECTIONS.east].some((direction) => basicStanceSafe(bot, offsetPosition(position, direction)));
+function hasEscape(bot, position, options = {}) {
+  return [DIRECTIONS.north, DIRECTIONS.south, DIRECTIONS.west, DIRECTIONS.east].some((direction) => [-1, 0, 1].some((vertical) => basicStanceSafe(bot, offsetPosition(offsetPosition(position, direction), { x: 0, y: vertical, z: 0 }), options)));
 }
 
-function lineOfSight(bot, stance, target) {
+function lineOfSight(bot, stance, target, options = {}, interactionPoint = null) {
   const start = { x: stance.x + 0.5, y: stance.y + 1.62, z: stance.z + 0.5 };
-  const end = { x: target.x + 0.5, y: target.y + 0.5, z: target.z + 0.5 };
+  const end = interactionPoint || { x: target.x + 0.5, y: target.y + 0.5, z: target.z + 0.5 };
   const length = positionDistance(start, end);
   const steps = Math.max(1, Math.ceil(length * 5));
   const startKey = positionKey(stance);
@@ -542,7 +652,7 @@ function lineOfSight(bot, stance, target) {
     const position = { x: Math.floor(start.x + (end.x - start.x) * ratio), y: Math.floor(start.y + (end.y - start.y) * ratio), z: Math.floor(start.z + (end.z - start.z) * ratio) };
     const key = positionKey(position);
     if (key === startKey || key === targetKey) continue;
-    const name = stanceBlockName(bot, position);
+    const name = stanceBlockName(bot, position, options);
     if (!name || !PASSABLE_BLOCKS.has(name)) return false;
   }
   return true;
@@ -551,17 +661,23 @@ function lineOfSight(bot, stance, target) {
 function candidateStances(bot, operation, options = {}) {
   const reach = Math.max(1, Math.min(6, Number(options.reach) || 4.5));
   const candidates = [];
-  for (let y = operation.position.y - 1; y <= operation.position.y + 1; y += 1) {
-    for (let x = operation.position.x - 4; x <= operation.position.x + 4; x += 1) {
-      for (let z = operation.position.z - 4; z <= operation.position.z + 4; z += 1) {
-        const position = { x, y, z };
-        const stanceKey = positionKey(position);
-        const headKey = positionKey(offsetPosition(position, DIRECTIONS.up));
-        if (stanceKey === positionKey(operation.position) || headKey === positionKey(operation.position)) continue;
-        const eye = { x: x + 0.5, y: y + 1.62, z: z + 0.5 };
-        const distance = Math.max(...operationPlacements(operation).map((placement) => positionDistance(eye, placementPoint(placement) || { x: placement.position.x + 0.5, y: placement.position.y + 0.5, z: placement.position.z + 0.5 })));
-        if (!operationStanceSafe(bot, position, operation, { reach })) continue;
-        candidates.push({ key: positionKey(position), position, distance });
+  const consider = (position) => {
+    const stanceKey = positionKey(position);
+    const headKey = positionKey(offsetPosition(position, DIRECTIONS.up));
+    const footingKey = positionKey(offsetPosition(position, DIRECTIONS.down));
+    if (stanceKey === positionKey(operation.position) || headKey === positionKey(operation.position)) return;
+    if ((operation.kind === 'remove' || operation.kind === 'scaffold-remove') && footingKey === positionKey(operation.position)) return;
+    const eye = { x: position.x + 0.5, y: position.y + 1.62, z: position.z + 0.5 };
+    const distance = Math.max(...operationPlacements(operation).map((placement) => positionDistance(eye, placementPoint(placement) || { x: placement.position.x + 0.5, y: placement.position.y + 0.5, z: placement.position.z + 0.5 })));
+    if (!operationStanceSafe(bot, position, operation, { ...options, reach })) return;
+    candidates.push({ key: stanceKey, position: { ...position }, distance });
+  };
+  if (Array.isArray(operation.requiredStances) && operation.requiredStances.length) {
+    for (const position of operation.requiredStances) consider(position);
+  } else {
+    for (let y = operation.position.y - 1; y <= operation.position.y + 1; y += 1) {
+      for (let x = operation.position.x - 4; x <= operation.position.x + 4; x += 1) {
+        for (let z = operation.position.z - 4; z <= operation.position.z + 4; z += 1) consider({ x, y, z });
       }
     }
   }
@@ -605,18 +721,24 @@ function compileStancePlan(bot, graph, options = {}) {
   if (targets.length > MAX_STANCE_OPERATIONS) throw new Error(`Stance compilation cannot exceed ${MAX_STANCE_OPERATIONS} ready operations.`);
   const candidates = new Map();
   const uncovered = new Set();
+  const simulated = new Map((graph.assumedAir || []).map((key) => [key, 'air']));
+  const blockNameAt = (position) => simulated.has(positionKey(position)) ? simulated.get(positionKey(position)) : stanceBlockName(bot, position);
   for (const operation of targets) {
     uncovered.add(operation.id);
-    const available = candidateStances(bot, operation, options);
+    const available = candidateStances(bot, operation, { ...options, blockNameAt });
     if (!available.length) {
       operation.blocked.push({ code: 'no-safe-stance', message: 'No safe reachable interaction stance was found.' });
-      continue;
+    } else {
+      for (const candidate of available) {
+        const value = candidates.get(candidate.key) || { key: candidate.key, position: candidate.position, covers: new Set() };
+        value.covers.add(operation.id);
+        candidates.set(candidate.key, value);
+      }
     }
-    for (const candidate of available) {
-      const value = candidates.get(candidate.key) || { key: candidate.key, position: candidate.position, covers: new Set() };
-      value.covers.add(operation.id);
-      candidates.set(candidate.key, value);
-    }
+    if (operation.kind === 'remove' || operation.kind === 'scaffold-remove') simulated.set(positionKey(operation.position), 'air');
+    else if (Array.isArray(operation.groupPlacements)) {
+      for (const placement of operation.groupPlacements) simulated.set(positionKey(placement.position), parseBlockState(placement.expected).name);
+    } else simulated.set(positionKey(operation.position), parseBlockState(operation.expected).name);
   }
   const selected = [];
   let current = bot.entity?.position || { x: 0, y: 0, z: 0 };
@@ -653,6 +775,7 @@ function publicPlacementPlan(analysis, graph, stancePlan) {
   const preview = { ...analysis };
   delete preview.transformed;
   delete preview.records;
+  delete preview.temporaryScaffolds;
   const operationById = new Map(graph.operations.map((operation) => [operation.id, operation]));
   const ordered = graph.order.map((id) => operationById.get(id)).filter(Boolean);
   const blocked = graph.operations.filter((operation) => operation.blocked.length);
@@ -709,6 +832,7 @@ module.exports = {
   positionDistance,
   positionKey,
   publicPlacementPlan,
+  removalPoint,
   routeCost,
   supportRule,
   topologicalOrder

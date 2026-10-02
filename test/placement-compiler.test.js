@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Vec3 } = require('vec3');
-const { candidateStances, compilePlacementGraph, compileStancePlan, supportRule, topologicalOrder } = require('../src/main/placement-compiler');
+const { candidateStances, compilePlacementGraph, compileStancePlan, positionKey, supportRule, topologicalOrder } = require('../src/main/placement-compiler');
 
 function entry(state, options = {}) {
   const name = state.replace(/^minecraft:/u, '').split('[')[0];
@@ -144,6 +144,36 @@ test('compiles recoverable scaffold columns for floating full blocks', () => {
   const order = new Map(graph.order.map((id, index) => [id, index]));
   assert.equal(order.get('scaffold-place:0,67,0') < order.get('place:0,68,0'), true);
   assert.equal(order.get('place:0,68,0') < order.get('scaffold-remove:0,67,0'), true);
+});
+
+test('builds and simulates a safe elevated scaffold access tower', () => {
+  const graph = compilePlacementGraph(flatBot(), {
+    policy: { scaffolding: ['dirt'] },
+    records: [record('placeable', 0, 74, 'minecraft:stone')]
+  });
+  const target = graph.operations.find((operation) => operation.id === 'place:0,74,0');
+  const placements = graph.operations.filter((operation) => operation.kind === 'scaffold-place');
+  const removals = graph.operations.filter((operation) => operation.kind === 'scaffold-remove');
+  assert.equal(graph.counts.scaffoldBlocks, 30);
+  assert.equal(placements.length, 30);
+  assert.equal(removals.length, 30);
+  assert.equal(placements.filter((operation) => operation.requiredStances?.length).length, 27);
+  assert.equal(removals.every((operation) => operation.requiredStances?.length === 1), true);
+  assert.equal(target.requiredStances.length, 1);
+  assert.equal(target.dependencies.filter((dependency) => dependency.startsWith('scaffold-place:')).length, 3);
+  assert.deepEqual(graph.cyclic, []);
+  const plan = compileStancePlan(flatBot(), graph);
+  assert.deepEqual(plan.uncovered, []);
+  assert.equal(plan.counts.blocked, 0);
+  assert.equal(plan.counts.covered, graph.operations.length);
+  const plannedStances = new Map(plan.stances.flatMap((stance) => stance.operations.map((id) => [id, stance.position])));
+  for (const operation of graph.operations.filter((entry) => entry.requiredStances?.length)) {
+    assert.equal(operation.requiredStances.some((stance) => positionKey(stance) === positionKey(plannedStances.get(operation.id))), true);
+  }
+  const order = new Map(graph.order.map((id, index) => [id, index]));
+  for (const operation of graph.operations) {
+    for (const dependency of operation.dependencies) assert.equal(order.get(dependency) < order.get(operation.id), true);
+  }
 });
 
 test('does not use removable scaffolding as permanent attachment support', () => {

@@ -176,7 +176,7 @@ async function analyzeBlueprint(bot, blueprint, request = {}, options = {}) {
   }
   const inventory = inventoryItemCounts(bot);
   const requirementList = [...requirements.entries()].map(([name, count]) => ({ name, count, available: inventory.get(name) || 0, missing: Math.max(0, count - (inventory.get(name) || 0)) }));
-  return {
+  const result = {
     blueprint: { id: blueprint.id, hash: blueprint.hash, name: blueprint.name, edition: blueprint.edition, version: blueprint.version },
     anchor,
     transform: transformed.transform,
@@ -193,6 +193,8 @@ async function analyzeBlueprint(bot, blueprint, request = {}, options = {}) {
     transformed,
     records
   };
+  if (records) result.temporaryScaffolds = [...temporaryScaffolds].sort();
+  return result;
 }
 
 async function diffBlueprint(bot, blueprint, request = {}) {

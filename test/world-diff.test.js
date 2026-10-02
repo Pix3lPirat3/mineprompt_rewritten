@@ -140,7 +140,9 @@ test('treats an owned temporary scaffold as a recoverable placement target', asy
   const analysis = await analyzeBlueprint(bot, source, { anchor: { x: 0, y: 64, z: 0 }, policy: { scaffolding: ['dirt'] } }, { records: true, temporaryScaffolds: [{ x: 0, y: 64, z: 0 }] });
   assert.equal(analysis.records[0].kind, 'placeable');
   assert.equal(analysis.records[0].temporaryScaffold, true);
+  assert.deepEqual(analysis.temporaryScaffolds, ['0,64,0']);
   const graph = compilePlacementGraph(bot, analysis);
+  assert.deepEqual(graph.assumedAir, ['0,64,0']);
   const placement = graph.operations.find((operation) => operation.kind === 'place');
   assert.deepEqual(placement.dependencies, ['scaffold-remove:0,64,0']);
 });

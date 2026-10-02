@@ -1,11 +1,11 @@
 'use strict';
 
-const { GoalNear } = require('mineflayer-pathfinder').goals;
+const { GoalBlock } = require('mineflayer-pathfinder').goals;
 const { Vec3 } = require('vec3');
 const { createBuildJob, updateBuildJob } = require('./build-job');
 const { isAirState } = require('./blueprint-model');
 const { itemIdentity } = require('./item-identity');
-const { candidateStances, MAX_ORIENTATION_PITCH_ERROR, MAX_ORIENTATION_YAW_ERROR, operationStanceSafe, placementPoint, positionDistance, positionKey } = require('./placement-compiler');
+const { candidateStances, MAX_ORIENTATION_PITCH_ERROR, MAX_ORIENTATION_YAW_ERROR, operationStanceSafe, placementPoint, positionDistance, positionKey, removalPoint } = require('./placement-compiler');
 const { EXECUTABLE_PLACEMENT_MODES, executablePlacementMode } = require('./placement-strategy');
 const { cancelNavigation, navigateGoal } = require('./navigation-service');
 const { currentStorageContext } = require('./storage-service');
@@ -18,6 +18,17 @@ const MATERIAL_RESERVE_SLOTS = 2;
 
 function positionVector(position) {
   return new Vec3(position.x, position.y, position.z);
+}
+
+function builderMovements(bot) {
+  const current = bot?.pathfinder?.movements;
+  if (!current) return null;
+  const movements = Object.assign(Object.create(Object.getPrototypeOf(current)), current);
+  movements.canDig = false;
+  movements.allow1by1towers = false;
+  movements.allowParkour = false;
+  movements.scafoldingBlocks = [];
+  return movements;
 }
 
 function operationMap(compiled) {
@@ -145,10 +156,35 @@ function withoutTemporaryBlocks(records, positions) {
   return records.filter((record) => !positions.some((position) => samePosition(record.position, position)));
 }
 
+function orderScaffoldCleanup(bot, entries) {
+  const columns = new Map();
+  for (const entry of entries) {
+    const key = `${entry.position.x},${entry.position.z}`;
+    const column = columns.get(key) || [];
+    column.push(entry);
+    columns.set(key, column);
+  }
+  for (const column of columns.values()) column.sort((left, right) => right.position.y - left.position.y);
+  const simulated = new Map();
+  const ordered = [];
+  const blockNameAt = (position) => simulated.has(positionKey(position)) ? simulated.get(positionKey(position)) : bot.blockAt(positionVector(position))?.name || null;
+  while (columns.size) {
+    const candidates = [...columns.values()].map((column) => column[0]).sort((left, right) => right.position.y - left.position.y || positionKey(left.position).localeCompare(positionKey(right.position)));
+    const selected = candidates.find((entry) => candidateStances(bot, entry.operation, { blockNameAt }).length);
+    if (!selected) throw new Error('Owned temporary scaffolding has no safe top-down cleanup route.');
+    ordered.push(selected.operation);
+    simulated.set(positionKey(selected.position), 'air');
+    const columnKey = `${selected.position.x},${selected.position.z}`;
+    const column = columns.get(columnKey);
+    column.shift();
+    if (!column.length) columns.delete(columnKey);
+  }
+  return ordered;
+}
+
 function resumeScaffoldPlan(bot, compiled, job) {
   const records = new Map((compiled.analysis.records || []).map((record) => [positionKey(record.position), record]));
-  const plannedCleanup = new Set(compiled.graph.operations.filter((operation) => operation.kind === 'scaffold-remove').map((operation) => positionKey(operation.position)));
-  const operations = [];
+  const entries = [];
   const positions = [];
   const seen = new Set();
   for (const position of job.temporaryScaffolds) {
@@ -162,21 +198,22 @@ function resumeScaffoldPlan(bot, compiled, job) {
     const block = bot.blockAt(positionVector(position));
     if (!block?.name || !job.policy.scaffolding.includes(block.name)) throw new Error(`Temporary scaffold ${key} changed to ${block?.name || 'an unloaded block'}.`);
     positions.push({ ...position });
-    if (plannedCleanup.has(key)) continue;
-    operations.push({
-      id: `resume-scaffold-remove:${key}`,
-      kind: 'scaffold-remove',
+    entries.push({
       position: { ...position },
-      current: observed,
-      expected: 'minecraft:air',
-      item: null,
-      dependencies: [],
-      blocked: [],
-      instruction: null
+      operation: {
+        id: `resume-scaffold-remove:${key}`,
+        kind: 'scaffold-remove',
+        position: { ...position },
+        current: observed,
+        expected: 'minecraft:air',
+        item: null,
+        dependencies: [],
+        blocked: [],
+        instruction: null
+      }
     });
   }
-  operations.sort((left, right) => right.position.y - left.position.y || left.id.localeCompare(right.id));
-  return { operations, positions };
+  return { operations: orderScaffoldCleanup(bot, entries), positions };
 }
 
 function activeConnection(getClient) {
@@ -495,6 +532,7 @@ class BuildExecutor {
       phase: 'building',
       completedCount: active.job.completedCount + 1,
       completedSamples: [...active.job.completedSamples, operation.position],
+      temporaryBlocks: operation.kind === 'scaffold-place' ? withoutTemporaryBlocks(active.job.temporaryBlocks, [operation.position]) : active.job.temporaryBlocks,
       temporaryScaffolds: operation.kind === 'scaffold-place'
         ? [...active.job.temporaryScaffolds, operation.position]
         : operation.kind === 'scaffold-remove'
@@ -538,7 +576,13 @@ class BuildExecutor {
     const bot = activeConnection(this.getClient).bot;
     const targetState = liveState(bot, operation.position);
     if (operation.kind === 'place' || operation.kind === 'scaffold-place') {
-      if (targetState === operation.expected) return;
+      if (targetState === operation.expected) {
+        if (operation.kind !== 'scaffold-place') return;
+        const owned = active.job.temporaryScaffolds.some((position) => samePosition(position, operation.position));
+        const pending = active.job.temporaryBlocks.some((record) => samePosition(record.position, operation.position) && record.intermediate === operation.expected);
+        if (owned || pending) return;
+        throw new Error(`Scaffold placement at ${positionKey(operation.position)} matches the requested material but is not owned by this build.`);
+      }
     } else if (isAirState(targetState || '')) {
       return;
     }
@@ -546,7 +590,17 @@ class BuildExecutor {
     if (!operationStanceSafe(bot, stance, operation)) throw new Error(`The stance for ${operation.id} became unsafe.`);
     if (operation.kind === 'remove' || operation.kind === 'scaffold-remove') await this.removeBlock(bot, operation);
     else if (Array.isArray(operation.groupPlacements)) await this.placeGroup(active, bot, operation);
-    else await this.placeBlock(bot, operation, active.controller.signal);
+    else {
+      if (operation.kind === 'scaffold-place') {
+        active.job = await this.save(active, {
+          temporaryBlocks: [
+            ...withoutTemporaryBlocks(active.job.temporaryBlocks, [operation.position]),
+            { position: operation.position, intermediate: operation.expected, expected: 'minecraft:air' }
+          ]
+        });
+      }
+      await this.placeBlock(bot, operation, active.controller.signal);
+    }
     const expected = operation.kind === 'remove' || operation.kind === 'scaffold-remove' ? null : operation.expected;
     const observed = liveState(bot, operation.position);
     if (expected ? observed !== expected : !isAirState(observed || '')) throw new Error(`Verification failed for ${operation.id}; observed ${observed || 'an unloaded block'}.`);
@@ -632,13 +686,22 @@ class BuildExecutor {
     if (!stance) stance = candidateStances(bot, operation)[0]?.position || null;
     if (!stance) throw new Error(`No safe live stance is available for ${operation.id}.`);
     const before = { x: bot.entity.position.x, y: bot.entity.position.y, z: bot.entity.position.z };
-    if (positionDistance(before, stance) > 0.75) {
-      await navigateGoal(bot, new GoalNear(stance.x, stance.y, stance.z, 0), { description: `the build stance at ${stance.x}, ${stance.y}, ${stance.z}` });
+    const center = { x: stance.x + 0.5, y: stance.y, z: stance.z + 0.5 };
+    if (positionDistance(before, center) > 0.35 || !samePosition(bot.entity.position.floored(), stance)) {
+      const previousMovements = bot.pathfinder?.movements || null;
+      const movements = builderMovements(bot);
+      if (movements && typeof bot.pathfinder.setMovements === 'function') bot.pathfinder.setMovements(movements);
+      try {
+        await navigateGoal(bot, new GoalBlock(stance.x, stance.y, stance.z), { description: `the build stance at ${stance.x}, ${stance.y}, ${stance.z}` });
+      } finally {
+        if (previousMovements && movements && typeof bot.pathfinder.setMovements === 'function') bot.pathfinder.setMovements(previousMovements);
+      }
       signal.throwIfAborted();
       const after = bot.entity.position;
       const travel = positionDistance(before, after);
       if (this.active) this.active.job = updateBuildJob(this.active.job, { metrics: { travel: this.active.job.metrics.travel + travel } }, this.now());
     }
+    if (!samePosition(bot.entity.position.floored(), stance)) throw new Error(`Pathfinding did not enter the exact stance for ${operation.id}.`);
     return stance;
   }
 
@@ -652,7 +715,11 @@ class BuildExecutor {
     let tool = null;
     try { tool = bot.pathfinder?.bestHarvestTool?.(block) || null; } catch {}
     if (tool) await bot.equip(tool, 'hand');
-    await bot.dig(block, true, 'raycast');
+    const stance = bot.entity.position.floored();
+    const point = removalPoint(stance, operation.position);
+    await bot.lookAt(new Vec3(point.x, point.y, point.z), true);
+    if (typeof bot.waitForTicks === 'function') await bot.waitForTicks(1);
+    await bot.dig(block, 'ignore');
   }
 
   async placeBlock(bot, operation, signal) {
@@ -730,10 +797,12 @@ module.exports = {
   BUILD_ACTIVITY_ID,
   BuildExecutor,
   EXECUTABLE_PLACEMENT_MODES,
+  builderMovements,
   inventoryCounts,
   inventoryVariantSnapshot,
   itemAdditionalCapacity,
   missingItems,
+  orderScaffoldCleanup,
   pendingItemDemand,
   requiredItems,
   surplusInventory,
