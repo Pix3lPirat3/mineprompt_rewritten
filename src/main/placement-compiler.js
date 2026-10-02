@@ -429,20 +429,29 @@ function compilePlacementGraph(bot, analysis) {
     for (const shape of accessShapes) {
       const firstTarget = offsetPosition(target, shape.first);
       const secondTarget = offsetPosition(firstTarget, shape.turn);
-      const firstTrace = traceScaffoldColumn(firstTarget);
-      const secondTrace = traceScaffoldColumn(secondTarget);
-      if (!firstTrace || !secondTrace) continue;
-      const levels = supportTrace.cells.map((cell) => cell.y);
-      if (firstTrace.cells.length !== levels.length || secondTrace.cells.length !== levels.length) continue;
-      if (!firstTrace.cells.every((cell, index) => cell.y === levels[index]) || !secondTrace.cells.every((cell, index) => cell.y === levels[index])) continue;
-      candidates.push({ firstTrace, secondTrace, firstTarget, secondTarget, score: positionDistance(bot.entity?.position || target, firstTrace.cells[0]) });
+      const rawFirstTrace = traceScaffoldColumn(firstTarget);
+      const rawSecondTrace = traceScaffoldColumn(secondTarget);
+      if (!rawFirstTrace || !rawSecondTrace) continue;
+      const traces = [supportTrace, rawFirstTrace, rawSecondTrace];
+      if (traces.some((trace) => !trace.cells.length)) continue;
+      const startY = Math.max(...traces.map((trace) => trace.cells[0].y));
+      const foundations = traces.map((trace) => ({ ...trace, cells: trace.cells.filter((cell) => cell.y < startY) }));
+      if (foundations.some((trace) => trace.cells.length > MAX_GROUND_SCAFFOLD_HEIGHT)) continue;
+      const aligned = traces.map((trace) => ({ ...trace, cells: trace.cells.filter((cell) => cell.y >= startY) }));
+      const levels = aligned[0].cells.map((cell) => cell.y);
+      if (aligned.some((trace) => trace.cells.length !== levels.length || !trace.cells.every((cell, index) => cell.y === levels[index]))) continue;
+      const foundationCount = foundations.reduce((count, trace) => count + trace.cells.length, 0);
+      candidates.push({ supportTrace: aligned[0], firstTrace: aligned[1], secondTrace: aligned[2], foundations, firstTarget, secondTarget, foundationCount, score: positionDistance(bot.entity?.position || target, aligned[1].cells[0]) });
     }
-    const selected = candidates.sort((left, right) => left.score - right.score || positionKey(left.firstTarget).localeCompare(positionKey(right.firstTarget)) || positionKey(left.secondTarget).localeCompare(positionKey(right.secondTarget)))[0];
+    const selected = candidates.sort((left, right) => left.foundationCount - right.foundationCount || left.score - right.score || positionKey(left.firstTarget).localeCompare(positionKey(right.firstTarget)) || positionKey(left.secondTarget).localeCompare(positionKey(right.secondTarget)))[0];
     if (!selected) return null;
+    ensureSingleScaffoldColumn(selected.foundations[0], target);
+    ensureSingleScaffoldColumn(selected.foundations[1], selected.firstTarget);
+    ensureSingleScaffoldColumn(selected.foundations[2], selected.secondTarget);
     const groupIdValue = `scaffold-tower:${positionKey(target)}`;
     const columns = { support: [], first: [], second: [] };
-    for (let index = 0; index < supportTrace.cells.length; index += 1) {
-      const supportCell = supportTrace.cells[index];
+    for (let index = 0; index < selected.supportTrace.cells.length; index += 1) {
+      const supportCell = selected.supportTrace.cells[index];
       const firstCell = selected.firstTrace.cells[index];
       const secondCell = selected.secondTrace.cells[index];
       const supportBelow = offsetPosition(supportCell, DIRECTIONS.down);
@@ -463,7 +472,7 @@ function compilePlacementGraph(bot, analysis) {
       columns.first.push(first.position);
       columns.second.push(second.position);
     }
-    scaffoldTowers.push(columns);
+    scaffoldTowers.push({ ...columns, foundations: selected.foundations.flatMap((trace) => trace.cells) });
     const accessTop = columns.first.at(-1);
     return {
       ids: [columns.support, columns.first, columns.second].map((column) => scaffoldPlacements.get(positionKey(column.at(-1)))?.id).filter(Boolean),
@@ -508,6 +517,12 @@ function compilePlacementGraph(bot, analysis) {
       cleanupStances.set(`scaffold-remove:${positionKey(tower.support[index])}`, [{ x: tower.first[index].x, y: tower.first[index].y + 1, z: tower.first[index].z }]);
       cleanupStances.set(`scaffold-remove:${positionKey(tower.first[index])}`, [{ x: tower.second[index].x, y: tower.second[index].y + 1, z: tower.second[index].z }]);
       cleanupStances.set(`scaffold-remove:${positionKey(tower.second[index])}`, [{ x: tower.first[index].x, y: tower.first[index].y, z: tower.first[index].z }]);
+    }
+    for (const foundation of tower.foundations) {
+      const id = `scaffold-remove:${positionKey(foundation)}`;
+      const dependencies = cleanupDependencies.get(id) || new Set();
+      if (previous) dependencies.add(previous);
+      cleanupDependencies.set(id, dependencies);
     }
   }
   for (const scaffold of [...scaffoldPlacements.values()].sort((left, right) => right.position.y - left.position.y || left.id.localeCompare(right.id))) {

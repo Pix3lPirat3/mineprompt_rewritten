@@ -176,6 +176,35 @@ test('builds and simulates a safe elevated scaffold access tower', () => {
   }
 });
 
+test('aligns scaffold access across uneven terrain', () => {
+  const terrain = new Map();
+  for (let x = -3; x <= 3; x += 1) for (let z = -3; z <= 3; z += 1) terrain.set(`${x},64,${z}`, 'stone');
+  for (const [x, z, top] of [[0, 0, 65], [0, -1, 65], [0, 1, 65], [-1, 0, 65], [1, 0, 65], [-1, -1, 66], [1, -1, 66], [-1, 1, 66], [1, 1, 66]]) for (let y = 65; y <= top; y += 1) terrain.set(`${x},${y},${z}`, 'stone');
+  const bot = flatBot(terrain);
+  const graph = compilePlacementGraph(bot, {
+    policy: { scaffolding: ['dirt'] },
+    records: [record('placeable', 0, 74, 'minecraft:stone')]
+  });
+  const target = graph.operations.find((operation) => operation.id === 'place:0,74,0');
+  assert.equal(graph.counts.scaffoldBlocks, 23);
+  assert.equal(graph.counts.blocked, 0);
+  assert.equal(target.requiredStances.length, 1);
+  assert.deepEqual(graph.cyclic, []);
+  const plan = compileStancePlan(bot, graph);
+  assert.deepEqual(plan.uncovered, []);
+  assert.equal(plan.counts.blocked, 0);
+});
+
+test('skips occupied access columns while selecting a scaffold tower', () => {
+  const graph = compilePlacementGraph(flatBot(new Map([['0,73,-1', 'stone']])), {
+    policy: { scaffolding: ['dirt'] },
+    records: [record('placeable', 0, 74, 'minecraft:stone')]
+  });
+  assert.equal(graph.counts.scaffoldBlocks, 30);
+  assert.equal(graph.counts.blocked, 0);
+  assert.deepEqual(graph.cyclic, []);
+});
+
 test('does not use removable scaffolding as permanent attachment support', () => {
   const graph = compilePlacementGraph(flatBot(), {
     policy: { scaffolding: ['dirt'] },
