@@ -32,30 +32,45 @@ class HostClient extends EventEmitter {
 
   async open() {
     this.closing = false;
-    this.token = (await fs.readFile(tokenPath(this.userDataPath), 'utf8')).trim();
-    this.socket = net.createConnection(this.endpoint);
-    await new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.socket.destroy();
-        reject(new Error('Timed out while connecting to the MinePrompt host.'));
-      }, Math.min(this.timeout, 3000));
-      this.socket.once('connect', () => {
-        clearTimeout(timer);
-        resolve();
+    try {
+      this.token = (await fs.readFile(tokenPath(this.userDataPath), 'utf8')).trim();
+      const socket = net.createConnection(this.endpoint);
+      this.socket = socket;
+      await new Promise((resolve, reject) => {
+        const failed = (error) => {
+          clearTimeout(timer);
+          socket.off('connect', connected);
+          reject(error);
+        };
+        const connected = () => {
+          clearTimeout(timer);
+          socket.off('error', failed);
+          resolve();
+        };
+        const timer = setTimeout(() => {
+          socket.destroy();
+          failed(new Error('Timed out while connecting to the MinePrompt host.'));
+        }, Math.min(this.timeout, 3000));
+        socket.once('connect', connected);
+        socket.once('error', failed);
       });
-      this.socket.once('error', (error) => {
-        clearTimeout(timer);
-        reject(error);
+      consumeMessages(socket, (message) => this.receive(message));
+      socket.on('error', (error) => this.failPending(error));
+      socket.on('close', () => {
+        const error = new Error('The MinePrompt host disconnected.');
+        this.failPending(error);
+        if (!this.closing) this.emit('event', 'attention', { message: error.message });
       });
-    });
-    consumeMessages(this.socket, (message) => this.receive(message));
-    this.socket.on('close', () => {
-      const error = new Error('The MinePrompt host disconnected.');
+      this.cached = await this.request('snapshot');
+      return this;
+    } catch (error) {
+      this.closing = true;
+      const socket = this.socket;
+      this.socket = null;
+      socket?.destroy();
       this.failPending(error);
-      if (!this.closing) this.emit('event', 'attention', { message: error.message });
-    });
-    this.cached = await this.request('snapshot');
-    return this;
+      throw error;
+    }
   }
 
   receive(message) {
