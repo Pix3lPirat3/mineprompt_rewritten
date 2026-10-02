@@ -261,7 +261,9 @@ test('allows bounded floor and ceiling face attachments', () => {
     ['0,63,0', 'stone'],
     ['2,65,0', 'stone'],
     ['4,63,0', 'stone'],
-    ['6,63,0', 'stone']
+    ['6,63,0', 'stone'],
+    ['8,63,0', 'stone'],
+    ['10,65,0', 'stone']
   ]);
   const graph = compilePlacementGraph(flatBot(overrides), {
     policy: { scaffolding: ['dirt'] },
@@ -269,7 +271,9 @@ test('allows bounded floor and ceiling face attachments', () => {
       record('placeable', 0, 64, 'minecraft:torch'),
       record('placeable', 2, 64, 'minecraft:lantern[hanging=true,waterlogged=false]'),
       record('placeable', 4, 64, 'minecraft:oak_pressure_plate[powered=false]'),
-      record('placeable', 6, 64, 'minecraft:rail[shape=east_west,waterlogged=false]')
+      record('placeable', 6, 64, 'minecraft:rail[shape=east_west,waterlogged=false]'),
+      record('placeable', 8, 64, 'minecraft:stone_button[face=floor,facing=west,powered=false]'),
+      record('placeable', 10, 64, 'minecraft:lever[face=ceiling,facing=south,powered=false]')
     ]
   });
   const byId = new Map(graph.operations.map((operation) => [operation.id, operation]));
@@ -279,6 +283,10 @@ test('allows bounded floor and ceiling face attachments', () => {
   assert.deepEqual(byId.get('place:2,64,0').instruction.clickedFace, { x: 0, y: -1, z: 0 });
   assert.equal(byId.get('place:4,64,0').instruction.mode, 'face-attached');
   assert.equal(byId.get('place:6,64,0').instruction.mode, 'attached');
+  assert.equal(byId.get('place:8,64,0').instruction.mode, 'face-attached');
+  assert.deepEqual(byId.get('place:8,64,0').instruction.look, { yaw: Math.PI / 2, pitch: null });
+  assert.equal(byId.get('place:10,64,0').instruction.mode, 'face-attached');
+  assert.deepEqual(byId.get('place:10,64,0').instruction.look, { yaw: Math.PI, pitch: null });
 });
 
 test('compiles verified heading strategies for bounded directional states', () => {

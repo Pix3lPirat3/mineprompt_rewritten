@@ -2,7 +2,7 @@
 
 const { Vec3 } = require('vec3');
 const { blockStateString, isAirState, parseBlockState } = require('./blueprint-model');
-const { directionalLook, multiblockLook, pairedContainerLook, placementMode } = require('./placement-strategy');
+const { attachmentLook, directionalLook, multiblockLook, pairedContainerLook, placementMode } = require('./placement-strategy');
 const { PriorityQueue } = require('./priority-queue');
 
 const MAX_PLACEMENT_OPERATIONS = 1048576;
@@ -57,7 +57,7 @@ function supportRule(entry) {
   const properties = parsed.properties;
   if (properties.face === 'ceiling' || properties.hanging === 'true' || properties.attachment === 'ceiling') return { kind: 'ceiling', offsets: [DIRECTIONS.up], required: true };
   if (properties.face === 'wall' && DIRECTIONS[properties.facing]) return { kind: 'wall', offsets: [opposite(DIRECTIONS[properties.facing])], required: true };
-  if ((WALL_ATTACHED_BLOCKS.test(parsed.name) || parsed.name.endsWith('_wall_sign') || parsed.name.endsWith('_wall_banner')) && DIRECTIONS[properties.facing]) return { kind: 'wall', offsets: [opposite(DIRECTIONS[properties.facing])], required: true };
+  if ((!properties.face || properties.face === 'wall') && (WALL_ATTACHED_BLOCKS.test(parsed.name) || parsed.name.endsWith('_wall_sign') || parsed.name.endsWith('_wall_banner')) && DIRECTIONS[properties.facing]) return { kind: 'wall', offsets: [opposite(DIRECTIONS[properties.facing])], required: true };
   if (properties.half === 'upper' && /(?:door|tall_|large_fern|sunflower|rose_bush|peony|lilac|pitcher_plant)$/u.test(parsed.name)) return { kind: 'multiblock', offsets: [DIRECTIONS.down], required: true };
   if (properties.part === 'head' && DIRECTIONS[properties.facing]) return { kind: 'multiblock', offsets: [opposite(DIRECTIONS[properties.facing])], required: true };
   if (properties.axis === 'x') return { kind: 'axis', offsets: [DIRECTIONS.west, DIRECTIONS.east], required: true };
@@ -146,7 +146,7 @@ function placementInstruction(operation, support, rule) {
     clickedFace: face,
     cursor,
     facing: facing ? { ...facing } : null,
-    look: directionalLook(parsed) || multiblockLook(parsed) || pairedContainerLook(parsed),
+    look: attachmentLook(parsed, rule.kind) || directionalLook(parsed) || multiblockLook(parsed) || pairedContainerLook(parsed),
     rotation: parsed.properties.rotation === undefined ? null : Number(parsed.properties.rotation),
     sneak: !operation.groupId?.startsWith('container:'),
     supportKind: rule.kind,
@@ -605,7 +605,9 @@ function placementAimValid(stance, operation, reach = 4.5) {
   const deltaZ = point.z - eye.z;
   const yaw = Math.atan2(-deltaX, -deltaZ);
   const pitch = Math.atan2(deltaY, Math.hypot(deltaX, deltaZ));
-  return angularDistance(yaw, operation.instruction.look.yaw) < MAX_ORIENTATION_YAW_ERROR && Math.abs(pitch - operation.instruction.look.pitch) < MAX_ORIENTATION_PITCH_ERROR;
+  const yawValid = !Number.isFinite(operation.instruction.look.yaw) || angularDistance(yaw, operation.instruction.look.yaw) < MAX_ORIENTATION_YAW_ERROR;
+  const pitchValid = !Number.isFinite(operation.instruction.look.pitch) || Math.abs(pitch - operation.instruction.look.pitch) < MAX_ORIENTATION_PITCH_ERROR;
+  return yawValid && pitchValid;
 }
 
 function operationPlacements(operation) {

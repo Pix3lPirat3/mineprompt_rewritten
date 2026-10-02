@@ -748,12 +748,14 @@ class BuildExecutor {
       const pitch = Math.atan2(deltaY, Math.hypot(deltaX, deltaZ));
       let yaw = measuredYaw;
       if (instruction.look) {
-        const yawDifference = Math.abs(Math.atan2(Math.sin(measuredYaw - instruction.look.yaw), Math.cos(measuredYaw - instruction.look.yaw)));
-        const pitchDifference = Math.abs(pitch - instruction.look.pitch);
+        const yawDifference = Number.isFinite(instruction.look.yaw) ? Math.abs(Math.atan2(Math.sin(measuredYaw - instruction.look.yaw), Math.cos(measuredYaw - instruction.look.yaw))) : 0;
+        const pitchDifference = Number.isFinite(instruction.look.pitch) ? Math.abs(pitch - instruction.look.pitch) : 0;
         if (yawDifference >= MAX_ORIENTATION_YAW_ERROR || pitchDifference >= MAX_ORIENTATION_PITCH_ERROR) throw new Error(`The live stance for ${operation.id} cannot produce its required orientation.`);
-        const measuredYawOffset = Math.atan2(Math.sin(measuredYaw - instruction.look.yaw), Math.cos(measuredYaw - instruction.look.yaw));
-        const yawOffset = Math.abs(measuredYawOffset) < 0.000001 ? 0 : measuredYawOffset;
-        yaw = instruction.look.yaw + yawOffset;
+        if (Number.isFinite(instruction.look.yaw)) {
+          const measuredYawOffset = Math.atan2(Math.sin(measuredYaw - instruction.look.yaw), Math.cos(measuredYaw - instruction.look.yaw));
+          const yawOffset = Math.abs(measuredYawOffset) < 0.000001 ? 0 : measuredYawOffset;
+          yaw = instruction.look.yaw + yawOffset;
+        }
       }
       await bot.look(yaw, pitch, true);
       if (typeof bot.waitForTicks === 'function') await bot.waitForTicks(2);

@@ -591,6 +591,28 @@ test('executes directional placement after synchronizing the required heading', 
   });
 });
 
+test('executes a floor attachment with yaw-only orientation', async () => {
+  const value = harness({
+    expectedState: 'minecraft:stone_button[face=floor,facing=east,powered=false]',
+    itemName: 'stone_button',
+    placeAs: 'stone_button',
+    placeProperties: { face: 'floor', facing: 'east', powered: false },
+    instruction: {
+      supportPosition: { x: 1, y: 63, z: 0 },
+      clickedFace: { x: 0, y: 1, z: 0 },
+      cursor: { x: 0.5, y: 1, z: 0.5 },
+      mode: 'face-attached',
+      look: { yaw: -Math.PI / 2, pitch: null },
+      stateProperties: { face: 'floor', facing: 'east', powered: 'false' }
+    }
+  });
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.equal(value.data.buildJobs[0].status, 'complete', value.data.buildJobs[0].latestError || 'No build error was recorded.');
+  assert.equal(Math.abs(value.lookCalls[0].yaw + Math.PI / 2) < Math.PI / 9, true);
+  assert.equal(value.lookCalls[0].pitch < -Math.PI / 6, true);
+});
+
 test('verifies every generated block from one multi-block placement', async () => {
   const upper = { x: 1, y: 65, z: 0 };
   const lowerState = 'minecraft:oak_door[facing=north,half=lower,hinge=right,open=false,powered=false]';

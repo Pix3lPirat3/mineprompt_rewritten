@@ -15,6 +15,9 @@ function onlyProperties(properties, names) {
 
 function faceAttached(parsed, supportKind) {
   const properties = parsed.properties;
+  if (/(?:_button|^lever)$/u.test(parsed.name)) {
+    return properties.face === supportKind && Object.hasOwn(AWAY_YAW, properties.facing) && falseState(properties.powered) && onlyProperties(properties, ['face', 'facing', 'powered']);
+  }
   if (['lantern', 'soul_lantern'].includes(parsed.name)) {
     const hanging = properties.hanging === 'true';
     return onlyProperties(properties, ['hanging', 'waterlogged']) && falseState(properties.waterlogged) && (supportKind === 'ceiling' ? hanging : !hanging);
@@ -24,6 +27,12 @@ function faceAttached(parsed, supportKind) {
   if (parsed.name.endsWith('_pressure_plate')) return onlyProperties(properties, ['powered']) && falseState(properties.powered);
   if (parsed.name.endsWith('_carpet')) return onlyProperties(properties, []);
   return false;
+}
+
+function attachmentLook(parsed, supportKind) {
+  return faceAttached(parsed, supportKind) && /(?:_button|^lever)$/u.test(parsed.name)
+    ? { yaw: AWAY_YAW[parsed.properties.facing], pitch: null }
+    : null;
 }
 
 function directionalLook(parsed) {
@@ -70,6 +79,7 @@ function executablePlacementMode(mode) {
 
 module.exports = {
   EXECUTABLE_PLACEMENT_MODES,
+  attachmentLook,
   directionalLook,
   executablePlacementMode,
   faceAttached,
