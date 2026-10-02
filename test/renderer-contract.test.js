@@ -31,6 +31,7 @@ test('preload requests have matching trusted IPC handlers', () => {
   assert.equal(IPC_EVENT_CHANNELS.includes('snapshot'), true);
   assert.match(preload, /createIpcRequests/u);
   assert.match(electron, /for \(const request of IPC_REQUESTS\)/u);
+  assert.match(electron, /channel === 'attention'.*flashFrame\(true\)/su);
   const specialRequests = [...preload.matchAll(/ipcRenderer\.invoke\('([^']+)'/gu)].map((match) => match[1]);
   const specialHandlers = [...electron.matchAll(/ipcMain\.handle\('([^']+)'/gu)].map((match) => match[1]);
   assert.deepEqual(specialRequests.toSorted(), specialHandlers.toSorted());

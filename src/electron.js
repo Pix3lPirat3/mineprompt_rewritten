@@ -56,6 +56,9 @@ function emit(channel, payload) {
     );
     updatePowerSaveBlocker(Boolean(active));
   }
+  if (channel === 'attention' && mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) {
+    mainWindow.flashFrame(true);
+  }
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.webContents.send(`mineprompt:${channel}`, payload);
   }
