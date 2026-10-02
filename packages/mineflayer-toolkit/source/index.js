@@ -6,6 +6,7 @@ module.exports = {
   ...require('./mining'),
   ...require('./trees'),
   ...require('./inventory'),
+  ...require('./storage'),
   ...require('./interactions'),
   ...require('./plugins')
 };

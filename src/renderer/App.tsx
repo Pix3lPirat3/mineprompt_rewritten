@@ -5,6 +5,7 @@ import { useAppDispatch } from './store';
 import { InventoryWorkspace } from './features/inventory/InventoryWorkspace';
 import { PlayerRibbon } from './features/players/PlayerRibbon';
 import { TargetRibbon } from './features/targets/TargetRibbon';
+import { StorageRibbon } from './features/storage/StorageRibbon';
 import { Dialogs } from './features/shell/Dialogs';
 import { Sidebar, type DialogTarget } from './features/shell/Sidebar';
 import { TerminalDock } from './features/terminal/TerminalDock';
@@ -27,6 +28,7 @@ export function App() {
         <GameOverlay />
         <PlayerRibbon />
         <TargetRibbon />
+        <StorageRibbon />
         <div className="workspace-content">
           <FeatureErrorBoundary label="Inventory workspace">
             <InventoryWorkspace />

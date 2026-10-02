@@ -241,6 +241,10 @@ class ApplicationRuntime {
     return this.sessionRequest(request.sessionId, 'stashAction', request);
   }
 
+  storageAction(request = {}) {
+    return this.sessionRequest(request.sessionId, 'storageAction', request);
+  }
+
   capabilities(request = {}) {
     return this.sessionRequest(request.sessionId, 'capabilities');
   }

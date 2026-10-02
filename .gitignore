@@ -27,7 +27,7 @@ report.*.*.*.*.json
 .env
 .env.*
 commands/mineflayer/customs/
-storage/
+/storage/
 cache/
 mineprompt
 mineprompt.db

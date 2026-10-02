@@ -1,9 +1,10 @@
 'use strict';
 
-const LOCAL_STORE_METHOD_NAMES = Object.freeze(['getConnection', 'getAccount', 'getAccounts', 'getServers', 'getSetting']);
+const LOCAL_STORE_METHOD_NAMES = Object.freeze(['getConnection', 'getAccount', 'getAccounts', 'getServers', 'getSetting', 'getStorageZones']);
 const REMOTE_STORE_METHOD_NAMES = Object.freeze([
   'addConnection', 'addAccount', 'saveAccount', 'removeAccount', 'renameAccount',
-  'saveServer', 'removeServer', 'setSetting', 'setSettings', 'saveWorkflow', 'removeWorkflow'
+  'saveServer', 'removeServer', 'setSetting', 'setSettings', 'saveWorkflow', 'removeWorkflow',
+  'saveMiningPreset', 'removeMiningPreset', 'selectMiningPreset', 'saveStorageZone', 'removeStorageZone'
 ]);
 const STORE_METHOD_NAMES = Object.freeze([...LOCAL_STORE_METHOD_NAMES, ...REMOTE_STORE_METHOD_NAMES]);
 
@@ -41,6 +42,10 @@ class ProcessStore {
 
   async getSetting(key) {
     return clone(this.read().settings?.[key]);
+  }
+
+  async getStorageZones() {
+    return clone(this.read().storageZones || []);
   }
 }
 

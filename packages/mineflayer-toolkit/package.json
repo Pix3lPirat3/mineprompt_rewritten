@@ -37,6 +37,11 @@
       "import": "./dist/inventory.js",
       "require": "./dist/inventory.cjs"
     },
+    "./storage": {
+      "types": "./index.d.ts",
+      "import": "./dist/storage.js",
+      "require": "./dist/storage.cjs"
+    },
     "./interactions": {
       "types": "./index.d.ts",
       "import": "./dist/interactions.js",

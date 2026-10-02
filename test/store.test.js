@@ -129,3 +129,24 @@ test('persists, selects, edits, and removes mining policies', async (context) =>
   assert.equal(await restored.removeMiningPreset(preset.id), true);
   assert.equal(restored.snapshot().activeMiningPresetId, null);
 });
+
+test('persists storage zones scoped to a server and dimension', async (context) => {
+  const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'mineprompt-storage-zones-'));
+  context.after(() => fs.rm(directory, { recursive: true, force: true }));
+  const file = path.join(directory, 'data.json');
+  const store = await new Store(file).init();
+  const zone = await store.saveStorageZone({
+    name: 'Warehouse',
+    server: { host: 'Example.Test', port: 25565 },
+    dimension: 'minecraft:overworld',
+    from: { x: 10, y: 64, z: 10 },
+    to: { x: 1, y: 70, z: 1 }
+  });
+  assert.equal(zone.id, 'warehouse');
+  await store.close();
+  const restored = await new Store(file).init();
+  assert.deepEqual(await restored.getStorageZones(), [zone]);
+  await assert.rejects(restored.saveStorageZone({ ...zone, id: '', name: 'warehouse' }), /already saved/u);
+  assert.equal(await restored.removeStorageZone('WAREHOUSE'), true);
+  assert.deepEqual(await restored.getStorageZones(), []);
+});

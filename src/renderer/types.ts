@@ -165,6 +165,69 @@ export interface TargetSnapshot {
   entities: EntityTarget[];
 }
 
+export interface StorageScanSummary {
+  zoneId: string;
+  running: boolean;
+  phase: string;
+  stale: boolean;
+  complete: boolean;
+  scannedAt: number | null;
+  containersFound: number;
+  containersScanned: number;
+  unknownBlocks: number;
+  failureCount: number;
+  variantCount: number;
+  itemCount: number;
+}
+
+export interface StorageZoneSummary {
+  id: string;
+  name: string;
+  server: { host: string; port: number };
+  dimension: string;
+  from: TargetPosition;
+  to: TargetPosition;
+  createdAt: number;
+  updatedAt: number;
+  scan: StorageScanSummary | null;
+}
+
+export interface StorageSnapshot {
+  active: StorageScanSummary | null;
+  zones: StorageZoneSummary[];
+}
+
+export interface StorageIndexedItem {
+  variantId: string;
+  name: string;
+  displayName: string;
+  count: number;
+  metadata: number;
+  stackSize: number;
+  maxDurability: number;
+  durabilityRemaining: number;
+  enchanted: boolean;
+  enchantments: Array<{ name: string; displayName: string; level: number }>;
+  customName: string | null;
+  lore: string[];
+}
+
+export interface StorageScanDetails {
+  zoneId: string;
+  zoneName: string;
+  running: boolean;
+  phase: string;
+  stale: boolean;
+  complete: boolean;
+  scannedAt: number | null;
+  containersFound: number;
+  containersScanned: number;
+  unknownBlocks: number;
+  failures: Array<{ position: TargetPosition | null; message: string }>;
+  items: StorageIndexedItem[];
+  containers: Array<{ position: TargetPosition; block: string; slotCount: number; itemCount: number; items: StorageIndexedItem[] }>;
+}
+
 export interface InventoryLayout {
   kind: 'player';
   inventoryStart: number;
@@ -231,6 +294,7 @@ export interface BotSnapshot {
   containerLayout: ContainerLayout | null;
   server: { host: string; port: number; version: string } | null;
   targets?: TargetSnapshot;
+  storage: StorageSnapshot;
 }
 
 export type InventorySessionPatch = Pick<BotSnapshot,
@@ -441,6 +505,7 @@ export interface MinePromptApi {
   reportRendererState(state: Record<string, unknown>): Promise<{ ok: boolean }>;
   playerAction(request: Record<string, unknown>): Promise<{ ok: boolean; message?: string; prepareCommand?: string }>;
   targetAction(request: Record<string, unknown>): Promise<{ ok: boolean; message?: string }>;
+  storageAction(request: Record<string, unknown>): Promise<Record<string, unknown>>;
   capabilities(request?: { sessionId?: string }): Promise<Record<string, unknown>>;
   capabilityAction(request: { sessionId?: string; actionId: string; input?: Record<string, unknown> }): Promise<unknown>;
   recipes(request: Record<string, unknown>): Promise<RecipeDescriptor[]>;

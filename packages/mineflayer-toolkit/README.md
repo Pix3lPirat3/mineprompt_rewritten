@@ -1,6 +1,6 @@
 # Mineflayer Toolkit
 
-Composable MinePrompt behavior for ordinary Mineflayer bots. The toolkit provides independent runtime, navigation, mining, tree, inventory, and interaction plugins without requiring Electron, React, MCP, or the MinePrompt desktop application.
+Composable MinePrompt behavior for ordinary Mineflayer bots. The toolkit provides independent runtime, navigation, mining, tree, inventory, storage, and interaction plugins without requiring Electron, React, MCP, or the MinePrompt desktop application.
 
 ```js
 const mineflayer = require('mineflayer')
@@ -39,3 +39,16 @@ bot.loadPlugin(toolkitPlugin())
 ```
 
 Capability APIs are available through `bot.mineprompt`, while the shared action registry provides structured operations for terminals, graphical interfaces, workflows, and agent tools.
+
+Storage zones and exact item indexes are available as an independent plugin. Pass a server context when the connection transport does not expose its destination:
+
+```js
+const { storagePlugin } = require('@mineprompt/mineflayer-toolkit')
+
+bot.loadPlugin(storagePlugin({
+  context: {
+    server: { host: 'localhost', port: 25565 },
+    dimension: 'minecraft:overworld'
+  }
+}))
+```

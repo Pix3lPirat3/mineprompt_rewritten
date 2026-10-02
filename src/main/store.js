@@ -4,6 +4,7 @@ const fs = require('node:fs/promises');
 const path = require('node:path');
 const { cleanWorkflow } = require('./workflow-model');
 const { cleanStoredPresets, createPreset } = require('./mining-presets');
+const { cleanStorageZones, createStorageZone } = require('./storage-model');
 
 const EMPTY_DATA = Object.freeze({
   version: 1,
@@ -13,7 +14,8 @@ const EMPTY_DATA = Object.freeze({
   connections: [],
   workflows: [],
   miningPresets: [],
-  activeMiningPresetId: null
+  activeMiningPresetId: null,
+  storageZones: []
 });
 
 function cleanData(value) {
@@ -47,7 +49,8 @@ function cleanData(value) {
         }).slice(0, 100)
       : [],
     miningPresets: cleanStoredPresets(source.miningPresets),
-    activeMiningPresetId: typeof source.activeMiningPresetId === 'string' ? source.activeMiningPresetId : null
+    activeMiningPresetId: typeof source.activeMiningPresetId === 'string' ? source.activeMiningPresetId : null,
+    storageZones: cleanStorageZones(source.storageZones)
   };
   if (!data.miningPresets.some((preset) => preset.id === data.activeMiningPresetId)) data.activeMiningPresetId = null;
   return data;
@@ -270,6 +273,35 @@ class Store {
     this.data.activeMiningPresetId = target;
     await this.changed();
     return target;
+  }
+
+  async getStorageZones() {
+    return structuredClone(this.data.storageZones);
+  }
+
+  async saveStorageZone(input) {
+    const requestedId = String(input?.id || '').trim();
+    const existing = requestedId ? this.data.storageZones.find((zone) => zone.id === requestedId) : null;
+    const zone = createStorageZone({ ...existing, ...input, id: requestedId || existing?.id }, this.data.storageZones);
+    const duplicate = this.data.storageZones.find((entry) => entry.id !== zone.id &&
+      entry.server.host === zone.server.host && entry.server.port === zone.server.port && entry.dimension === zone.dimension &&
+      entry.name.toLowerCase() === zone.name.toLowerCase());
+    if (duplicate) throw new Error(`${zone.name} is already saved for this server and dimension.`);
+    const index = this.data.storageZones.findIndex((entry) => entry.id === zone.id);
+    if (index >= 0) this.data.storageZones[index] = zone;
+    else this.data.storageZones.push(zone);
+    this.data.storageZones.sort((left, right) => left.name.localeCompare(right.name));
+    await this.changed();
+    return structuredClone(zone);
+  }
+
+  async removeStorageZone(id) {
+    const target = String(id || '').trim().toLowerCase();
+    const previousLength = this.data.storageZones.length;
+    this.data.storageZones = this.data.storageZones.filter((zone) => zone.id.toLowerCase() !== target);
+    if (this.data.storageZones.length === previousLength) return false;
+    await this.changed();
+    return true;
   }
 
   async close() {

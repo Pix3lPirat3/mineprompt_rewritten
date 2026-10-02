@@ -17,6 +17,7 @@ const IPC_REQUESTS = Object.freeze([
   ['reportRendererState', 'report-renderer-state', 'reportRendererState'],
   ['playerAction', 'player-action', 'playerAction'],
   ['targetAction', 'target-action', 'targetAction'],
+  ['storageAction', 'storage-action', 'storageAction'],
   ['capabilities', 'capabilities', 'capabilities'],
   ['capabilityAction', 'capability-action', 'capabilityAction'],
   ['recipes', 'recipes', 'recipes'],

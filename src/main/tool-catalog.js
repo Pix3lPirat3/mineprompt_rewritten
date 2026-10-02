@@ -232,6 +232,19 @@ class ToolCatalog {
     }, { additionalProperties: false }), async (runtime, input) => runtime.stashAction(input), {
       destructive: true, capability: 'inventory', approval: 'recommended', openWorld: true
     }));
+    this.register(tool('mineprompt_storage', 'Register bounded storage zones, scan loaded containers, and query exact item variants with freshness and partial-scan details.', Type.Object({
+      sessionId: SessionId,
+      action: Type.Union(['zones', 'save', 'remove', 'scan', 'inspect', 'find', 'status', 'stop'].map((value) => Type.Literal(value))),
+      zone: Type.Optional(Type.String({ minLength: 1, maxLength: 80 })),
+      name: Type.Optional(Type.String({ minLength: 1, maxLength: 64 })),
+      from: Type.Optional(Position),
+      to: Type.Optional(Position),
+      item: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+      minimum: Type.Optional(Type.Integer({ minimum: 0, maximum: 2147483647 })),
+      all: Type.Optional(Type.Boolean())
+    }, { additionalProperties: false }), async (runtime, input) => runtime.storageAction(input), {
+      destructive: true, capability: 'world', approval: 'recommended', openWorld: true
+    }));
     this.register(tool('mineprompt_inventory_action', 'Run the same validated inventory or open-container action exposed by the GUI and terminal. Use equips the selected item and calls bot.activateItem. Swing optionally equips an item and calls bot.swingArm with the requested arm. Transfer moves one, half, or a full stack between the player inventory and open container.', Type.Object({
       sessionId: Type.String({ minLength: 1, maxLength: 128 }),
       connectionId: Type.Integer({ minimum: 0 }),

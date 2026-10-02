@@ -102,14 +102,27 @@ test('installs supplied application services as public capabilities and actions'
     stop: () => true,
     status: () => ({ running: false })
   };
+  const storageService = {
+    zones: () => [{ id: 'main' }],
+    saveZone: async (request) => request,
+    removeZone: async () => true,
+    start: () => ({ running: true }),
+    inspect: () => ({ zone: { id: 'main' } }),
+    find: () => [],
+    status: () => null,
+    stop: () => true,
+    summary: () => ({ active: null, zones: [] })
+  };
   const installed = installToolkit(bot, {
     mining: { service: miningService },
     trees: { service: treeService },
+    storage: { service: storageService },
     inventory: false,
     interactions: false
   });
   assert.equal(installed.mining.service, miningService);
   assert.equal(installed.trees.service, treeService);
+  assert.equal(installed.storage.service, storageService);
   assert.equal(bot.mineprompt.snapshot().capabilities.some((entry) => entry.id === 'trees'), true);
   const inspected = await bot.mineprompt.actions.execute('trees.inspect', { target: 'nearest' });
   assert.equal(inspected.species, 'oak');
@@ -118,6 +131,13 @@ test('installs supplied application services as public capabilities and actions'
     'mining.region',
     'mining.stop',
     'navigation.stop',
+    'storage.find',
+    'storage.inspect',
+    'storage.remove',
+    'storage.save',
+    'storage.scan',
+    'storage.stop',
+    'storage.zones',
     'trees.farm',
     'trees.fell',
     'trees.inspect',
@@ -148,7 +168,7 @@ test('rolls back partial plugin registration after an action collision', () => {
 test('keeps CommonJS and ESM toolkit exports aligned', async () => {
   const common = require('../packages/mineflayer-toolkit');
   const module = await import('../packages/mineflayer-toolkit/dist/index.js');
-  for (const name of ['installRuntime', 'installMining', 'installTrees', 'installInventory', 'installInteractions', 'installToolkit']) {
+  for (const name of ['installRuntime', 'installMining', 'installTrees', 'installInventory', 'installStorage', 'installInteractions', 'installToolkit']) {
     assert.equal(typeof common[name], 'function');
     assert.equal(typeof module[name], 'function');
   }

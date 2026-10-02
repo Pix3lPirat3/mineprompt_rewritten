@@ -14,6 +14,7 @@ const target = require('../commands/mineflayer/target');
 const consistentMine = require('../commands/mineflayer/world/consistentmine');
 const mine = require('../commands/mineflayer/world/mine');
 const stashCommand = require('../commands/mineflayer/world/stash');
+const storageCommand = require('../commands/mineflayer/world/storage');
 
 function sender() {
   const replies = [];
@@ -217,4 +218,24 @@ test('starts, reports, and stops nearby stash activities from the terminal', asy
   const unconfirmed = sender();
   await stashCommand.execute(unconfirmed.value, 'stash', ['inventory', 'all'], { stash });
   assert.match(unconfirmed.replies[0], /requires confirm/u);
+});
+
+test('registers, scans, and queries storage through one terminal service', async () => {
+  const calls = [];
+  const storage = {
+    zones: () => [],
+    saveZone: async (request) => { calls.push(['save', request]); return { id: 'main', name: request.name }; },
+    start: (zone) => { calls.push(['scan', zone]); return { zoneName: 'Main', running: true }; },
+    find: (item, options) => { calls.push(['find', item, options]); return [{ zoneName: 'Main', count: 64, displayName: 'Stone', variantId: 'variant', stale: false }]; }
+  };
+  const added = sender();
+  await storageCommand.execute(added.value, 'storage', ['add', 'Main', '0', '64', '0', '8', '72', '8'], { bot: { entity: {} }, storage });
+  assert.deepEqual(calls[0], ['save', { name: 'Main', from: { x: 0, y: 64, z: 0 }, to: { x: 8, y: 72, z: 8 } }]);
+  const scanned = sender();
+  await storageCommand.execute(scanned.value, 'storage', ['scan', 'main'], { bot: { entity: {} }, storage });
+  assert.deepEqual(calls[1], ['scan', 'main']);
+  const found = sender();
+  await storageCommand.execute(found.value, 'storage', ['find', 'stone', 'main', '32'], { bot: { entity: {} }, storage });
+  assert.deepEqual(calls[2], ['find', 'stone', { zone: 'main', minimum: '32' }]);
+  assert.match(found.replies[0], /64 x Stone/u);
 });

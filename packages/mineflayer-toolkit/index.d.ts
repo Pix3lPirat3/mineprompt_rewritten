@@ -100,6 +100,7 @@ export interface MinepromptRuntime {
   mining?: MiningApi;
   trees?: TreeApi;
   inventory?: InventoryApi;
+  storage?: StorageApi;
   interactions?: InteractionsApi;
   has(id: string): boolean;
   get<T = unknown>(id: string): T | null;
@@ -198,6 +199,31 @@ export interface InventoryApi {
   snapshot(): Record<string, unknown>;
 }
 
+export interface StorageZone {
+  id: string;
+  name: string;
+  server: { host: string; port: number };
+  dimension: string;
+  from: Position;
+  to: Position;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface StorageApi {
+  readonly service: StorageService;
+  readonly store: unknown;
+  zones(request?: { all?: boolean }): StorageZone[];
+  saveZone(request: Partial<StorageZone> & Pick<StorageZone, 'name' | 'from' | 'to'>): Promise<StorageZone>;
+  removeZone(reference: string): Promise<boolean>;
+  scan(reference: string): unknown;
+  inspect(reference: string): unknown;
+  find(selector: string, request?: { zone?: string; minimum?: number }): unknown[];
+  status(): unknown;
+  stop(): boolean;
+  snapshot(): Record<string, unknown>;
+}
+
 export interface InteractionsApi {
   readonly relationships: RelationshipService;
   readonly players: PlayerActionRegistry;
@@ -213,6 +239,8 @@ export class TreeService { constructor(options: Record<string, unknown>); }
 export class InventoryService { constructor(options: Record<string, unknown>); }
 export class CraftingService { constructor(options: Record<string, unknown>); }
 export class StashService { constructor(options: Record<string, unknown>); }
+export class StorageService { constructor(options: Record<string, unknown>); }
+export class MemoryStorageStore { constructor(zones?: StorageZone[]); }
 export class PlayerActionRegistry { constructor(options?: Record<string, unknown>); }
 export class RelationshipService { constructor(store: unknown); }
 export class TargetingService { constructor(options: Record<string, unknown>); }
@@ -231,9 +259,11 @@ export function installTrees(bot: Bot, options?: Record<string, unknown>): TreeA
 export function treePlugin(options?: Record<string, unknown>): (bot: Bot) => TreeApi;
 export function installInventory(bot: Bot, options?: Record<string, unknown>): InventoryApi;
 export function inventoryPlugin(options?: Record<string, unknown>): (bot: Bot) => InventoryApi;
+export function installStorage(bot: Bot, options?: Record<string, unknown>): StorageApi;
+export function storagePlugin(options?: Record<string, unknown>): (bot: Bot) => StorageApi;
 export function installInteractions(bot: Bot, options?: Record<string, unknown>): InteractionsApi;
 export function interactionsPlugin(options?: Record<string, unknown>): (bot: Bot) => InteractionsApi;
-export function installToolkit(bot: Bot, options?: Record<string, unknown>): { runtime: MinepromptRuntime; navigation: NavigationApi | null; mining: MiningApi | null; trees: TreeApi | null; inventory: InventoryApi | null; interactions: InteractionsApi | null };
+export function installToolkit(bot: Bot, options?: Record<string, unknown>): { runtime: MinepromptRuntime; navigation: NavigationApi | null; mining: MiningApi | null; trees: TreeApi | null; inventory: InventoryApi | null; storage: StorageApi | null; interactions: InteractionsApi | null };
 export function toolkitPlugin(options?: Record<string, unknown>): (bot: Bot) => ReturnType<typeof installToolkit>;
 
 declare module 'mineflayer' {

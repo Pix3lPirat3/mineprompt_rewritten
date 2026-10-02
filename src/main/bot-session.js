@@ -11,6 +11,7 @@ const { InventoryPipeline } = require('./inventory-pipeline');
 const { MiningService } = require('./mining-service');
 const { TreeService } = require('./tree-service');
 const { StashService } = require('./stash-service');
+const { StorageService } = require('./storage-service');
 const { CraftingService } = require('./crafting-service');
 const { PlayerActionRegistry } = require('./player-actions');
 const { RelationshipService } = require('./relationship-service');
@@ -97,6 +98,13 @@ class BotSession {
       logger,
       onChange: () => this.publishSnapshot()
     });
+    this.storage = new StorageService({
+      getClient: () => this.client,
+      store: this.store,
+      activities: this.activities,
+      logger,
+      onChange: () => this.publishSnapshot()
+    });
     this.targets = new TargetingService({
       getClient: () => this.client,
       activities: this.activities,
@@ -112,6 +120,7 @@ class BotSession {
       mining: { client: this.client, service: this.mining },
       trees: { client: this.client, service: this.trees },
       inventory: { client: this.client, service: this.inventory, crafting: this.crafting, stash: this.stash },
+      storage: { client: this.client, service: this.storage, store: this.store },
       interactions: {
         client: this.client,
         store: this.store,
@@ -156,6 +165,7 @@ class BotSession {
       mining,
       trees,
       stash,
+      storage: this.capability('storage')?.service || this.storage,
       relationships: interactions?.relationships || this.relationships,
       targets: interactions?.targets || this.targets,
       store: this.store,
@@ -218,6 +228,7 @@ class BotSession {
       mining: this.mining,
       trees: this.trees,
       stash: this.stash,
+      storage: this.storage,
       targets: this.targets,
       activities: this.activities,
       automation: this.automation,
@@ -319,6 +330,20 @@ class BotSession {
     return { ok: true, status };
   }
 
+  async storageAction(request = {}) {
+    const storage = this.capability('storage')?.service || this.storage;
+    const action = String(request.action || 'zones').toLowerCase();
+    if (action === 'zones') return { ok: true, zones: storage.zones({ all: request.all === true }) };
+    if (action === 'status') return { ok: true, status: storage.status(), storage: storage.summary() };
+    if (action === 'inspect') return { ok: true, ...storage.inspect(request.zone) };
+    if (action === 'find') return { ok: true, items: storage.find(request.item, { zone: request.zone, minimum: request.minimum }) };
+    if (action === 'scan') return { ok: true, status: storage.start(request.zone) };
+    if (action === 'stop') return { ok: storage.stop(), status: storage.status() };
+    if (action === 'save') return { ok: true, zone: await storage.saveZone(request.zoneDetails || request) };
+    if (action === 'remove') return { ok: await storage.removeZone(request.zone) };
+    throw new Error('Unknown storage action.');
+  }
+
   capabilities() {
     const runtime = this.client.bot?.mineprompt;
     if (!runtime) return { apiVersion: null, revision: 0, capabilities: [], actions: [], activities: this.activities.snapshot(), tasks: { active: [], recent: [] } };
@@ -382,7 +407,7 @@ class BotSession {
       },
       state: this.interface.snapshot(),
       activities: this.activities.snapshot(),
-      session: { ...this.client.snapshot(), targets: this.targets.snapshot() },
+      session: { ...this.client.snapshot(), targets: this.targets.snapshot(), storage: this.storage.summary() },
       commands: this.commands.descriptors(),
       diagnostics: { inventory: this.inventoryPipeline.telemetry.snapshot(), snapshots: this.snapshotPublisher.snapshot() },
       extensions: {

@@ -47,7 +47,8 @@ function emptySession(id, engine = null) {
       containerSlots: [],
       containerLayout: null,
       server: null,
-      targets: { cursorBlock: null, cursorEntity: null, entities: [] }
+      targets: { cursorBlock: null, cursorEntity: null, entities: [] },
+      storage: { active: null, zones: [] }
     },
     commands: [],
     extensions: { apiVersion: null, revision: 0, capabilities: [], actionCount: 0, tasks: { active: [] } },
