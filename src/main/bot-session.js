@@ -1,5 +1,6 @@
 'use strict';
 
+const path = require('node:path');
 const { CommandRegistry } = require('./command-registry');
 const { InterfaceState } = require('./interface-state');
 const { MineflayerClient } = require('./mineflayer-client');
@@ -12,6 +13,8 @@ const { MiningService } = require('./mining-service');
 const { TreeService } = require('./tree-service');
 const { StashService } = require('./stash-service');
 const { StorageService } = require('./storage-service');
+const { BlueprintLibrary } = require('./blueprint-library');
+const { BlueprintService } = require('./blueprint-service');
 const { CraftingService } = require('./crafting-service');
 const { PlayerActionRegistry } = require('./player-actions');
 const { RelationshipService } = require('./relationship-service');
@@ -105,6 +108,12 @@ class BotSession {
       logger,
       onChange: () => this.publishSnapshot()
     });
+    this.blueprintLibrary = new BlueprintLibrary({
+      directory: path.join(path.dirname(privateCommandsPath), 'blueprints'),
+      logger,
+      onChange: () => this.publishSnapshot()
+    });
+    this.blueprints = new BlueprintService({ library: this.blueprintLibrary, getClient: () => this.client });
     this.targets = new TargetingService({
       getClient: () => this.client,
       activities: this.activities,
@@ -121,6 +130,7 @@ class BotSession {
       trees: { client: this.client, service: this.trees },
       inventory: { client: this.client, service: this.inventory, crafting: this.crafting, stash: this.stash },
       storage: { client: this.client, service: this.storage, store: this.store },
+      builder: { client: this.client, service: this.blueprints, library: this.blueprintLibrary },
       interactions: {
         client: this.client,
         store: this.store,
@@ -134,7 +144,8 @@ class BotSession {
     this.ready = Promise.resolve(this.init());
   }
 
-  init() {
+  async init() {
+    await this.blueprintLibrary.init();
     this.commands.setCommands('global');
     this.publishSnapshot();
     this.snapshotPublisher.flush();
@@ -166,6 +177,7 @@ class BotSession {
       trees,
       stash,
       storage: this.capability('storage')?.service || this.storage,
+      blueprints: this.blueprints,
       relationships: interactions?.relationships || this.relationships,
       targets: interactions?.targets || this.targets,
       store: this.store,
@@ -229,6 +241,7 @@ class BotSession {
       trees: this.trees,
       stash: this.stash,
       storage: this.storage,
+      blueprints: this.blueprints,
       targets: this.targets,
       activities: this.activities,
       automation: this.automation,
@@ -344,6 +357,34 @@ class BotSession {
     throw new Error('Unknown storage action.');
   }
 
+  async blueprintAction(request = {}) {
+    const action = String(request.action || 'list').toLowerCase();
+    if (action === 'list') return { ok: true, blueprints: this.blueprints.list() };
+    if (action === 'inspect') return { ok: true, ...this.blueprints.materials(request.blueprint) };
+    if (action === 'materials') return { ok: true, ...this.blueprints.materials(request.blueprint) };
+    if (action === 'preview' || action === 'conflicts' || action === 'requirements') {
+      const preview = await this.blueprints.preview(request.blueprint, request);
+      if (action === 'conflicts') return { ok: true, blueprint: preview.blueprint, warnings: preview.warnings, counts: preview.counts, conflicts: preview.samples.conflicting, removals: preview.removals };
+      if (action === 'requirements') return { ok: true, blueprint: preview.blueprint, warnings: preview.warnings, requirements: preview.requirements, missing: preview.missing };
+      return { ok: true, preview };
+    }
+    throw new Error('Unknown blueprint action.');
+  }
+
+  async blueprintImport(request = {}) {
+    const blueprint = await this.blueprints.importFile(request.file, {
+      edition: request.edition,
+      version: request.version,
+      name: request.name
+    });
+    return { ok: true, blueprint };
+  }
+
+  async blueprintRemove(request = {}) {
+    await this.blueprints.remove(request.blueprint);
+    return { ok: true };
+  }
+
   capabilities() {
     const runtime = this.client.bot?.mineprompt;
     if (!runtime) return { apiVersion: null, revision: 0, capabilities: [], actions: [], activities: this.activities.snapshot(), tasks: { active: [], recent: [] } };
@@ -407,7 +448,7 @@ class BotSession {
       },
       state: this.interface.snapshot(),
       activities: this.activities.snapshot(),
-      session: { ...this.client.snapshot(), targets: this.targets.snapshot(), storage: this.storage.summary() },
+      session: { ...this.client.snapshot(), targets: this.targets.snapshot(), storage: this.storage.summary(), blueprints: this.blueprints.snapshot() },
       commands: this.commands.descriptors(),
       diagnostics: { inventory: this.inventoryPipeline.telemetry.snapshot(), snapshots: this.snapshotPublisher.snapshot() },
       extensions: {
@@ -436,6 +477,7 @@ class BotSession {
     this.inventoryPipeline.close();
     this.workflows.close();
     this.automation.close();
+    await this.blueprintLibrary.close();
     await this.client.close();
   }
 }

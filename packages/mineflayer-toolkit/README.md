@@ -1,6 +1,6 @@
 # Mineflayer Toolkit
 
-Composable MinePrompt behavior for ordinary Mineflayer bots. The toolkit provides independent runtime, navigation, mining, tree, inventory, storage, and interaction plugins without requiring Electron, React, MCP, or the MinePrompt desktop application.
+Composable MinePrompt behavior for ordinary Mineflayer bots. The toolkit provides independent runtime, navigation, mining, tree, inventory, storage, blueprint, and interaction plugins without requiring Electron, React, MCP, or the MinePrompt desktop application.
 
 ```js
 const mineflayer = require('mineflayer')
@@ -52,3 +52,5 @@ bot.loadPlugin(storagePlugin({
   }
 }))
 ```
+
+The builder plugin accepts normalized blueprints and exposes material inspection, transforms, and non-mutating world diffs through `bot.mineprompt.builder`.

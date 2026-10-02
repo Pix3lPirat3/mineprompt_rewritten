@@ -11,6 +11,7 @@ export type DialogTarget =
   | { kind: 'server'; server?: ServerProfile }
   | { kind: 'settings' }
   | { kind: 'mining' }
+  | { kind: 'blueprints' }
   | { kind: 'workflows' }
   | { kind: 'commands' };
 
@@ -75,6 +76,7 @@ export function Sidebar({ open }: SidebarProps) {
       <nav className="sidebar-nav" aria-label="Application tools">
         <button type="button" onClick={() => open({ kind: 'workflows' })}>Workflow studio</button>
         <button type="button" onClick={() => open({ kind: 'commands' })}>Command library</button>
+        <button type="button" onClick={() => open({ kind: 'blueprints' })}>Blueprint library</button>
         <button type="button" onClick={() => open({ kind: 'mining' })}>Mining policies</button>
         <button type="button" onClick={() => open({ kind: 'settings' })}>Settings</button>
       </nav>

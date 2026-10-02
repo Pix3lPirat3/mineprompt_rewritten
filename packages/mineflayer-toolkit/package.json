@@ -42,6 +42,11 @@
       "import": "./dist/storage.js",
       "require": "./dist/storage.cjs"
     },
+    "./builder": {
+      "types": "./index.d.ts",
+      "import": "./dist/builder.js",
+      "require": "./dist/builder.cjs"
+    },
     "./interactions": {
       "types": "./index.d.ts",
       "import": "./dist/interactions.js",

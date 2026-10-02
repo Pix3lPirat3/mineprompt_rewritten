@@ -4,7 +4,7 @@ const path = require('node:path');
 const fs = require('node:fs');
 const { buildSync } = require('esbuild');
 
-const names = ['index', 'runtime', 'navigation', 'mining', 'trees', 'inventory', 'storage', 'interactions'];
+const names = ['index', 'runtime', 'navigation', 'mining', 'trees', 'inventory', 'storage', 'builder', 'interactions'];
 const entryPoints = Object.fromEntries(names.map((name) => [name, path.join(__dirname, 'source', `${name}.js`)]));
 const shared = {
   entryPoints,

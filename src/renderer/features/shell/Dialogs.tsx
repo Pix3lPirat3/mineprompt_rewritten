@@ -5,6 +5,7 @@ import { consoleActions, uiActions, useAppDispatch, useAppSelector } from '../..
 import type { EngineProfile, Preferences } from '../../types';
 import type { DialogTarget } from './Sidebar';
 import { WorkflowStudio } from '../automation/WorkflowStudio';
+import { BlueprintLibrary } from '../builder/BlueprintLibrary';
 import { MiningPolicyEditor } from '../mining/MiningPolicyEditor';
 
 interface DialogsProps {
@@ -57,6 +58,7 @@ export function Dialogs({ target, close }: DialogsProps) {
     [command.command, command.category, command.description, ...command.aliases].join(' ').toLowerCase().includes(query.trim().toLowerCase())), [query, runtime.commands]);
 
   if (target.kind === 'workflows') return <WorkflowStudio close={close} />;
+  if (target.kind === 'blueprints') return <BlueprintLibrary close={close} />;
   if (target.kind === 'mining') return <MiningPolicyEditor close={close} />;
 
   if (target.kind === 'connect') {

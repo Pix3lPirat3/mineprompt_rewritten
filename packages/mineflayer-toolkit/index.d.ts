@@ -101,6 +101,7 @@ export interface MinepromptRuntime {
   trees?: TreeApi;
   inventory?: InventoryApi;
   storage?: StorageApi;
+  builder?: BuilderApi;
   interactions?: InteractionsApi;
   has(id: string): boolean;
   get<T = unknown>(id: string): T | null;
@@ -224,6 +225,37 @@ export interface StorageApi {
   snapshot(): Record<string, unknown>;
 }
 
+export interface BlueprintSummary {
+  id: string;
+  hash: string;
+  name: string;
+  sourceFile: string;
+  sourceFormat: string;
+  edition: string;
+  version: string;
+  detectedVersion: string | null;
+  dimensions: Position;
+  volume: number;
+  offset: Position;
+  paletteSize: number;
+  blockEntityCount: number;
+  materialTypes: number;
+  materialCount: number;
+  unsupportedCount: number;
+  supportSensitiveCount: number;
+  importedAt: number;
+}
+
+export interface BuilderApi {
+  readonly service: unknown;
+  readonly library: unknown;
+  list(): BlueprintSummary[];
+  inspect(reference: string): unknown;
+  materials(reference: string): unknown;
+  preview(reference: string, request: Record<string, unknown>): Promise<unknown>;
+  snapshot(): { blueprints: BlueprintSummary[] };
+}
+
 export interface InteractionsApi {
   readonly relationships: RelationshipService;
   readonly players: PlayerActionRegistry;
@@ -241,6 +273,7 @@ export class CraftingService { constructor(options: Record<string, unknown>); }
 export class StashService { constructor(options: Record<string, unknown>); }
 export class StorageService { constructor(options: Record<string, unknown>); }
 export class MemoryStorageStore { constructor(zones?: StorageZone[]); }
+export class MemoryBlueprintLibrary { constructor(blueprints?: unknown[]); }
 export class PlayerActionRegistry { constructor(options?: Record<string, unknown>); }
 export class RelationshipService { constructor(store: unknown); }
 export class TargetingService { constructor(options: Record<string, unknown>); }
@@ -261,9 +294,11 @@ export function installInventory(bot: Bot, options?: Record<string, unknown>): I
 export function inventoryPlugin(options?: Record<string, unknown>): (bot: Bot) => InventoryApi;
 export function installStorage(bot: Bot, options?: Record<string, unknown>): StorageApi;
 export function storagePlugin(options?: Record<string, unknown>): (bot: Bot) => StorageApi;
+export function installBuilder(bot: Bot, options?: Record<string, unknown>): BuilderApi;
+export function builderPlugin(options?: Record<string, unknown>): (bot: Bot) => BuilderApi;
 export function installInteractions(bot: Bot, options?: Record<string, unknown>): InteractionsApi;
 export function interactionsPlugin(options?: Record<string, unknown>): (bot: Bot) => InteractionsApi;
-export function installToolkit(bot: Bot, options?: Record<string, unknown>): { runtime: MinepromptRuntime; navigation: NavigationApi | null; mining: MiningApi | null; trees: TreeApi | null; inventory: InventoryApi | null; storage: StorageApi | null; interactions: InteractionsApi | null };
+export function installToolkit(bot: Bot, options?: Record<string, unknown>): { runtime: MinepromptRuntime; navigation: NavigationApi | null; mining: MiningApi | null; trees: TreeApi | null; inventory: InventoryApi | null; storage: StorageApi | null; builder: BuilderApi | null; interactions: InteractionsApi | null };
 export function toolkitPlugin(options?: Record<string, unknown>): (bot: Bot) => ReturnType<typeof installToolkit>;
 
 declare module 'mineflayer' {

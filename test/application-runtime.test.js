@@ -43,7 +43,7 @@ test('runs global commands through the application runtime', async (context) => 
     await fs.rm(userDataPath, { recursive: true, force: true });
   });
 
-  assert.equal(runtime.snapshot().commands.length, 14);
+  assert.equal(runtime.snapshot().commands.length, 15);
   assert.equal((await runtime.execute('engine list')).ok, true);
   assert.equal((await runtime.complete('engine ')).includes('use'), true);
   assert.equal((await runtime.execute('engine use stable')).ok, true);

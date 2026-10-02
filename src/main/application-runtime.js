@@ -245,6 +245,18 @@ class ApplicationRuntime {
     return this.sessionRequest(request.sessionId, 'storageAction', request);
   }
 
+  blueprintAction(request = {}) {
+    return this.sessionRequest(request.sessionId, 'blueprintAction', request);
+  }
+
+  blueprintImport(request = {}) {
+    return this.sessionRequest(request.sessionId, 'blueprintImport', request);
+  }
+
+  blueprintRemove(request = {}) {
+    return this.sessionRequest(request.sessionId, 'blueprintRemove', request);
+  }
+
   capabilities(request = {}) {
     return this.sessionRequest(request.sessionId, 'capabilities');
   }

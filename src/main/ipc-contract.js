@@ -18,6 +18,7 @@ const IPC_REQUESTS = Object.freeze([
   ['playerAction', 'player-action', 'playerAction'],
   ['targetAction', 'target-action', 'targetAction'],
   ['storageAction', 'storage-action', 'storageAction'],
+  ['blueprintAction', 'blueprint-action', 'blueprintAction'],
   ['capabilities', 'capabilities', 'capabilities'],
   ['capabilityAction', 'capability-action', 'capabilityAction'],
   ['recipes', 'recipes', 'recipes'],

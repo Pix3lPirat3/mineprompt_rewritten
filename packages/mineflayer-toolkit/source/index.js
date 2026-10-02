@@ -7,6 +7,7 @@ module.exports = {
   ...require('./trees'),
   ...require('./inventory'),
   ...require('./storage'),
+  ...require('./builder'),
   ...require('./interactions'),
   ...require('./plugins')
 };

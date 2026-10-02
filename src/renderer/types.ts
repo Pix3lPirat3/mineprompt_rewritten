@@ -197,6 +197,37 @@ export interface StorageSnapshot {
   zones: StorageZoneSummary[];
 }
 
+export interface BlueprintSummary {
+  id: string;
+  hash: string;
+  name: string;
+  sourceFile: string;
+  sourceFormat: string;
+  edition: 'java';
+  version: string;
+  detectedVersion: string | null;
+  dimensions: TargetPosition;
+  volume: number;
+  offset: TargetPosition;
+  paletteSize: number;
+  blockEntityCount: number;
+  materialTypes: number;
+  materialCount: number;
+  unsupportedCount: number;
+  supportSensitiveCount: number;
+  importedAt: number;
+}
+
+export interface BlueprintMaterial {
+  name: string;
+  displayName: string;
+  count: number;
+}
+
+export interface BlueprintSnapshot {
+  blueprints: BlueprintSummary[];
+}
+
 export interface StorageIndexedItem {
   variantId: string;
   name: string;
@@ -295,6 +326,7 @@ export interface BotSnapshot {
   server: { host: string; port: number; version: string } | null;
   targets?: TargetSnapshot;
   storage: StorageSnapshot;
+  blueprints: BlueprintSnapshot;
 }
 
 export type InventorySessionPatch = Pick<BotSnapshot,
@@ -434,6 +466,7 @@ export interface CommandDescriptor {
   toolName: string;
   risk: 'restricted' | 'read' | 'standard' | 'dangerous';
   approval: 'none' | 'recommended' | 'required';
+  agentVisible: boolean;
 }
 
 export interface ApplicationSnapshot {
@@ -506,6 +539,9 @@ export interface MinePromptApi {
   playerAction(request: Record<string, unknown>): Promise<{ ok: boolean; message?: string; prepareCommand?: string }>;
   targetAction(request: Record<string, unknown>): Promise<{ ok: boolean; message?: string }>;
   storageAction(request: Record<string, unknown>): Promise<Record<string, unknown>>;
+  blueprintAction(request: Record<string, unknown>): Promise<Record<string, unknown>>;
+  importBlueprint(options: { sessionId?: string; edition?: 'java'; version?: string; name?: string }): Promise<{ ok: boolean; canceled?: boolean; blueprint?: BlueprintSummary }>;
+  removeBlueprint(request: { sessionId?: string; blueprint: string }): Promise<{ ok: boolean }>;
   capabilities(request?: { sessionId?: string }): Promise<Record<string, unknown>>;
   capabilityAction(request: { sessionId?: string; actionId: string; input?: Record<string, unknown> }): Promise<unknown>;
   recipes(request: Record<string, unknown>): Promise<RecipeDescriptor[]>;

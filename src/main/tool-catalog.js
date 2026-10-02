@@ -245,6 +245,23 @@ class ToolCatalog {
     }, { additionalProperties: false }), async (runtime, input) => runtime.storageAction(input), {
       destructive: true, capability: 'world', approval: 'recommended', openWorld: true
     }));
+    this.register(tool('mineprompt_blueprints', 'List and inspect imported version-declared blueprints, read their material bills, or compare a transformed blueprint with the loaded world. Import and removal remain local application operations.', Type.Object({
+      sessionId: SessionId,
+      action: Type.Union(['list', 'inspect', 'materials', 'preview', 'conflicts', 'requirements'].map((value) => Type.Literal(value))),
+      blueprint: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
+      anchor: Type.Optional(Position),
+      rotation: Type.Optional(Type.Union([0, 90, 180, 270].map((value) => Type.Literal(value)))),
+      mirror: Type.Optional(Type.Union(['none', 'x', 'z'].map((value) => Type.Literal(value)))),
+      policy: Type.Optional(Type.Object({
+        terrain: Type.Optional(Type.Union(['preserve', 'replace', 'flatten'].map((value) => Type.Literal(value)))),
+        conflicts: Type.Optional(Type.Union(['stop', 'skip', 'replace'].map((value) => Type.Literal(value)))),
+        air: Type.Optional(Type.Union([Type.Literal('ignore'), Type.Literal('clear')])),
+        maximumReplacements: Type.Optional(Type.Integer({ minimum: 0, maximum: 1048576 })),
+        maximumRange: Type.Optional(Type.Integer({ minimum: 1, maximum: 4096 }))
+      }, { additionalProperties: false }))
+    }, { additionalProperties: false }), async (runtime, input) => runtime.blueprintAction(input), {
+      readOnly: true, capability: 'world', openWorld: true
+    }));
     this.register(tool('mineprompt_inventory_action', 'Run the same validated inventory or open-container action exposed by the GUI and terminal. Use equips the selected item and calls bot.activateItem. Swing optionally equips an item and calls bot.swingArm with the requested arm. Transfer moves one, half, or a full stack between the player inventory and open container.', Type.Object({
       sessionId: Type.String({ minLength: 1, maxLength: 128 }),
       connectionId: Type.Integer({ minimum: 0 }),
@@ -309,14 +326,14 @@ class ToolCatalog {
 
   list() {
     const commands = this.runtime.commandDescriptors?.() || this.runtime.snapshot().commands || [];
-    const dynamic = commands.map(commandTool);
+    const dynamic = commands.filter((command) => command.agentVisible !== false).map(commandTool);
     return [...this.fixed.values(), ...dynamic].map(({ validate, execute, ...definition }) => definition);
   }
 
   resolve(name) {
     if (this.fixed.has(name)) return this.fixed.get(name);
     const commands = this.runtime.commandDescriptors?.() || this.runtime.snapshot().commands || [];
-    const command = commands.find((entry) => `command_${entry.command.replaceAll('-', '_')}` === name);
+    const command = commands.find((entry) => entry.agentVisible !== false && `command_${entry.command.replaceAll('-', '_')}` === name);
     return command ? commandTool(command) : null;
   }
 

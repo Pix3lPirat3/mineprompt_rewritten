@@ -1855,6 +1855,212 @@ button.danger {
   width: min(820px, 100%);
 }
 
+.modal:has(.blueprint-library) {
+  width: min(940px, 100%);
+}
+
+.blueprint-library {
+  display: grid;
+  grid-template-columns: 250px minmax(0, 1fr);
+  min-height: 560px;
+}
+
+.blueprint-library > aside {
+  padding: 14px;
+  border-right: 1px solid var(--line);
+  background: rgba(8, 12, 17, 0.34);
+}
+
+.blueprint-library > main {
+  position: relative;
+  min-width: 0;
+  padding: 18px;
+}
+
+.blueprint-import {
+  display: grid;
+  gap: 7px;
+  padding-bottom: 13px;
+  border-bottom: 1px solid var(--line);
+}
+
+.blueprint-import input,
+.blueprint-preview-controls input,
+.blueprint-preview-controls select {
+  width: 100%;
+  padding: 8px 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #0c1118;
+  font-size: 10px;
+}
+
+.blueprint-list {
+  display: grid;
+  max-height: 390px;
+  gap: 6px;
+  margin-top: 12px;
+  overflow: auto;
+}
+
+.blueprint-list > button {
+  display: grid;
+  gap: 3px;
+  padding: 9px;
+  text-align: left;
+}
+
+.blueprint-list > button.selected {
+  border-color: var(--accent);
+  background: rgba(49, 149, 99, 0.16);
+}
+
+.blueprint-list span,
+.blueprint-list small,
+.blueprint-list p,
+.blueprint-summary span {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.blueprint-summary,
+.blueprint-actions,
+.blueprint-preview-controls,
+.blueprint-preview > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.blueprint-summary {
+  justify-content: space-between;
+}
+
+.blueprint-summary h3 {
+  margin: 0 0 4px;
+  font-size: 16px;
+}
+
+.blueprint-summary code {
+  color: var(--accent-bright);
+  font-size: 9px;
+}
+
+.blueprint-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  margin: 15px 0;
+}
+
+.blueprint-metrics div,
+.blueprint-preview > div > span {
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: rgba(7, 11, 16, 0.62);
+}
+
+.blueprint-metrics dt,
+.blueprint-preview span {
+  color: var(--muted);
+  font-size: 8px;
+  text-transform: uppercase;
+}
+
+.blueprint-metrics dd {
+  margin: 4px 0 0;
+  font-size: 11px;
+}
+
+.blueprint-actions {
+  margin-bottom: 12px;
+}
+
+.blueprint-materials {
+  display: grid;
+  max-height: 150px;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px 14px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: auto;
+}
+
+.blueprint-materials div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: #aab5c3;
+  font-size: 9px;
+}
+
+.blueprint-materials p {
+  grid-column: 1 / -1;
+  margin: 2px 0;
+  font-size: 9px;
+}
+
+.blueprint-preview-controls {
+  align-items: end;
+  margin-top: 14px;
+}
+
+.blueprint-preview-controls label {
+  display: grid;
+  gap: 4px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.coordinate-fields {
+  display: grid;
+  grid-template-columns: repeat(3, 65px);
+  gap: 5px;
+}
+
+.blueprint-preview-controls button {
+  margin-left: auto;
+}
+
+.blueprint-preview {
+  margin-top: 13px;
+}
+
+.blueprint-preview > div {
+  flex-wrap: wrap;
+}
+
+.blueprint-preview > div > span {
+  display: grid;
+  min-width: 72px;
+  gap: 3px;
+}
+
+.blueprint-preview strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.blueprint-preview p {
+  margin: 9px 0 0;
+  color: #aab5c3;
+  font-size: 9px;
+}
+
+.blueprint-error {
+  margin-top: 12px;
+}
+
+.blueprint-empty {
+  display: grid;
+  min-height: 420px;
+  place-items: center;
+  color: var(--muted);
+  font-size: 10px;
+}
+
 .mining-policy-editor {
   display: grid;
   grid-template-columns: 190px minmax(0, 1fr);
@@ -1895,6 +2101,31 @@ button.danger {
 }
 
 @media (max-width: 700px) {
+  .blueprint-library {
+    grid-template-columns: 1fr;
+  }
+
+  .blueprint-library > aside {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .blueprint-list {
+    max-height: 150px;
+  }
+
+  .blueprint-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .blueprint-preview-controls {
+    flex-wrap: wrap;
+  }
+
+  .blueprint-preview-controls button {
+    margin-left: 0;
+  }
+
   .mining-policy-editor {
     grid-template-columns: 1fr;
   }

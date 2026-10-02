@@ -9,6 +9,8 @@ contextBridge.exposeInMainWorld('mineprompt', Object.freeze({
   ...createIpcRequests((channel, ...args) => ipcRenderer.invoke(channel, ...args)),
   checkForUpdate: () => ipcRenderer.invoke('mineprompt:check-for-update'),
   openReleases: () => ipcRenderer.invoke('mineprompt:open-releases'),
+  importBlueprint: (options) => ipcRenderer.invoke('mineprompt:import-blueprint', options),
+  removeBlueprint: (request) => ipcRenderer.invoke('mineprompt:remove-blueprint', request),
   exportDiagnostics: () => ipcRenderer.invoke('mineprompt:export-diagnostics'),
   on: (channel, callback) => {
     if (!eventChannels.has(channel) || typeof callback !== 'function') return () => {};

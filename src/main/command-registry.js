@@ -17,7 +17,8 @@ function commandDescriptor(command) {
     requiresConnection: Boolean(command.requires?.entity),
     toolName: `command_${command.command.replaceAll('-', '_')}`,
     risk: dangerous ? 'dangerous' : command.risk || (command.capability ? 'standard' : 'restricted'),
-    approval: command.approval || (dangerous ? 'recommended' : 'none')
+    approval: command.approval || (dangerous ? 'recommended' : 'none'),
+    agentVisible: command.agent !== false
   };
 }
 
@@ -143,6 +144,7 @@ class CommandRegistry {
     if (command.approval !== undefined && !['none', 'recommended', 'required'].includes(command.approval)) {
       throw new TypeError(`Command ${command.command} has an invalid approval policy.`);
     }
+    if (command.agent !== undefined && typeof command.agent !== 'boolean') throw new TypeError(`Command ${command.command} has an invalid agent visibility policy.`);
   }
 
   getCommand(name) {

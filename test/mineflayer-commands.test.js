@@ -15,6 +15,7 @@ const consistentMine = require('../commands/mineflayer/world/consistentmine');
 const mine = require('../commands/mineflayer/world/mine');
 const stashCommand = require('../commands/mineflayer/world/stash');
 const storageCommand = require('../commands/mineflayer/world/storage');
+const buildCommand = require('../commands/global/build');
 
 function sender() {
   const replies = [];
@@ -238,4 +239,35 @@ test('registers, scans, and queries storage through one terminal service', async
   await storageCommand.execute(found.value, 'storage', ['find', 'stone', 'main', '32'], { bot: { entity: {} }, storage });
   assert.deepEqual(calls[2], ['find', 'stone', { zone: 'main', minimum: '32' }]);
   assert.match(found.replies[0], /64 x Stone/u);
+});
+
+test('imports and previews blueprints through the shared build service', async () => {
+  const calls = [];
+  const blueprints = {
+    importFile: async (file, options) => {
+      calls.push(['import', file, options]);
+      return { id: 'house', name: 'House', version: '1.21.11', dimensions: { x: 4, y: 5, z: 6 }, materialCount: 80 };
+    },
+    preview: async (reference, options) => {
+      calls.push(['preview', reference, options]);
+      return {
+        blueprint: { name: 'House' },
+        warnings: [],
+        counts: { correct: 1, placeable: 2, replaceable: 3, conflicting: 4, temporarilyObstructed: 5, unknown: 6, unsupported: 7 },
+        requirements: [],
+        removals: []
+      };
+    }
+  };
+  const imported = sender();
+  await buildCommand.execute(imported.value, 'build', ['import', 'house.schematic', '--version', '1.12.2', '--name', 'House'], { blueprints });
+  assert.deepEqual(calls[0], ['import', 'house.schematic', { policy: {}, version: '1.12.2', name: 'House' }]);
+  assert.match(imported.replies[0], /Imported House/u);
+  const previewed = sender();
+  await buildCommand.execute(previewed.value, 'build', ['preview', 'house', '--at', '10', '64', '-3', '--rotate', '90', '--mirror', 'x'], { bot: { entity: {} }, blueprints });
+  assert.equal(calls[1][0], 'preview');
+  assert.deepEqual(calls[1][2].anchor, { x: 10, y: 64, z: -3 });
+  assert.equal(calls[1][2].rotation, 90);
+  assert.equal(calls[1][2].mirror, 'x');
+  assert.match(previewed.replies[0], /4 conflicts/u);
 });

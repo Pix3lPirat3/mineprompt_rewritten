@@ -6,6 +6,7 @@ const { installMining } = require('./mining-plugin');
 const { installTrees } = require('./tree-plugin');
 const { installInventory } = require('./inventory-plugin');
 const { installStorage } = require('./storage-plugin');
+const { installBuilder } = require('./builder-plugin');
 const { installInteractions } = require('./interactions-plugin');
 
 function installToolkit(bot, options = {}) {
@@ -15,8 +16,9 @@ function installToolkit(bot, options = {}) {
   const trees = options.trees === false ? null : installTrees(bot, { ...options.trees, mining });
   const inventory = options.inventory === false ? null : installInventory(bot, { ...options.inventory, mining });
   const storage = options.storage === false ? null : installStorage(bot, options.storage);
+  const builder = options.builder === false ? null : installBuilder(bot, options.builder);
   const interactions = options.interactions === false ? null : installInteractions(bot, { ...options.interactions, mining, trees, inventory });
-  return { runtime, navigation, mining, trees, inventory, storage, interactions };
+  return { runtime, navigation, mining, trees, inventory, storage, builder, interactions };
 }
 
 function toolkitPlugin(options = {}) {

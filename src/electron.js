@@ -108,6 +108,25 @@ function registerIpc() {
   for (const request of IPC_REQUESTS) ipcMain.handle(request.channel, guard((...args) => runtime[request.method](...args)));
   ipcMain.handle('mineprompt:check-for-update', guard(() => checkForUpdate()));
   ipcMain.handle('mineprompt:open-releases', guard(() => openExternal(RELEASES_URL)));
+  ipcMain.handle('mineprompt:import-blueprint', guard(async (options = {}) => {
+    const result = await dialog.showOpenDialog(mainWindow, {
+      title: 'Import Minecraft blueprint',
+      properties: ['openFile'],
+      filters: [
+        { name: 'Minecraft schematics', extensions: ['schem', 'schematic'] },
+        { name: 'All files', extensions: ['*'] }
+      ]
+    });
+    if (result.canceled || result.filePaths.length !== 1) return { ok: false, canceled: true };
+    return runtime.blueprintImport({
+      sessionId: options.sessionId,
+      file: result.filePaths[0],
+      edition: options.edition,
+      version: options.version,
+      name: options.name
+    });
+  }));
+  ipcMain.handle('mineprompt:remove-blueprint', guard((request = {}) => runtime.blueprintRemove(request)));
   ipcMain.handle('mineprompt:export-diagnostics', guard(async () => {
     const result = await dialog.showSaveDialog(mainWindow, {
       title: 'Export MinePrompt diagnostics',
