@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     outputs:
       tag: ${{ steps.metadata.outputs.tag }}
@@ -67,7 +67,7 @@ jobs:
           - target: macos-arm64
             os: macos-15
           - target: linux-x64
-            os: ubuntu-latest
+            os: ubuntu-24.04
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -97,7 +97,7 @@ jobs:
 
   publish:
     needs: [validate, build]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     permissions:
       actions: write
