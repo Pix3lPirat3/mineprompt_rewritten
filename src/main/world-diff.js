@@ -74,7 +74,7 @@ function publicCounts(counts) {
   return Object.fromEntries(Object.entries(counts));
 }
 
-async function diffBlueprint(bot, blueprint, request = {}) {
+async function analyzeBlueprint(bot, blueprint, request = {}, options = {}) {
   if (!bot?.entity) throw new Error('An active connection is required for a world preview.');
   const anchor = normalizeAnchor(request.anchor || request.at);
   const policy = normalizeBuildPolicy(request.policy);
@@ -93,33 +93,42 @@ async function diffBlueprint(bot, blueprint, request = {}) {
   const removals = new Map();
   const occupied = entityPositions(bot);
   const stateCache = new Map();
+  const records = options.records === true ? [] : null;
   let replacements = 0;
   for (let index = 0; index < transformed.blocks.length; index += 1) {
     if (index && index % 4096 === 0) await yieldEventLoop();
-    const entry = transformed.palette[transformed.blocks[index]];
+    const paletteIndex = transformed.blocks[index];
+    const entry = transformed.palette[paletteIndex];
     const local = positionFromIndex(index, transformed.dimensions);
     const position = targetPosition(anchor, transformed.offset, local);
     const expectedAir = entry.air || isAirState(entry.state);
     const block = bot.blockAt(new Vec3(position.x, position.y, position.z));
     const record = { position, expected: entry.state, current: blockStateFromWorld(block, stateCache) };
+    const collect = (kind) => {
+      if (records) records.push({ index, paletteIndex, kind, local, position: { ...position }, expected: entry.state, current: record.current, blockName: block?.name || null, entry });
+    };
     if (!block) {
       counts.unknown += 1;
       addSample(samples, 'unknown', record);
+      collect('unknown');
       continue;
     }
     if (blocksMatch(entry, block, sameVersion, stateCache)) {
       counts.correct += 1;
       addSample(samples, 'correct', record);
+      collect('correct');
       continue;
     }
     if (expectedAir && policy.air === 'ignore') {
       counts.ignoredAir += 1;
       addSample(samples, 'ignoredAir', record);
+      collect('ignoredAir');
       continue;
     }
     if (!expectedAir && !entrySupportedByRegistry(bot, entry)) {
       counts.unsupported += 1;
       addSample(samples, 'unsupported', record);
+      collect('unsupported');
       continue;
     }
     const currentAir = REPLACEABLE_BLOCKS.has(block.name) && ['air', 'cave_air', 'void_air'].includes(block.name);
@@ -128,9 +137,11 @@ async function diffBlueprint(bot, blueprint, request = {}) {
       if (occupied.has(key)) {
         counts.temporarilyObstructed += 1;
         addSample(samples, 'temporarilyObstructed', record);
+        collect('temporarilyObstructed');
       } else {
         counts.placeable += 1;
         addSample(samples, 'placeable', record);
+        collect('placeable');
       }
       if (entry.item) addCount(requirements, entry.item);
       continue;
@@ -144,9 +155,11 @@ async function diffBlueprint(bot, blueprint, request = {}) {
       addCount(removals, block.name);
       if (!expectedAir && entry.item) addCount(requirements, entry.item);
       addSample(samples, 'replaceable', record);
+      collect('replaceable');
     } else {
       counts.conflicting += 1;
       addSample(samples, 'conflicting', record);
+      collect('conflicting');
     }
   }
   const inventory = inventoryItemCounts(bot);
@@ -164,8 +177,17 @@ async function diffBlueprint(bot, blueprint, request = {}) {
     requirements: requirementList.sort((left, right) => right.count - left.count || left.name.localeCompare(right.name)),
     missing: requirementList.filter((entry) => entry.missing > 0).sort((left, right) => right.missing - left.missing || left.name.localeCompare(right.name)),
     removals: [...removals.entries()].map(([name, count]) => ({ name, count })).sort((left, right) => right.count - left.count || left.name.localeCompare(right.name)),
-    samples
+    samples,
+    transformed,
+    records
   };
 }
 
-module.exports = { REPLACEABLE_BLOCKS, SAMPLE_LIMIT, blockStateFromWorld, blocksMatch, diffBlueprint, entityPositions, entrySupportedByRegistry, inventoryItemCounts, normalizeAnchor, targetPosition };
+async function diffBlueprint(bot, blueprint, request = {}) {
+  const result = await analyzeBlueprint(bot, blueprint, request);
+  delete result.transformed;
+  delete result.records;
+  return result;
+}
+
+module.exports = { REPLACEABLE_BLOCKS, SAMPLE_LIMIT, analyzeBlueprint, blockStateFromWorld, blocksMatch, diffBlueprint, entityPositions, entrySupportedByRegistry, inventoryItemCounts, normalizeAnchor, targetPosition };

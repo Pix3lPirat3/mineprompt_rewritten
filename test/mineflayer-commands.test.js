@@ -290,6 +290,10 @@ test('imports and previews blueprints through the shared build service', async (
         requirements: [],
         removals: []
       };
+    },
+    plan: async (reference, options) => {
+      calls.push(['plan', reference, options]);
+      return { preview: { blueprint: { name: 'House' } }, graph: { counts: { operations: 12, groups: 1, blocked: 0 } }, stances: { counts: { stances: 3 }, estimatedTravel: 8.5 } };
     }
   };
   const imported = sender();
@@ -303,4 +307,8 @@ test('imports and previews blueprints through the shared build service', async (
   assert.equal(calls[1][2].rotation, 90);
   assert.equal(calls[1][2].mirror, 'x');
   assert.match(previewed.replies[0], /4 conflicts/u);
+  const planned = sender();
+  await buildCommand.execute(planned.value, 'build', ['plan', 'house', '--at', '10', '64', '-3'], { bot: { entity: {} }, blueprints });
+  assert.equal(calls[2][0], 'plan');
+  assert.match(planned.replies[0], /12 operations/u);
 });

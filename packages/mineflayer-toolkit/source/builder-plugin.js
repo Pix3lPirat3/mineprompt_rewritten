@@ -52,9 +52,10 @@ function installBuilder(bot, options = {}) {
     inspect: (reference) => service.inspect(reference),
     materials: (reference) => service.materials(reference),
     preview: (reference, request) => service.preview(reference, request),
+    plan: (reference, request) => service.plan(reference, request),
     snapshot: () => service.snapshot()
   });
-  return registerCapability(runtime, 'builder', api, 'Version-declared blueprint inspection, transforms, material bills, and read-only world diffs.', [
+  return registerCapability(runtime, 'builder', api, 'Version-declared blueprint inspection, transforms, material bills, world diffs, dependency graphs, and safe stance plans.', [
     {
       id: 'builder.list',
       title: 'List blueprints',
@@ -86,6 +87,14 @@ function installBuilder(bot, options = {}) {
       risk: 'read',
       inputSchema: { type: 'object', additionalProperties: true },
       execute: ({ request }) => api.preview(request.blueprint, request)
+    },
+    {
+      id: 'builder.plan',
+      title: 'Compile a blueprint placement plan',
+      capability: 'builder',
+      risk: 'read',
+      inputSchema: { type: 'object', additionalProperties: true },
+      execute: ({ request }) => api.plan(request.blueprint, request)
     }
   ]);
 }

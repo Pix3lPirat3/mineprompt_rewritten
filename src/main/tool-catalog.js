@@ -254,7 +254,7 @@ class ToolCatalog {
     }));
     this.register(tool('mineprompt_blueprints', 'List and inspect imported version-declared blueprints, read their material bills, or compare a transformed blueprint with the loaded world. Import and removal remain local application operations.', Type.Object({
       sessionId: SessionId,
-      action: Type.Union(['list', 'inspect', 'materials', 'preview', 'conflicts', 'requirements'].map((value) => Type.Literal(value))),
+        action: Type.Union(['list', 'inspect', 'materials', 'preview', 'conflicts', 'requirements', 'plan'].map((value) => Type.Literal(value))),
       blueprint: Type.Optional(Type.String({ minLength: 1, maxLength: 128 })),
       anchor: Type.Optional(Position),
       rotation: Type.Optional(Type.Union([0, 90, 180, 270].map((value) => Type.Literal(value)))),

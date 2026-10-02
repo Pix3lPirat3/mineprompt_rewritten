@@ -51,8 +51,8 @@ function blueprintReferences(blueprints) {
 module.exports = {
   command: 'build',
   aliases: ['blueprint'],
-  usage: 'build <import <file> --version <version>|list|inspect <blueprint>|materials <blueprint>|remove <blueprint> --confirm|preview <blueprint> --at x y z [--rotate 90] [--mirror x]|conflicts|requirements>',
-  description: 'Import, inspect, transform, and compare version-declared schematics.',
+  usage: 'build <import <file> --version <version>|list|inspect <blueprint>|materials <blueprint>|remove <blueprint> --confirm|preview <blueprint> --at x y z [--rotate 90] [--mirror x]|conflicts|requirements|plan>',
+  description: 'Import, inspect, compare, and compile dependency-aware plans for version-declared schematics.',
   capability: 'world',
   risk: 'dangerous',
   approval: 'recommended',
@@ -60,8 +60,8 @@ module.exports = {
   agent: false,
 
   autocomplete(command, args, { blueprints }, completion = {}) {
-    if (!args.length || args.length === 1 && !completion.trailingSpace) return ['import', 'list', 'inspect', 'materials', 'remove', 'preview', 'conflicts', 'requirements'];
-    if (['inspect', 'materials', 'remove', 'preview', 'conflicts', 'requirements'].includes(args[0]?.toLowerCase()) && (args.length === 1 || args.length === 2 && !completion.trailingSpace)) return blueprintReferences(blueprints);
+    if (!args.length || args.length === 1 && !completion.trailingSpace) return ['import', 'list', 'inspect', 'materials', 'remove', 'preview', 'conflicts', 'requirements', 'plan'];
+    if (['inspect', 'materials', 'remove', 'preview', 'conflicts', 'requirements', 'plan'].includes(args[0]?.toLowerCase()) && (args.length === 1 || args.length === 2 && !completion.trailingSpace)) return blueprintReferences(blueprints);
     const previous = args.at(-2);
     if (previous === '--rotate') return ['0', '90', '180', '270'];
     if (previous === '--mirror') return ['none', 'x', 'z'];
@@ -102,9 +102,13 @@ module.exports = {
         await blueprints.remove(parsed.positional[0]);
         return sender.reply(`[Build] Removed ${parsed.positional[0]}.`);
       }
-      if (['preview', 'conflicts', 'requirements'].includes(action)) {
+      if (['preview', 'conflicts', 'requirements', 'plan'].includes(action)) {
         if (!bot?.entity) throw new Error('An active connection is required for a world preview.');
         if (parsed.positional.length !== 1 || !parsed.options.anchor) throw new Error(`Usage: ${this.usage}`);
+        if (action === 'plan') {
+          const plan = await blueprints.plan(parsed.positional[0], parsed.options);
+          return sender.reply(`[Build] ${plan.preview.blueprint.name}: ${plan.graph.counts.operations} operations, ${plan.graph.counts.groups} multi-block groups, ${plan.graph.counts.blocked} blocked, ${plan.stances.counts.stances} stances, estimated travel ${plan.stances.estimatedTravel.toFixed(1)} blocks.`);
+        }
         const preview = await blueprints.preview(parsed.positional[0], parsed.options);
         const warning = preview.warnings.length ? ` Warning: ${preview.warnings.join(' ')}` : '';
         if (action === 'conflicts') return sender.reply(`[Build] ${preview.blueprint.name}: ${preview.counts.conflicting} conflicts, ${preview.counts.replaceable} replacements, ${preview.counts.unknown} unknown blocks. Removals: ${preview.removals.map((entry) => `${entry.count} x ${entry.name}`).join(', ') || 'none'}.${warning}`);

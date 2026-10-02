@@ -371,8 +371,9 @@ class BotSession {
     if (action === 'list') return { ok: true, blueprints: this.blueprints.list() };
     if (action === 'inspect') return { ok: true, ...this.blueprints.materials(request.blueprint) };
     if (action === 'materials') return { ok: true, ...this.blueprints.materials(request.blueprint) };
-    if (action === 'preview' || action === 'conflicts' || action === 'requirements') {
-      const preview = await this.blueprints.preview(request.blueprint, request);
+      if (action === 'preview' || action === 'conflicts' || action === 'requirements' || action === 'plan') {
+        if (action === 'plan') return { ok: true, plan: await this.blueprints.plan(request.blueprint, request) };
+        const preview = await this.blueprints.preview(request.blueprint, request);
       if (action === 'conflicts') return { ok: true, blueprint: preview.blueprint, warnings: preview.warnings, counts: preview.counts, conflicts: preview.samples.conflicting, removals: preview.removals };
       if (action === 'requirements') return { ok: true, blueprint: preview.blueprint, warnings: preview.warnings, requirements: preview.requirements, missing: preview.missing };
       return { ok: true, preview };

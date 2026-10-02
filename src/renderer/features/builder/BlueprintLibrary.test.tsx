@@ -27,9 +27,11 @@ const blueprint: BlueprintSummary = {
 
 describe('blueprint library', () => {
   it('inspects materials and previews the selected blueprint', async () => {
-    const blueprintAction = vi.fn(async (request: Record<string, unknown>) => request.action === 'materials'
-      ? { ok: true, materials: [{ name: 'stone', displayName: 'Stone', count: 64 }], unsupportedBlocks: [], supportSensitiveBlocks: ['minecraft:torch'] }
-      : { ok: true, preview: { warnings: [], counts: { correct: 10, placeable: 80 }, requirements: [{ name: 'stone', count: 64, available: 64, missing: 0 }], removals: [] } });
+    const blueprintAction = vi.fn(async (request: Record<string, unknown>) => {
+      if (request.action === 'materials') return { ok: true, materials: [{ name: 'stone', displayName: 'Stone', count: 64 }], unsupportedBlocks: [], supportSensitiveBlocks: ['minecraft:torch'] };
+      if (request.action === 'plan') return { ok: true, plan: { graph: { counts: { operations: 80, removals: 0, placements: 80, blocked: 0, scaffolded: 2, groups: 0 }, cyclicCount: 0 }, stances: { counts: { stances: 4, covered: 80, blocked: 0 }, estimatedTravel: 12.5, uncoveredCount: 0 } } };
+      return { ok: true, preview: { warnings: [], counts: { correct: 10, placeable: 80 }, requirements: [{ name: 'stone', count: 64, available: 64, missing: 0 }], removals: [] } };
+    });
     const { user } = renderWithRuntime(<BlueprintLibrary close={() => {}} />, {
       api: { blueprintAction },
       snapshot: {
@@ -43,6 +45,9 @@ describe('blueprint library', () => {
     await user.click(screen.getByRole('button', { name: 'Compare with world' }));
     expect(blueprintAction).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'preview', blueprint: blueprint.id, anchor: { x: 10, y: 65, z: -4 } }));
     expect(await screen.findByText('placeable')).toBeTruthy();
+    await user.click(screen.getByRole('button', { name: 'Compile plan' }));
+    expect(blueprintAction).toHaveBeenLastCalledWith(expect.objectContaining({ action: 'plan', blueprint: blueprint.id, anchor: { x: 10, y: 65, z: -4 } }));
+    expect(await screen.findByText('need scaffold')).toBeTruthy();
   });
 
   it('uses native import selection and explicit removal confirmation', async () => {

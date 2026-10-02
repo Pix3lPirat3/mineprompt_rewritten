@@ -126,6 +126,7 @@ test('installs supplied application services as public capabilities and actions'
     inspect: () => ({ id: 'house' }),
     materials: () => ({ materials: [] }),
     preview: async () => ({ counts: {} }),
+    plan: async () => ({ graph: {} }),
     snapshot: () => ({ blueprints: [] })
   };
   const installed = installToolkit(bot, {
@@ -147,6 +148,7 @@ test('installs supplied application services as public capabilities and actions'
     'builder.inspect',
     'builder.list',
     'builder.materials',
+    'builder.plan',
     'builder.preview',
     'mining.once',
     'mining.region',

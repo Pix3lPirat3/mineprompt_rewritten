@@ -3,7 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Vec3 } = require('vec3');
-const { diffBlueprint, entrySupportedByRegistry } = require('../src/main/world-diff');
+const { analyzeBlueprint, diffBlueprint, entrySupportedByRegistry } = require('../src/main/world-diff');
 
 function worldBlock(name, x, stateId, options = {}) {
   return {
@@ -104,4 +104,20 @@ test('uses the connected bot registry for placement support', () => {
   const bot = { registry: { blocksByName: { stone: {} }, itemsByName: { stone: {} } } };
   assert.equal(entrySupportedByRegistry(bot, entry('minecraft:stone', 1)), true);
   assert.equal(entrySupportedByRegistry(bot, entry('minecraft:oak_planks', 2)), false);
+});
+
+test('collects internal compiler records without exposing them in previews', async () => {
+  const bot = {
+    version: '1.21.11',
+    entity: { id: 1, position: new Vec3(0, 64, 0) },
+    entities: {},
+    inventory: { items: () => [] },
+    blockAt: (position) => worldBlock('air', position.x, 0)
+  };
+  const analysis = await analyzeBlueprint(bot, blueprint(), { anchor: { x: 0, y: 64, z: 0 } }, { records: true });
+  assert.equal(analysis.records.length, 7);
+  assert.equal(analysis.records[0].entry.state, 'minecraft:stone');
+  const preview = await diffBlueprint(bot, blueprint(), { anchor: { x: 0, y: 64, z: 0 } });
+  assert.equal(Object.hasOwn(preview, 'records'), false);
+  assert.equal(Object.hasOwn(preview, 'transformed'), false);
 });

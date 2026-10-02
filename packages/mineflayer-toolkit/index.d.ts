@@ -272,6 +272,7 @@ export interface BuilderApi {
   inspect(reference: string): unknown;
   materials(reference: string): unknown;
   preview(reference: string, request: Record<string, unknown>): Promise<unknown>;
+  plan(reference: string, request: Record<string, unknown>): Promise<unknown>;
   snapshot(): { blueprints: BlueprintSummary[] };
 }
 

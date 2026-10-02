@@ -20,6 +20,11 @@ interface BlueprintPreview {
   removals: Array<{ name: string; count: number }>;
 }
 
+interface BlueprintPlan {
+  graph: { counts: { operations: number; removals: number; placements: number; blocked: number; scaffolded: number; groups: number }; cyclicCount: number };
+  stances: { counts: { stances: number; covered: number; blocked: number }; estimatedTravel: number; uncoveredCount: number };
+}
+
 function message(error: unknown) {
   return String(error instanceof Error ? error.message : error).replace(/^Error invoking remote method '[^']+': Error: /u, '');
 }
@@ -40,6 +45,7 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
   const selected = useMemo(() => blueprints.find((entry) => entry.id === selectedId) || blueprints[0] || null, [blueprints, selectedId]);
   const [details, setDetails] = useState<BlueprintDetails | null>(null);
   const [preview, setPreview] = useState<BlueprintPreview | null>(null);
+  const [plan, setPlan] = useState<BlueprintPlan | null>(null);
   const [version, setVersion] = useState('');
   const [name, setName] = useState('');
   const initialPosition = positionDefaults(runtime.state.position);
@@ -53,6 +59,7 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
   useEffect(() => {
     setDetails(null);
     setPreview(null);
+    setPlan(null);
     setPendingRemove('');
   }, [selected?.id]);
 
@@ -135,6 +142,27 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
     }
   };
 
+  const planBlueprint = async () => {
+    if (!selected) return;
+    setBusy(true);
+    setError('');
+    try {
+      const result = await window.mineprompt.blueprintAction({
+        sessionId: runtime.selectedSessionId,
+        action: 'plan',
+        blueprint: selected.id,
+        anchor,
+        rotation,
+        mirror
+      });
+      setPlan(result.plan as BlueprintPlan);
+    } catch (caught) {
+      setError(message(caught));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <Modal eyebrow="Build" title="Blueprint library" close={close}>
       <div className="blueprint-library">
@@ -187,12 +215,25 @@ export function BlueprintLibrary({ close }: BlueprintLibraryProps) {
                 <label><span>Rotation</span><select value={rotation} onChange={(event) => setRotation(Number(event.target.value))}><option value="0">0</option><option value="90">90</option><option value="180">180</option><option value="270">270</option></select></label>
                 <label><span>Mirror</span><select value={mirror} onChange={(event) => setMirror(event.target.value)}><option value="none">None</option><option value="x">X</option><option value="z">Z</option></select></label>
                 <button className="primary" type="button" disabled={busy || runtime.state.status !== 'online'} onClick={() => void previewBlueprint()}>Compare with world</button>
+                <button type="button" disabled={busy || runtime.state.status !== 'online'} onClick={() => void planBlueprint()}>Compile plan</button>
               </section>
               {preview ? (
                 <section className="blueprint-preview">
                   <div>{Object.entries(preview.counts).map(([label, value]) => <span key={label}><strong>{value.toLocaleString()}</strong>{label.replace(/[A-Z]/gu, (letter) => ` ${letter.toLowerCase()}`)}</span>)}</div>
                   {preview.warnings.map((warning) => <p className="form-error" key={warning}>{warning}</p>)}
                   {preview.requirements.length ? <p>{preview.requirements.filter((entry) => entry.missing > 0).map((entry) => `${entry.missing} ${entry.name}`).join(', ') || 'All required materials are in inventory'}</p> : null}
+                </section>
+              ) : null}
+              {plan ? (
+                <section className="blueprint-preview">
+                  <div>
+                    <span><strong>{plan.graph.counts.operations.toLocaleString()}</strong>operations</span>
+                    <span><strong>{plan.graph.counts.blocked.toLocaleString()}</strong>blocked</span>
+                    <span><strong>{plan.graph.counts.scaffolded.toLocaleString()}</strong>need scaffold</span>
+                    <span><strong>{plan.stances.counts.stances.toLocaleString()}</strong>stances</span>
+                    <span><strong>{plan.stances.estimatedTravel.toFixed(1)}</strong>travel</span>
+                  </div>
+                  {plan.graph.cyclicCount || plan.stances.uncoveredCount ? <p className="form-error">{plan.graph.cyclicCount} cyclic operations, {plan.stances.uncoveredCount} without a safe stance</p> : null}
                 </section>
               ) : null}
             </>
