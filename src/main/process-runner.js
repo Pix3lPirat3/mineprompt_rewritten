@@ -35,7 +35,10 @@ function runProcess(command, args = [], options = {}) {
     const append = (current, chunk) => {
       const next = current + chunk;
       if (next.length <= maximumOutput) return next;
-      overflow = true;
+      if (!overflow) {
+        overflow = true;
+        terminateOwnedProcess(child);
+      }
       return next.slice(-maximumOutput);
     };
     child.stdout.on('data', (chunk) => { stdout = append(stdout, String(chunk)); options.onOutput?.('stdout', String(chunk)); });

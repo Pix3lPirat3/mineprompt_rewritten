@@ -11,5 +11,8 @@ test('captures hidden child output without a command shell', async () => {
 });
 
 test('bounds child output', async () => {
-  await assert.rejects(runProcess(process.execPath, ['-e', "process.stdout.write('x'.repeat(4096))"], { maximumOutput: 1024 }), /too much output/u);
+  await assert.rejects(
+    runProcess(process.execPath, ['-e', "setInterval(() => process.stdout.write('x'.repeat(4096)), 1)"], { maximumOutput: 1024, timeout: 5000 }),
+    /too much output/u
+  );
 });
