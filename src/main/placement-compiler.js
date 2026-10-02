@@ -1,8 +1,8 @@
 'use strict';
 
 const { Vec3 } = require('vec3');
-const { isAirState, parseBlockState } = require('./blueprint-model');
-const { directionalLook, multiblockLook, placementMode } = require('./placement-strategy');
+const { blockStateString, isAirState, parseBlockState } = require('./blueprint-model');
+const { directionalLook, multiblockLook, pairedContainerLook, placementMode } = require('./placement-strategy');
 const { PriorityQueue } = require('./priority-queue');
 
 const MAX_PLACEMENT_OPERATIONS = 1048576;
@@ -11,6 +11,8 @@ const MAX_STANCES = 4096;
 const PLAN_SAMPLE_LIMIT = 128;
 const MAX_SCAFFOLD_HEIGHT = 64;
 const MAX_SCAFFOLD_BLOCKS = 8192;
+const MAX_ORIENTATION_YAW_ERROR = Math.PI / 9;
+const MAX_ORIENTATION_PITCH_ERROR = Math.PI / 6;
 const PASSABLE_BLOCKS = new Set(['air', 'cave_air', 'void_air', 'grass', 'short_grass', 'tall_grass', 'fern', 'large_fern', 'dead_bush', 'snow', 'vine']);
 const HAZARD_BLOCKS = new Set(['lava', 'fire', 'soul_fire', 'cactus', 'magma_block', 'campfire', 'soul_campfire', 'sweet_berry_bush', 'powder_snow']);
 const GRAVITY_BLOCKS = /(?:sand|gravel|concrete_powder|anvil|dragon_egg|scaffolding)$/u;
@@ -142,9 +144,9 @@ function placementInstruction(operation, support, rule) {
     clickedFace: face,
     cursor,
     facing: facing ? { ...facing } : null,
-    look: directionalLook(parsed) || multiblockLook(parsed),
+    look: directionalLook(parsed) || multiblockLook(parsed) || pairedContainerLook(parsed),
     rotation: parsed.properties.rotation === undefined ? null : Number(parsed.properties.rotation),
-    sneak: false,
+    sneak: !operation.groupId?.startsWith('container:'),
     supportKind: rule.kind,
     mode,
     stateProperties: { ...parsed.properties },
@@ -156,6 +158,8 @@ function groupOrder(operation) {
   const properties = parseBlockState(operation.expected).properties;
   if (properties.half === 'lower' || properties.part === 'foot') return 0;
   if (properties.half === 'upper' || properties.part === 'head') return 1;
+  if (properties.type === 'right') return 0;
+  if (properties.type === 'left') return 1;
   return 2;
 }
 
@@ -183,6 +187,36 @@ function validateGeneratedGroup(group) {
     return Boolean(facing && head.position.x === foot.position.x + facing.x && head.position.y === foot.position.y && head.position.z === foot.position.z + facing.z);
   }
   return true;
+}
+
+function validateContainerGroup(group) {
+  if (group.length !== 2) return false;
+  const left = group.find((operation) => parseBlockState(operation.expected).properties.type === 'left');
+  const right = group.find((operation) => parseBlockState(operation.expected).properties.type === 'right');
+  if (!left || !right || comparableState(left, 'type') !== comparableState(right, 'type')) return false;
+  const parsed = parseBlockState(left.expected);
+  const facing = DIRECTIONS[parsed.properties.facing];
+  const offset = facing ? { x: -facing.z, z: facing.x } : null;
+  return Boolean(['chest', 'trapped_chest'].includes(parsed.name) && offset && right.position.x === left.position.x + offset.x && right.position.y === left.position.y && right.position.z === left.position.z + offset.z);
+}
+
+function singleContainerState(operation) {
+  const parsed = parseBlockState(operation.expected);
+  return blockStateString({ ...parsed, properties: { ...parsed.properties, type: 'single' } });
+}
+
+function placementStep(operation, intermediateExpected = null) {
+  return {
+    id: operation.id,
+    kind: operation.kind,
+    position: { ...operation.position },
+    current: operation.current,
+    expected: operation.expected,
+    item: operation.item,
+    dependencies: [...operation.dependencies],
+    instruction: structuredClone(operation.instruction),
+    intermediateExpected
+  };
 }
 
 function topologicalOrder(operations) {
@@ -300,7 +334,15 @@ function compilePlacementGraph(bot, analysis) {
   }
   for (const group of groups.values()) {
     const ordered = group.sort((left, right) => groupOrder(left) - groupOrder(right) || compareOperations(left, right));
-    if (!ordered[0].groupId.startsWith('container:')) {
+    if (ordered[0].groupId.startsWith('container:')) {
+      if (!validateContainerGroup(ordered)) {
+        for (const operation of ordered) operation.blocked.push({ code: 'invalid-container-pair', message: 'The paired container structure is incomplete or inconsistent.' });
+      } else {
+        const companions = ordered.map((operation) => ({ position: { ...operation.position }, expected: operation.expected }));
+        ordered[0].companions = companions;
+        ordered[0].groupPlacements = ordered.map((operation, index) => placementStep(operation, index === 0 ? singleContainerState(operation) : null));
+      }
+    } else {
       if (!validateGeneratedGroup(ordered)) {
         for (const operation of ordered) operation.blocked.push({ code: 'invalid-multiblock', message: 'The generated multi-block structure is incomplete or inconsistent.' });
       } else {
@@ -446,6 +488,44 @@ function basicStanceSafe(bot, position) {
   return stanceCellClear(bot, position) && stanceCellClear(bot, offsetPosition(position, DIRECTIONS.up)) && safeFooting(bot, position);
 }
 
+function angularDistance(left, right) {
+  return Math.abs(Math.atan2(Math.sin(left - right), Math.cos(left - right)));
+}
+
+function placementPoint(operation) {
+  const instruction = operation.instruction;
+  if (!instruction?.supportPosition || !instruction.cursor) return null;
+  return {
+    x: instruction.supportPosition.x + instruction.cursor.x,
+    y: instruction.supportPosition.y + instruction.cursor.y,
+    z: instruction.supportPosition.z + instruction.cursor.z
+  };
+}
+
+function placementAimValid(stance, operation, reach = 4.5) {
+  const point = placementPoint(operation);
+  if (!point) return true;
+  const eye = { x: stance.x + 0.5, y: stance.y + 1.62, z: stance.z + 0.5 };
+  if (positionDistance(eye, point) > reach) return false;
+  if (!operation.instruction.look) return true;
+  const deltaX = point.x - eye.x;
+  const deltaY = point.y - eye.y;
+  const deltaZ = point.z - eye.z;
+  const yaw = Math.atan2(-deltaX, -deltaZ);
+  const pitch = Math.atan2(deltaY, Math.hypot(deltaX, deltaZ));
+  return angularDistance(yaw, operation.instruction.look.yaw) < MAX_ORIENTATION_YAW_ERROR && Math.abs(pitch - operation.instruction.look.pitch) < MAX_ORIENTATION_PITCH_ERROR;
+}
+
+function operationPlacements(operation) {
+  return Array.isArray(operation.groupPlacements) ? operation.groupPlacements : [operation];
+}
+
+function operationStanceSafe(bot, position, operation, options = {}) {
+  const reach = Math.max(1, Math.min(6, Number(options.reach) || 4.5));
+  if (!basicStanceSafe(bot, position) || !hasEscape(bot, position)) return false;
+  return operationPlacements(operation).every((placement) => placementAimValid(position, placement, reach) && lineOfSight(bot, position, placement.position));
+}
+
 function hasEscape(bot, position) {
   return [DIRECTIONS.north, DIRECTIONS.south, DIRECTIONS.west, DIRECTIONS.east].some((direction) => basicStanceSafe(bot, offsetPosition(position, direction)));
 }
@@ -479,9 +559,8 @@ function candidateStances(bot, operation, options = {}) {
         const headKey = positionKey(offsetPosition(position, DIRECTIONS.up));
         if (stanceKey === positionKey(operation.position) || headKey === positionKey(operation.position)) continue;
         const eye = { x: x + 0.5, y: y + 1.62, z: z + 0.5 };
-        const target = { x: operation.position.x + 0.5, y: operation.position.y + 0.5, z: operation.position.z + 0.5 };
-        const distance = positionDistance(eye, target);
-        if (distance > reach || !basicStanceSafe(bot, position) || !hasEscape(bot, position) || !lineOfSight(bot, position, operation.position)) continue;
+        const distance = Math.max(...operationPlacements(operation).map((placement) => positionDistance(eye, placementPoint(placement) || { x: placement.position.x + 0.5, y: placement.position.y + 0.5, z: placement.position.z + 0.5 })));
+        if (!operationStanceSafe(bot, position, operation, { reach })) continue;
         candidates.push({ key: positionKey(position), position, distance });
       }
     }
@@ -608,6 +687,8 @@ function publicPlacementPlan(analysis, graph, stancePlan) {
 
 module.exports = {
   HAZARD_BLOCKS,
+  MAX_ORIENTATION_PITCH_ERROR,
+  MAX_ORIENTATION_YAW_ERROR,
   MAX_PLACEMENT_OPERATIONS,
   MAX_STANCES,
   MAX_STANCE_OPERATIONS,
@@ -621,6 +702,9 @@ module.exports = {
   hasEscape,
   improveStanceRoute,
   lineOfSight,
+  operationStanceSafe,
+  placementAimValid,
+  placementPoint,
   placementInstruction,
   positionDistance,
   positionKey,

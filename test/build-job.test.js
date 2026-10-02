@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { cleanBuildJobs, createBuildJob, updateBuildJob } = require('../src/main/build-job');
+const { BUILD_JOB_SCHEMA_VERSION, cleanBuildJobs, createBuildJob, updateBuildJob } = require('../src/main/build-job');
 
 function jobInput() {
   return {
@@ -20,6 +20,7 @@ function jobInput() {
 
 test('creates and updates durable build jobs', () => {
   const job = createBuildJob(jobInput(), 1000);
+  assert.equal(job.schemaVersion, BUILD_JOB_SCHEMA_VERSION);
   assert.match(job.id, /^[a-f0-9-]{36}$/u);
   assert.deepEqual(job.server, { host: 'example.test', port: 25565 });
   assert.equal(job.dimension, 'minecraft:overworld');
@@ -29,6 +30,7 @@ test('creates and updates durable build jobs', () => {
     status: 'running',
     completedCount: 2,
     completedSamples: [{ x: 10, y: 64, z: -5 }],
+    temporaryBlocks: [{ position: { x: 11, y: 64, z: -5 }, intermediate: 'minecraft:chest[type=single,facing=north]', expected: 'minecraft:chest[type=left,facing=north]' }],
     metrics: { attempts: 2, verified: 2, travel: 4.5, startedAt: 1050 }
   }, 1100);
   assert.equal(updated.id, job.id);
@@ -36,12 +38,14 @@ test('creates and updates durable build jobs', () => {
   assert.equal(updated.updatedAt, 1100);
   assert.equal(updated.completedCount, 2);
   assert.equal(updated.metrics.travel, 4.5);
+  assert.deepEqual(updated.temporaryBlocks, [{ position: { x: 11, y: 64, z: -5 }, intermediate: 'minecraft:chest[facing=north,type=single]', expected: 'minecraft:chest[facing=north,type=left]' }]);
 });
 
 test('drops invalid persisted jobs without migration', () => {
   const first = createBuildJob(jobInput(), 1000);
   const second = createBuildJob({ ...jobInput(), blueprintHash: 'b'.repeat(64) }, 2000);
-  const jobs = cleanBuildJobs([first, { id: 'broken' }, second, first]);
+  const legacy = { ...first, schemaVersion: 1, id: '11111111-1111-4111-8111-111111111111' };
+  const jobs = cleanBuildJobs([first, { id: 'broken' }, legacy, second, first]);
   assert.deepEqual(jobs.map((job) => job.id), [second.id, first.id]);
 });
 

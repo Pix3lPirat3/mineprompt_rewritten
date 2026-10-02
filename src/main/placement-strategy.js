@@ -1,7 +1,7 @@
 'use strict';
 
 const FACE_DETERMINED_WALL_BLOCKS = /(?:wall_torch|ladder|button|lever|tripwire_hook|wall_sign|wall_hanging_sign|wall_banner)$/u;
-const EXECUTABLE_PLACEMENT_MODES = new Set(['simple', 'gravity', 'scaffold', 'axis', 'slab', 'wall-attached', 'directional', 'multiblock']);
+const EXECUTABLE_PLACEMENT_MODES = new Set(['simple', 'gravity', 'scaffold', 'axis', 'slab', 'wall-attached', 'directional', 'multiblock', 'paired-container']);
 const TOWARD_YAW = Object.freeze({ south: 0, east: Math.PI / 2, north: Math.PI, west: -Math.PI / 2 });
 const AWAY_YAW = Object.freeze({ north: 0, west: Math.PI / 2, south: Math.PI, east: -Math.PI / 2 });
 
@@ -30,8 +30,15 @@ function multiblockLook(parsed) {
   return null;
 }
 
+function pairedContainerLook(parsed) {
+  const properties = parsed.properties;
+  if (!['chest', 'trapped_chest'].includes(parsed.name) || !['left', 'right'].includes(properties.type) || properties.waterlogged === 'true') return null;
+  return Object.hasOwn(TOWARD_YAW, properties.facing) ? { yaw: TOWARD_YAW[properties.facing], pitch: 0 } : null;
+}
+
 function placementMode(parsed, supportKind, groupId) {
-  if (groupId && !groupId.startsWith('container:')) return multiblockLook(parsed) ? 'multiblock' : 'multiblock-unsupported';
+  if (groupId?.startsWith('container:')) return pairedContainerLook(parsed) ? 'paired-container' : 'container-unsupported';
+  if (groupId) return multiblockLook(parsed) ? 'multiblock' : 'multiblock-unsupported';
   if (supportKind === 'wall') return parsed.properties.facing && FACE_DETERMINED_WALL_BLOCKS.test(parsed.name) ? 'wall-attached' : 'attached';
   if (supportKind === 'ceiling' || supportKind === 'floor') return 'attached';
   if (supportKind === 'gravity' || supportKind === 'scaffold' || supportKind === 'axis' || supportKind === 'slab') return supportKind;
@@ -49,5 +56,6 @@ module.exports = {
   directionalLook,
   executablePlacementMode,
   multiblockLook,
+  pairedContainerLook,
   placementMode
 };

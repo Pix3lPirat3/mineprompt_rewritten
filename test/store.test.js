@@ -5,6 +5,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs/promises');
 const os = require('node:os');
 const path = require('node:path');
+const { createBuildJob } = require('../src/main/build-job');
 const { Store, cleanData } = require('../src/main/store');
 
 test('normalizes persisted data', () => {
@@ -170,7 +171,7 @@ test('persists and removes durable build jobs', async (context) => {
   context.after(() => fs.rm(directory, { recursive: true, force: true }));
   const file = path.join(directory, 'data.json');
   const store = await new Store(file).init();
-  const input = {
+  const input = createBuildJob({
     id: '12345678-1234-4123-8123-123456789abc',
     blueprintHash: 'c'.repeat(64),
     blueprintName: 'Workshop',
@@ -178,8 +179,9 @@ test('persists and removes durable build jobs', async (context) => {
     dimension: 'overworld',
     anchor: { x: 1, y: 64, z: 2 },
     operationCount: 8,
-    completedCount: 3
-  };
+    completedCount: 3,
+    temporaryBlocks: [{ position: { x: 2, y: 64, z: 2 }, intermediate: 'minecraft:chest[type=single,facing=north]', expected: 'minecraft:chest[type=right,facing=north]' }]
+  });
   const saved = await store.saveBuildJob(input);
   await store.close();
   const restored = await new Store(file).init();

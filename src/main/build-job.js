@@ -1,12 +1,13 @@
 'use strict';
 
 const crypto = require('node:crypto');
-const { normalizeMirror, normalizeRotation } = require('./blueprint-model');
+const { blockStateString, normalizeMirror, normalizeRotation } = require('./blueprint-model');
 const { normalizeBuildPolicy } = require('./build-policy');
 const { normalizeDimension, normalizePosition, normalizeServer } = require('./storage-model');
 
 const MAX_BUILD_JOBS = 100;
 const MAX_BUILD_JOB_SAMPLES = 4096;
+const BUILD_JOB_SCHEMA_VERSION = 2;
 const BUILD_JOB_STATUSES = Object.freeze(['planned', 'running', 'paused', 'complete', 'failed', 'stopped']);
 
 function boundedInteger(value, fallback = 0) {
@@ -30,8 +31,19 @@ function cleanUnresolvedSamples(value) {
   });
 }
 
+function cleanTemporaryBlocks(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(-MAX_BUILD_JOB_SAMPLES).map((entry) => {
+    if (typeof entry?.intermediate !== 'string' || typeof entry?.expected !== 'string') throw new Error('Temporary build blocks require exact intermediate and expected states.');
+    const intermediate = blockStateString(entry.intermediate);
+    const expected = blockStateString(entry.expected);
+    return { position: normalizePosition(entry.position, 'Temporary build position'), intermediate, expected };
+  });
+}
+
 function cleanBuildJob(input, options = {}) {
   if (!input || typeof input !== 'object') throw new Error('A build job is required.');
+  if (input.schemaVersion !== BUILD_JOB_SCHEMA_VERSION) throw new Error('The build job schema is unsupported.');
   const now = Number.isFinite(Number(options.now)) ? Number(options.now) : Date.now();
   const id = String(input.id || '').trim().toLowerCase();
   const blueprintHash = String(input.blueprintHash || '').trim().toLowerCase();
@@ -47,7 +59,7 @@ function cleanBuildJob(input, options = {}) {
   const metrics = input.metrics && typeof input.metrics === 'object' ? input.metrics : {};
   const travel = Number(metrics.travel);
   return {
-    schemaVersion: 1,
+    schemaVersion: BUILD_JOB_SCHEMA_VERSION,
     id,
     owner: String(input.owner || '').trim().slice(0, 128),
     blueprintHash,
@@ -68,6 +80,7 @@ function cleanBuildJob(input, options = {}) {
     completedSamples: cleanPositionSamples(input.completedSamples),
     unresolvedSamples: cleanUnresolvedSamples(input.unresolvedSamples),
     temporaryScaffolds: cleanPositionSamples(input.temporaryScaffolds),
+    temporaryBlocks: cleanTemporaryBlocks(input.temporaryBlocks),
     latestError: input.latestError ? String(input.latestError).slice(0, 1024) : null,
     metrics: {
       attempts: boundedInteger(metrics.attempts),
@@ -83,7 +96,7 @@ function cleanBuildJob(input, options = {}) {
 }
 
 function createBuildJob(input, now = Date.now()) {
-  return cleanBuildJob({ ...input, id: input?.id || crypto.randomUUID(), status: input?.status || 'planned', createdAt: now }, { now });
+  return cleanBuildJob({ ...input, schemaVersion: BUILD_JOB_SCHEMA_VERSION, id: input?.id || crypto.randomUUID(), status: input?.status || 'planned', createdAt: now }, { now });
 }
 
 function cleanBuildJobs(value) {
@@ -105,4 +118,4 @@ function updateBuildJob(job, patch, now = Date.now()) {
   return cleanBuildJob({ ...job, ...patch, metrics: { ...job.metrics, ...patch?.metrics }, id: job.id, blueprintHash: job.blueprintHash, createdAt: job.createdAt }, { now });
 }
 
-module.exports = { BUILD_JOB_STATUSES, MAX_BUILD_JOBS, MAX_BUILD_JOB_SAMPLES, cleanBuildJob, cleanBuildJobs, createBuildJob, updateBuildJob };
+module.exports = { BUILD_JOB_SCHEMA_VERSION, BUILD_JOB_STATUSES, MAX_BUILD_JOBS, MAX_BUILD_JOB_SAMPLES, cleanBuildJob, cleanBuildJobs, createBuildJob, updateBuildJob };

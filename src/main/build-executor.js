@@ -5,7 +5,7 @@ const { Vec3 } = require('vec3');
 const { createBuildJob, updateBuildJob } = require('./build-job');
 const { isAirState } = require('./blueprint-model');
 const { itemIdentity } = require('./item-identity');
-const { basicStanceSafe, candidateStances, lineOfSight, positionDistance, positionKey } = require('./placement-compiler');
+const { candidateStances, MAX_ORIENTATION_PITCH_ERROR, MAX_ORIENTATION_YAW_ERROR, operationStanceSafe, placementPoint, positionDistance, positionKey } = require('./placement-compiler');
 const { EXECUTABLE_PLACEMENT_MODES, executablePlacementMode } = require('./placement-strategy');
 const { cancelNavigation, navigateGoal } = require('./navigation-service');
 const { currentStorageContext } = require('./storage-service');
@@ -133,6 +133,18 @@ function samePosition(left, right) {
   return left.x === right.x && left.y === right.y && left.z === right.z;
 }
 
+function temporaryBlockRecords(operation) {
+  return (operation.groupPlacements || []).flatMap((placement) => placement.intermediateExpected ? [{
+    position: { ...placement.position },
+    intermediate: placement.intermediateExpected,
+    expected: placement.expected
+  }] : []);
+}
+
+function withoutTemporaryBlocks(records, positions) {
+  return records.filter((record) => !positions.some((position) => samePosition(record.position, position)));
+}
+
 function resumeScaffoldPlan(bot, compiled, job) {
   const records = new Map((compiled.analysis.records || []).map((record) => [positionKey(record.position), record]));
   const plannedCleanup = new Set(compiled.graph.operations.filter((operation) => operation.kind === 'scaffold-remove').map((operation) => positionKey(operation.position)));
@@ -223,7 +235,7 @@ class BuildExecutor {
   }
 
   async resume(id) {
-    const job = this.jobs().find((entry) => entry.id === String(id || '').trim().toLowerCase());
+    let job = this.jobs().find((entry) => entry.id === String(id || '').trim().toLowerCase());
     if (!job) throw new Error('The build job was not found.');
     if (job.status === 'complete') throw new Error('The build job is already complete.');
     if (this.starting || this.active || this.activities.has(BUILD_ACTIVITY_ID)) throw new Error('A build is already active.');
@@ -232,6 +244,7 @@ class BuildExecutor {
       const client = activeConnection(this.getClient);
       const context = currentStorageContext(client);
       if (!context || context.server.host !== job.server.host || context.server.port !== job.server.port || context.dimension !== job.dimension) throw new Error('The build job belongs to another server or dimension.');
+      job = await this.recoverTemporaryBlocks(client.bot, job);
       const request = { anchor: job.anchor, rotation: job.rotation, mirror: job.mirror, policy: job.policy, confirmed: true };
       const compiled = await this.compile(job.blueprintHash, request, { temporaryScaffolds: job.temporaryScaffolds });
       const storageZone = this.resolveStorageZone(compiled);
@@ -240,6 +253,24 @@ class BuildExecutor {
     } finally {
       this.starting = false;
     }
+  }
+
+  async recoverTemporaryBlocks(bot, job) {
+    if (!job.temporaryBlocks.length) return job;
+    for (const record of job.temporaryBlocks) {
+      const observed = liveState(bot, record.position);
+      if (isAirState(observed || '') || observed === record.expected) continue;
+      if (observed !== record.intermediate) throw new Error(`Temporary build block ${positionKey(record.position)} changed from ${record.intermediate} to ${observed || 'an unloaded block'}.`);
+      const block = bot.blockAt(positionVector(record.position));
+      if (!block || block.diggable === false) throw new Error(`Temporary build block ${positionKey(record.position)} cannot be removed safely.`);
+      let tool = null;
+      try { tool = bot.pathfinder?.bestHarvestTool?.(block) || null; } catch {}
+      if (tool) await bot.equip(tool, 'hand');
+      await bot.dig(block, true, 'raycast');
+      const after = liveState(bot, record.position);
+      if (!isAirState(after || '')) throw new Error(`Temporary build block ${positionKey(record.position)} remained ${after || 'unloaded'} after cleanup.`);
+    }
+    return this.store.saveBuildJob(updateBuildJob(job, { temporaryBlocks: [] }, this.now()));
   }
 
   resolveStorageZone(compiled) {
@@ -497,6 +528,9 @@ class BuildExecutor {
         lastError = error;
       }
     }
+    if (Array.isArray(operation.groupPlacements)) {
+      try { await this.cleanupIntermediateGroup(active, activeConnection(this.getClient).bot, operation.groupPlacements); } catch (error) { this.logger.warn(`[Build] Temporary block cleanup failed: ${error.message}`); }
+    }
     throw lastError || new Error(`Operation ${operation.id} failed.`);
   }
 
@@ -509,13 +543,67 @@ class BuildExecutor {
       return;
     }
     const stance = await this.reachStance(bot, operation, plannedStance, active.controller.signal);
-    if (!basicStanceSafe(bot, stance) || !lineOfSight(bot, stance, operation.position)) throw new Error(`The stance for ${operation.id} became unsafe.`);
+    if (!operationStanceSafe(bot, stance, operation)) throw new Error(`The stance for ${operation.id} became unsafe.`);
     if (operation.kind === 'remove' || operation.kind === 'scaffold-remove') await this.removeBlock(bot, operation);
-    else await this.placeBlock(bot, operation);
+    else if (Array.isArray(operation.groupPlacements)) await this.placeGroup(active, bot, operation);
+    else await this.placeBlock(bot, operation, active.controller.signal);
     const expected = operation.kind === 'remove' || operation.kind === 'scaffold-remove' ? null : operation.expected;
     const observed = liveState(bot, operation.position);
     if (expected ? observed !== expected : !isAirState(observed || '')) throw new Error(`Verification failed for ${operation.id}; observed ${observed || 'an unloaded block'}.`);
-    if (expected && Array.isArray(operation.companions)) await this.verifyCompanions(bot, operation.companions, active.controller.signal);
+    if (expected && Array.isArray(operation.companions)) {
+      await this.verifyCompanions(bot, operation.companions, active.controller.signal);
+      if (Array.isArray(operation.groupPlacements)) await this.clearTemporaryBlocks(active, operation.groupPlacements.map((placement) => placement.position));
+    }
+  }
+
+  async placeGroup(active, bot, operation) {
+    const records = temporaryBlockRecords(operation);
+    if (records.length) {
+      const positions = records.map((record) => record.position);
+      active.job = await this.save(active, {
+        temporaryBlocks: [...withoutTemporaryBlocks(active.job.temporaryBlocks, positions), ...records]
+      });
+    }
+    try {
+      for (const placement of operation.groupPlacements) {
+        active.controller.signal.throwIfAborted();
+        const observed = liveState(bot, placement.position);
+        if (observed === placement.expected || placement.intermediateExpected && observed === placement.intermediateExpected) continue;
+        await this.placeBlock(bot, placement, active.controller.signal);
+      }
+    } catch (error) {
+      try {
+        await this.verifyCompanions(bot, operation.companions, active.controller.signal);
+        return;
+      } catch {}
+      throw error;
+    }
+  }
+
+  async clearTemporaryBlocks(active, positions) {
+    const temporaryBlocks = withoutTemporaryBlocks(active.job.temporaryBlocks, positions);
+    if (temporaryBlocks.length !== active.job.temporaryBlocks.length) active.job = await this.save(active, { temporaryBlocks });
+  }
+
+  async cleanupIntermediateGroup(active, bot, placements) {
+    const cleared = [];
+    for (const placement of placements) {
+      if (!placement.intermediateExpected) continue;
+      const observed = liveState(bot, placement.position);
+      if (isAirState(observed || '') || observed === placement.expected) {
+        cleared.push(placement.position);
+        continue;
+      }
+      if (observed !== placement.intermediateExpected) continue;
+      const block = bot.blockAt(positionVector(placement.position));
+      if (!block || block.diggable === false) continue;
+      let tool = null;
+      try { tool = bot.pathfinder?.bestHarvestTool?.(block) || null; } catch {}
+      if (tool) await bot.equip(tool, 'hand');
+      await bot.dig(block, true, 'raycast');
+      if (isAirState(liveState(bot, placement.position) || '')) cleared.push(placement.position);
+    }
+    await this.clearTemporaryBlocks(active, cleared);
   }
 
   async verifyCompanions(bot, companions, signal) {
@@ -540,7 +628,7 @@ class BuildExecutor {
   }
 
   async reachStance(bot, operation, planned, signal) {
-    let stance = planned && basicStanceSafe(bot, planned) && lineOfSight(bot, planned, operation.position) ? planned : null;
+    let stance = planned && operationStanceSafe(bot, planned, operation) ? planned : null;
     if (!stance) stance = candidateStances(bot, operation)[0]?.position || null;
     if (!stance) throw new Error(`No safe live stance is available for ${operation.id}.`);
     const before = { x: bot.entity.position.x, y: bot.entity.position.y, z: bot.entity.position.z };
@@ -567,7 +655,7 @@ class BuildExecutor {
     await bot.dig(block, true, 'raycast');
   }
 
-  async placeBlock(bot, operation) {
+  async placeBlock(bot, operation, signal) {
     const current = bot.blockAt(positionVector(operation.position));
     const observed = blockStateFromWorld(current);
     const key = positionKey(operation.position);
@@ -582,20 +670,35 @@ class BuildExecutor {
     if (typeof bot._placeBlockWithOptions !== 'function') throw new Error('Exact block placement is unavailable in this Mineflayer engine.');
     await bot.equip(item, 'hand');
     const previousSneak = Boolean(bot.controlState?.sneak);
-    if (!previousSneak) bot.setControlState?.('sneak', true);
+    const desiredSneak = instruction.sneak !== false;
+    if (previousSneak !== desiredSneak) bot.setControlState?.('sneak', desiredSneak);
     try {
+      const point = placementPoint(operation);
+      const deltaX = point.x - bot.entity.position.x;
+      const deltaY = point.y - (bot.entity.position.y + (Number(bot.entity.eyeHeight) || 1.62));
+      const deltaZ = point.z - bot.entity.position.z;
+      const measuredYaw = Math.atan2(-deltaX, -deltaZ);
+      const pitch = Math.atan2(deltaY, Math.hypot(deltaX, deltaZ));
+      let yaw = measuredYaw;
       if (instruction.look) {
-        await bot.look(instruction.look.yaw, instruction.look.pitch, true);
-        if (typeof bot.waitForTicks === 'function') await bot.waitForTicks(1);
+        const yawDifference = Math.abs(Math.atan2(Math.sin(measuredYaw - instruction.look.yaw), Math.cos(measuredYaw - instruction.look.yaw)));
+        const pitchDifference = Math.abs(pitch - instruction.look.pitch);
+        if (yawDifference >= MAX_ORIENTATION_YAW_ERROR || pitchDifference >= MAX_ORIENTATION_PITCH_ERROR) throw new Error(`The live stance for ${operation.id} cannot produce its required orientation.`);
+        const measuredYawOffset = Math.atan2(Math.sin(measuredYaw - instruction.look.yaw), Math.cos(measuredYaw - instruction.look.yaw));
+        const yawOffset = Math.abs(measuredYawOffset) < 0.000001 ? 0 : measuredYawOffset;
+        yaw = instruction.look.yaw + yawOffset;
       }
+      await bot.look(yaw, pitch, true);
+      if (typeof bot.waitForTicks === 'function') await bot.waitForTicks(2);
+      else await abortableDelay(100, signal);
       await bot._placeBlockWithOptions(reference, positionVector(instruction.clickedFace), {
         delta: positionVector(instruction.cursor),
-        forceLook: instruction.look ? 'ignore' : true,
+        forceLook: 'ignore',
         swingArm: 'right',
         showHand: true
       });
     } finally {
-      if (!previousSneak) bot.setControlState?.('sneak', false);
+      if (previousSneak !== desiredSneak) bot.setControlState?.('sneak', previousSneak);
     }
   }
 

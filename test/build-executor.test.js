@@ -32,6 +32,7 @@ function harness(options = {}) {
   let itemCount = options.itemCount ?? 2;
   const expectedState = options.expectedState || 'minecraft:stone';
   const itemName = options.itemName || 'stone';
+  const controlCalls = [];
   const lookCalls = [];
   const placementCalls = [];
   let deferredExtras = [];
@@ -43,19 +44,20 @@ function harness(options = {}) {
     inventory: { items: () => itemCount > 0 ? [{ name: itemName, count: itemCount, slot: 36 }] : [] },
     pathfinder: {
       bestHarvestTool: () => null,
-      async goto(goal) { bot.entity.position = new Vec3(goal.x, goal.y, goal.z); }
+      async goto(goal) { bot.entity.position = new Vec3(goal.x + 0.5, goal.y, goal.z + 0.5); }
     },
     blockAt(position) {
       return blocks.get(key(position)) || (position.y === 63 ? block('stone', position) : block('air', position));
     },
     async equip() {},
     async look(yaw, pitch, force) { lookCalls.push({ yaw, pitch, force }); },
+    async lookAt(point, force) { lookCalls.push({ point: { x: point.x, y: point.y, z: point.z }, force }); },
     async waitForTicks(ticks) {
       lookCalls.push({ ticks });
       for (const extra of deferredExtras) blocks.set(key(extra.position), block(extra.name, extra.position, extra.properties));
       deferredExtras = [];
     },
-    setControlState(control, value) { this.controlState[control] = value; },
+    setControlState(control, value) { this.controlState[control] = value; controlCalls.push({ control, value }); },
     async _placeBlockWithOptions(reference, face, placementOptions) {
       const position = reference.position.plus(face);
       placementCalls.push({
@@ -68,7 +70,12 @@ function harness(options = {}) {
           showHand: placementOptions.showHand
         }
       });
-      blocks.set(key(position), block(options.placeAs || 'stone', position, options.placeProperties));
+      if (options.pairedChest && position.x === 2) blocks.set(key(position), block('chest', position, { facing: 'north', type: 'single', waterlogged: false }));
+      else if (options.pairedChest && position.x === 1) {
+        if (options.failPairSecond) throw new Error('Second chest placement failed.');
+        blocks.set('1,64,0', block('chest', { x: 1, y: 64, z: 0 }, { facing: 'north', type: 'left', waterlogged: false }));
+        blocks.set('2,64,0', block('chest', { x: 2, y: 64, z: 0 }, { facing: 'north', type: 'right', waterlogged: false }));
+      } else blocks.set(key(position), block(options.placeAs || 'stone', position, options.placeProperties));
       if (options.consumeItems) itemCount = Math.max(0, itemCount - 1);
       if (options.delayPlaceExtras) deferredExtras = options.placeExtras || [];
       else for (const extra of options.placeExtras || []) blocks.set(key(extra.position), block(extra.name, extra.position, extra.properties));
@@ -162,7 +169,48 @@ function harness(options = {}) {
     storage,
     owner: 'test'
   });
-  return { activities, blocks, bot, compiled, data, deposits, executor, fetches, lookCalls, operation, placementCalls, target };
+  return { activities, blocks, bot, compiled, controlCalls, data, deposits, executor, fetches, lookCalls, operation, placementCalls, target };
+}
+
+function configurePairedChest(value) {
+  const leftState = 'minecraft:chest[facing=north,type=left,waterlogged=false]';
+  const rightState = 'minecraft:chest[facing=north,type=right,waterlogged=false]';
+  const left = {
+    ...structuredClone(value.operation),
+    id: 'place:1,64,0',
+    position: { ...value.target },
+    current: 'minecraft:air',
+    expected: leftState,
+    item: 'chest',
+    groupId: 'container:1,64,0',
+    instruction: {
+      supportPosition: { x: 1, y: 63, z: 0 },
+      clickedFace: { x: 0, y: 1, z: 0 },
+      cursor: { x: 0.5, y: 1, z: 0.5 },
+      mode: 'paired-container',
+      look: { yaw: Math.PI, pitch: 0 },
+      sneak: false,
+      stateProperties: { facing: 'north', type: 'left', waterlogged: 'false' }
+    }
+  };
+  value.operation.id = 'place:2,64,0';
+  value.operation.position = { x: 2, y: 64, z: 0 };
+  value.operation.expected = rightState;
+  value.operation.item = 'chest';
+  value.operation.groupId = left.groupId;
+  value.operation.instruction = { ...structuredClone(left.instruction), supportPosition: { x: 2, y: 63, z: 0 }, stateProperties: { facing: 'north', type: 'right', waterlogged: 'false' } };
+  value.operation.companions = [{ position: value.target, expected: leftState }, { position: value.operation.position, expected: rightState }];
+  value.operation.groupPlacements = [
+    { ...structuredClone(value.operation), companions: undefined, groupPlacements: undefined, intermediateExpected: 'minecraft:chest[facing=north,type=single,waterlogged=false]' },
+    structuredClone(left)
+  ];
+  left.dependencies = [value.operation.id];
+  value.compiled.graph.operations = [value.operation, left];
+  value.compiled.graph.order = [value.operation.id, left.id];
+  value.compiled.graph.counts.operations = 2;
+  value.compiled.stances.stances[0].operations = [value.operation.id, left.id];
+  value.compiled.analysis.counts.placeable = 2;
+  return { leftState, rightState };
 }
 
 test('executes and verifies a survival placement', async () => {
@@ -355,7 +403,7 @@ test('executes exact axis placement instructions', async () => {
   assert.deepEqual(value.placementCalls, [{
     reference: { x: 2, y: 64, z: 0 },
     face: { x: -1, y: 0, z: 0 },
-    options: { delta: { x: 0, y: 0.5, z: 0.5 }, forceLook: true, swingArm: 'right', showHand: true }
+    options: { delta: { x: 0, y: 0.5, z: 0.5 }, forceLook: 'ignore', swingArm: 'right', showHand: true }
   }]);
 });
 
@@ -380,7 +428,7 @@ test('executes exact top slab placement instructions', async () => {
   assert.deepEqual(value.placementCalls, [{
     reference: { x: 1, y: 64, z: -1 },
     face: { x: 0, y: 0, z: 1 },
-    options: { delta: { x: 0.5, y: 0.75, z: 1 }, forceLook: true, swingArm: 'right', showHand: true }
+    options: { delta: { x: 0.5, y: 0.75, z: 1 }, forceLook: 'ignore', swingArm: 'right', showHand: true }
   }]);
 });
 
@@ -405,7 +453,7 @@ test('executes face-determined wall placement instructions', async () => {
   assert.deepEqual(value.placementCalls, [{
     reference: { x: 2, y: 64, z: 0 },
     face: { x: -1, y: 0, z: 0 },
-    options: { delta: { x: 0, y: 0.5, z: 0.5 }, forceLook: true, swingArm: 'right', showHand: true }
+    options: { delta: { x: 0, y: 0.5, z: 0.5 }, forceLook: 'ignore', swingArm: 'right', showHand: true }
   }]);
 });
 
@@ -427,7 +475,10 @@ test('executes directional placement after synchronizing the required heading', 
   await value.executor.start('test', { anchor: value.target });
   await value.executor.waitForIdle();
   assert.equal(value.data.buildJobs[0].status, 'complete', value.data.buildJobs[0].latestError || 'No build error was recorded.');
-  assert.deepEqual(value.lookCalls, [{ yaw: Math.PI / 2, pitch: 0, force: true }, { ticks: 1 }]);
+  assert.equal(value.lookCalls[0].force, true);
+  assert.equal(Math.abs(value.lookCalls[0].yaw - Math.PI / 2) < Math.PI / 9, true);
+  assert.equal(Math.abs(value.lookCalls[0].pitch) < Math.PI / 6, true);
+  assert.deepEqual(value.lookCalls[1], { ticks: 2 });
   assert.deepEqual(value.placementCalls[0].options, {
     delta: { x: 0.5, y: 1, z: 0.5 },
     forceLook: 'ignore',
@@ -461,4 +512,83 @@ test('verifies every generated block from one multi-block placement', async () =
   await value.executor.waitForIdle();
   assert.equal(value.data.buildJobs[0].status, 'complete', value.data.buildJobs[0].latestError || 'No build error was recorded.');
   assert.equal(blockStateFromWorld(value.blocks.get('1,65,0')), upperState);
+});
+
+test('places and verifies a paired container as one non-sneaking transaction', async () => {
+  const leftState = 'minecraft:chest[facing=north,type=left,waterlogged=false]';
+  const value = harness({ itemCount: 2, itemName: 'chest', expectedState: leftState, pairedChest: true, consumeItems: true });
+  const { rightState } = configurePairedChest(value);
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.equal(value.data.buildJobs[0].status, 'complete', value.data.buildJobs[0].latestError || 'No build error was recorded.');
+  assert.equal(blockStateFromWorld(value.blocks.get('1,64,0')), leftState);
+  assert.equal(blockStateFromWorld(value.blocks.get('2,64,0')), rightState);
+  assert.equal(value.placementCalls.length, 2);
+  assert.equal(value.controlCalls.some((entry) => entry.control === 'sneak' && entry.value === true), false);
+  assert.deepEqual(value.data.buildJobs[0].temporaryBlocks, []);
+});
+
+test('removes a proven temporary single chest after pair failure', async () => {
+  const leftState = 'minecraft:chest[facing=north,type=left,waterlogged=false]';
+  const value = harness({ itemCount: 2, itemName: 'chest', expectedState: leftState, pairedChest: true, failPairSecond: true, consumeItems: true });
+  configurePairedChest(value);
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.equal(value.data.buildJobs[0].status, 'failed');
+  assert.equal(value.blocks.get('2,64,0').name, 'air');
+  assert.deepEqual(value.data.buildJobs[0].temporaryBlocks, []);
+  assert.match(value.data.buildJobs[0].latestError, /Second chest placement failed/u);
+});
+
+test('recovers a persisted temporary single chest before resuming a pair', async () => {
+  const leftState = 'minecraft:chest[facing=north,type=left,waterlogged=false]';
+  const singleState = 'minecraft:chest[facing=north,type=single,waterlogged=false]';
+  const value = harness({ itemCount: 2, itemName: 'chest', expectedState: leftState, pairedChest: true, consumeItems: true });
+  const { rightState } = configurePairedChest(value);
+  const temporaryPosition = { x: 2, y: 64, z: 0 };
+  value.blocks.set('2,64,0', block('chest', temporaryPosition, { facing: 'north', type: 'single', waterlogged: false }));
+  const job = createBuildJob({
+    owner: 'test',
+    blueprintHash: 'a'.repeat(64),
+    blueprintName: 'Test build',
+    server: { host: 'build.test', port: 25565 },
+    dimension: 'overworld',
+    anchor: value.target,
+    policy: value.compiled.analysis.policy,
+    status: 'paused',
+    operationCount: 2,
+    temporaryBlocks: [{ position: temporaryPosition, intermediate: singleState, expected: rightState }]
+  });
+  value.data.buildJobs.push(job);
+  await value.executor.resume(job.id);
+  await value.executor.waitForIdle();
+  assert.equal(value.data.buildJobs[0].status, 'complete', value.data.buildJobs[0].latestError || 'No build error was recorded.');
+  assert.equal(blockStateFromWorld(value.blocks.get('1,64,0')), leftState);
+  assert.equal(blockStateFromWorld(value.blocks.get('2,64,0')), rightState);
+  assert.deepEqual(value.data.buildJobs[0].temporaryBlocks, []);
+});
+
+test('refuses to remove a changed temporary build block during resume', async () => {
+  const leftState = 'minecraft:chest[facing=north,type=left,waterlogged=false]';
+  const rightState = 'minecraft:chest[facing=north,type=right,waterlogged=false]';
+  const value = harness({ itemName: 'chest', expectedState: leftState, pairedChest: true });
+  configurePairedChest(value);
+  const temporaryPosition = { x: 2, y: 64, z: 0 };
+  value.blocks.set('2,64,0', block('barrel', temporaryPosition, { facing: 'north', open: false }));
+  const job = createBuildJob({
+    owner: 'test',
+    blueprintHash: 'a'.repeat(64),
+    blueprintName: 'Test build',
+    server: { host: 'build.test', port: 25565 },
+    dimension: 'overworld',
+    anchor: value.target,
+    policy: value.compiled.analysis.policy,
+    status: 'paused',
+    operationCount: 2,
+    temporaryBlocks: [{ position: temporaryPosition, intermediate: 'minecraft:chest[facing=north,type=single,waterlogged=false]', expected: rightState }]
+  });
+  value.data.buildJobs.push(job);
+  await assert.rejects(value.executor.resume(job.id), /changed from .*single.* to minecraft:barrel/iu);
+  assert.equal(value.blocks.get('2,64,0').name, 'barrel');
+  assert.equal(value.data.buildJobs[0].temporaryBlocks.length, 1);
 });

@@ -160,7 +160,8 @@ test('groups paired containers and gates unsupported state restoration', () => {
     record('placeable', 0, 64, 'minecraft:chest[facing=north,type=left,waterlogged=false]'),
     record('placeable', 1, 64, 'minecraft:chest[facing=north,type=right,waterlogged=false]'),
     record('placeable', 2, 64, 'minecraft:oak_slab[half=bottom,type=bottom,waterlogged=true]'),
-    record('placeable', 3, 64, 'minecraft:oak_sign[rotation=4,waterlogged=false]')
+    record('placeable', 3, 64, 'minecraft:oak_sign[rotation=4,waterlogged=false]'),
+    record('placeable', 5, 64, 'minecraft:trapped_chest[facing=north,type=left,waterlogged=false]')
   ];
   const graph = compilePlacementGraph(flatBot(), {
     anchor: { x: 0, y: 64, z: 0 },
@@ -170,10 +171,19 @@ test('groups paired containers and gates unsupported state restoration', () => {
   });
   const byId = new Map(graph.operations.map((operation) => [operation.id, operation]));
   assert.equal(byId.get('place:0,64,0').groupId, byId.get('place:1,64,0').groupId);
-  assert.equal(byId.get('place:1,64,0').dependencies.includes('place:0,64,0'), true);
+  assert.equal(byId.get('place:0,64,0').dependencies.includes('place:1,64,0'), true);
+  assert.equal(byId.get('place:1,64,0').instruction.mode, 'paired-container');
+  assert.equal(byId.get('place:1,64,0').instruction.sneak, false);
+  assert.deepEqual(byId.get('place:1,64,0').groupPlacements.map((entry) => entry.position.x), [1, 0]);
+  assert.equal(byId.get('place:1,64,0').groupPlacements[0].intermediateExpected, 'minecraft:chest[facing=north,type=single,waterlogged=false]');
+  assert.equal(byId.get('place:1,64,0').companions.length, 2);
+  const pairStances = candidateStances(flatBot(), byId.get('place:1,64,0'));
+  assert.equal(pairStances.length > 0, true);
+  assert.equal(pairStances.every((stance) => stance.position.z < 0), true);
   assert.equal(byId.get('place:2,64,0').blocked.some((reason) => reason.code === 'waterlogged-unsupported'), true);
   assert.equal(byId.get('place:3,64,0').blocked.some((reason) => reason.code === 'block-entity-unsupported'), true);
   assert.equal(byId.get('place:3,64,0').instruction.rotation, 4);
+  assert.equal(byId.get('place:5,64,0').blocked.some((reason) => reason.code === 'invalid-container-pair'), true);
 });
 
 test('compiles exact face and cursor strategies for axis blocks and slabs', () => {
