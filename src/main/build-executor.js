@@ -10,7 +10,7 @@ const { currentStorageContext } = require('./storage-service');
 const { blockStateFromWorld, REPLACEABLE_BLOCKS } = require('./world-diff');
 const { abortableDelay } = require('./workflow-runtime');
 
-const EXECUTABLE_PLACEMENT_MODES = new Set(['simple', 'gravity', 'scaffold']);
+const EXECUTABLE_PLACEMENT_MODES = new Set(['simple', 'gravity', 'scaffold', 'axis', 'slab']);
 const BUILD_ACTIVITY_ID = 'builder';
 
 function positionVector(position) {
@@ -37,8 +37,12 @@ function inventoryCounts(bot) {
 
 function requiredItems(compiled) {
   const counts = new Map();
+  const grouped = new Set();
   for (const operation of compiled.graph.operations) {
     if (!['place', 'scaffold-place'].includes(operation.kind) || !operation.item) continue;
+    const singleItemGroup = operation.groupId && (operation.groupId.startsWith('vertical:') || operation.groupId.startsWith('horizontal:'));
+    if (singleItemGroup && grouped.has(operation.groupId)) continue;
+    if (singleItemGroup) grouped.add(operation.groupId);
     counts.set(operation.item, (counts.get(operation.item) || 0) + 1);
   }
   return counts;

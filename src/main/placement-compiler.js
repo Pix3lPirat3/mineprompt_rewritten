@@ -56,6 +56,11 @@ function supportRule(entry) {
   if ((WALL_ATTACHED_BLOCKS.test(parsed.name) || parsed.name.endsWith('_wall_sign') || parsed.name.endsWith('_wall_banner')) && DIRECTIONS[properties.facing]) return { kind: 'wall', offsets: [opposite(DIRECTIONS[properties.facing])], required: true };
   if (properties.half === 'upper' && /(?:door|tall_|large_fern|sunflower|rose_bush|peony|lilac|pitcher_plant)$/u.test(parsed.name)) return { kind: 'multiblock', offsets: [DIRECTIONS.down], required: true };
   if (properties.part === 'head' && DIRECTIONS[properties.facing]) return { kind: 'multiblock', offsets: [opposite(DIRECTIONS[properties.facing])], required: true };
+  if (properties.axis === 'x') return { kind: 'axis', offsets: [DIRECTIONS.west, DIRECTIONS.east], required: true };
+  if (properties.axis === 'z') return { kind: 'axis', offsets: [DIRECTIONS.north, DIRECTIONS.south], required: true };
+  if (properties.axis === 'y') return { kind: 'axis', offsets: [DIRECTIONS.down, DIRECTIONS.up], required: true };
+  if (parsed.name.endsWith('_slab') && properties.type === 'top') return { kind: 'slab', offsets: [DIRECTIONS.north, DIRECTIONS.south, DIRECTIONS.west, DIRECTIONS.east, DIRECTIONS.up], required: true };
+  if (parsed.name.endsWith('_slab')) return { kind: 'slab', offsets: [DIRECTIONS.down, DIRECTIONS.north, DIRECTIONS.south, DIRECTIONS.west, DIRECTIONS.east], required: true };
   if (GRAVITY_BLOCKS.test(parsed.name)) return { kind: 'gravity', offsets: [DIRECTIONS.down], required: true };
   if (properties.face === 'floor' || FLOOR_ATTACHED_BLOCKS.test(parsed.name)) return { kind: 'floor', offsets: [DIRECTIONS.down], required: true };
   const vineOffsets = Object.entries(DIRECTIONS).filter(([name]) => ['north', 'south', 'east', 'west'].includes(name) && properties[name] === 'true').map(([, direction]) => direction);
@@ -120,9 +125,10 @@ function placementInstruction(operation, support, rule) {
     if (face.y) cursor.y = face.y > 0 ? 1 : 0;
     if (face.z) cursor.z = face.z > 0 ? 1 : 0;
   }
-  if (parsed.properties.half === 'top') cursor.y = 0.75;
-  if (parsed.properties.half === 'bottom') cursor.y = 0.25;
-  const mode = operation.groupId ? 'multiblock' : rule.kind === 'wall' || rule.kind === 'ceiling' || rule.kind === 'floor' ? 'attached' : rule.kind === 'gravity' ? 'gravity' : rule.kind === 'scaffold' ? 'scaffold' : facing ? 'directional' : 'simple';
+  if (parsed.properties.half === 'top' || parsed.properties.type === 'top') cursor.y = 0.75;
+  if (parsed.properties.half === 'bottom' || parsed.properties.type === 'bottom') cursor.y = 0.25;
+  const multiBlock = operation.groupId && !operation.groupId.startsWith('container:');
+  const mode = multiBlock ? 'multiblock' : rule.kind === 'wall' || rule.kind === 'ceiling' || rule.kind === 'floor' ? 'attached' : rule.kind === 'gravity' ? 'gravity' : rule.kind === 'scaffold' ? 'scaffold' : rule.kind === 'axis' ? 'axis' : rule.kind === 'slab' ? 'slab' : facing ? 'directional' : 'simple';
   return {
     supportPosition: support ? { ...support } : null,
     clickedFace: face,
@@ -214,6 +220,7 @@ function compilePlacementGraph(bot, analysis) {
     };
     const properties = parseBlockState(record.entry.state).properties;
     if (properties.waterlogged === 'true') operation.blocked.push({ code: 'waterlogged-unsupported', message: 'Waterlogged placement requires an explicit fluid strategy.' });
+    if (record.entry.name.endsWith('_slab') && properties.type === 'double') operation.blocked.push({ code: 'double-slab-unsupported', message: 'Double slabs require two verified placement actions.' });
     if (operation.requiresBlockEntityData) operation.blocked.push({ code: 'block-entity-unsupported', message: 'Block entity data application is not implemented.' });
     operations.push(operation);
     placements.set(positionKey(operation.position), operation);

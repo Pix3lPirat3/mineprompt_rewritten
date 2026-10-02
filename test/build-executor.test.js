@@ -4,22 +4,23 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { Vec3 } = require('vec3');
 const { ActivityManager } = require('../src/main/activity-manager');
-const { BuildExecutor } = require('../src/main/build-executor');
+const { BuildExecutor, requiredItems } = require('../src/main/build-executor');
 const { createBuildJob } = require('../src/main/build-job');
 const { normalizeBuildPolicy } = require('../src/main/build-policy');
+const { blockStateFromWorld } = require('../src/main/world-diff');
 
 function key(position) {
   return `${position.x},${position.y},${position.z}`;
 }
 
-function block(name, position) {
+function block(name, position, properties = {}) {
   return {
     name,
     type: name === 'air' ? 0 : 1,
     stateId: name === 'air' ? 0 : 1,
     diggable: name !== 'bedrock',
     position: new Vec3(position.x, position.y, position.z),
-    getProperties: () => ({})
+    getProperties: () => ({ ...properties })
   };
 }
 
@@ -29,21 +30,34 @@ function harness(options = {}) {
   blocks.set('1,63,0', block('stone', { x: 1, y: 63, z: 0 }));
   const target = { x: 1, y: 64, z: 0 };
   let itemCount = options.itemCount ?? 2;
+  const expectedState = options.expectedState || 'minecraft:stone';
+  const itemName = options.itemName || 'stone';
+  const placementCalls = [];
   const bot = {
     entity: { position: new Vec3(0, 64, 0), dimension: 'overworld' },
     game: { dimension: 'overworld' },
     lastOptions: { host: 'build.test', port: 25565 },
     controlState: {},
-    inventory: { items: () => itemCount > 0 ? [{ name: 'stone', count: itemCount, slot: 36 }] : [] },
+    inventory: { items: () => itemCount > 0 ? [{ name: itemName, count: itemCount, slot: 36 }] : [] },
     pathfinder: { bestHarvestTool: () => null },
     blockAt(position) {
       return blocks.get(key(position)) || (position.y === 63 ? block('stone', position) : block('air', position));
     },
     async equip() {},
     setControlState(control, value) { this.controlState[control] = value; },
-    async _placeBlockWithOptions(reference, face) {
+    async _placeBlockWithOptions(reference, face, placementOptions) {
       const position = reference.position.plus(face);
-      blocks.set(key(position), block(options.placeAs || 'stone', position));
+      placementCalls.push({
+        reference: { x: reference.position.x, y: reference.position.y, z: reference.position.z },
+        face: { x: face.x, y: face.y, z: face.z },
+        options: {
+          delta: { x: placementOptions.delta.x, y: placementOptions.delta.y, z: placementOptions.delta.z },
+          forceLook: placementOptions.forceLook,
+          swingArm: placementOptions.swingArm,
+          showHand: placementOptions.showHand
+        }
+      });
+      blocks.set(key(position), block(options.placeAs || 'stone', position, options.placeProperties));
     },
     async dig(value) { blocks.set(key(value.position), block('air', value.position)); },
     clearControlStates() {}
@@ -54,11 +68,11 @@ function harness(options = {}) {
     kind: 'place',
     position: target,
     current: 'minecraft:air',
-    expected: 'minecraft:stone',
-    item: 'stone',
+    expected: expectedState,
+    item: itemName,
     dependencies: [],
     blocked: [],
-    instruction: {
+    instruction: options.instruction || {
       supportPosition: { x: 1, y: 63, z: 0 },
       clickedFace: { x: 0, y: 1, z: 0 },
       cursor: { x: 0.5, y: 1, z: 0.5 },
@@ -112,7 +126,7 @@ function harness(options = {}) {
     stop: () => true
   } : null;
   const executor = new BuildExecutor({
-    compile: async () => blocks.get('1,64,0')?.name === 'stone'
+    compile: async () => blockStateFromWorld(blocks.get('1,64,0')) === expectedState
       ? {
           analysis: { ...compiled.analysis, counts: { correct: 1, ignoredAir: 0, placeable: 0, replaceable: 0, conflicting: 0, temporarilyObstructed: 0, unknown: 0, unsupported: 0 } },
           graph: { operations: [], order: [], cyclic: [], counts: { operations: 0, removals: 0, blocked: 0 } },
@@ -125,7 +139,7 @@ function harness(options = {}) {
     storage,
     owner: 'test'
   });
-  return { activities, blocks, bot, compiled, data, executor, fetches, operation, target };
+  return { activities, blocks, bot, compiled, data, executor, fetches, operation, placementCalls, target };
 }
 
 test('executes and verifies a survival placement', async () => {
@@ -221,4 +235,64 @@ test('resumes by removing an owned scaffold before permanent placement', async (
   assert.equal(value.blocks.get('1,64,0').name, 'stone', value.data.buildJobs[0].latestError || 'No build error was recorded.');
   assert.equal(value.data.buildJobs[0].status, 'complete');
   assert.deepEqual(value.data.buildJobs[0].temporaryScaffolds, []);
+});
+
+test('counts one item for paired block items but two paired containers', () => {
+  const compiled = { graph: { operations: [
+    { kind: 'place', item: 'oak_door', groupId: 'vertical:0,64,0' },
+    { kind: 'place', item: 'oak_door', groupId: 'vertical:0,64,0' },
+    { kind: 'place', item: 'chest', groupId: 'container:2,64,0' },
+    { kind: 'place', item: 'chest', groupId: 'container:2,64,0' }
+  ] } };
+  assert.deepEqual(Object.fromEntries(requiredItems(compiled)), { oak_door: 1, chest: 2 });
+});
+
+test('executes exact axis placement instructions', async () => {
+  const value = harness({
+    expectedState: 'minecraft:oak_log[axis=x]',
+    itemName: 'oak_log',
+    placeAs: 'oak_log',
+    placeProperties: { axis: 'x' },
+    instruction: {
+      supportPosition: { x: 2, y: 64, z: 0 },
+      clickedFace: { x: -1, y: 0, z: 0 },
+      cursor: { x: 0, y: 0.5, z: 0.5 },
+      mode: 'axis',
+      stateProperties: { axis: 'x' }
+    }
+  });
+  value.blocks.set('2,64,0', block('stone', { x: 2, y: 64, z: 0 }));
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.equal(value.data.buildJobs[0].status, 'complete', value.data.buildJobs[0].latestError || 'No build error was recorded.');
+  assert.deepEqual(value.placementCalls, [{
+    reference: { x: 2, y: 64, z: 0 },
+    face: { x: -1, y: 0, z: 0 },
+    options: { delta: { x: 0, y: 0.5, z: 0.5 }, forceLook: true, swingArm: 'right', showHand: true }
+  }]);
+});
+
+test('executes exact top slab placement instructions', async () => {
+  const value = harness({
+    expectedState: 'minecraft:stone_slab[type=top,waterlogged=false]',
+    itemName: 'stone_slab',
+    placeAs: 'stone_slab',
+    placeProperties: { type: 'top', waterlogged: false },
+    instruction: {
+      supportPosition: { x: 1, y: 64, z: -1 },
+      clickedFace: { x: 0, y: 0, z: 1 },
+      cursor: { x: 0.5, y: 0.75, z: 1 },
+      mode: 'slab',
+      stateProperties: { type: 'top', waterlogged: 'false' }
+    }
+  });
+  value.blocks.set('1,64,-1', block('stone', { x: 1, y: 64, z: -1 }));
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.equal(value.data.buildJobs[0].status, 'complete', value.data.buildJobs[0].latestError || 'No build error was recorded.');
+  assert.deepEqual(value.placementCalls, [{
+    reference: { x: 1, y: 64, z: -1 },
+    face: { x: 0, y: 0, z: 1 },
+    options: { delta: { x: 0.5, y: 0.75, z: 1 }, forceLook: true, swingArm: 'right', showHand: true }
+  }]);
 });

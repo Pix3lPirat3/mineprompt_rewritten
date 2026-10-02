@@ -174,3 +174,25 @@ test('groups paired containers and gates unsupported state restoration', () => {
   assert.equal(byId.get('place:3,64,0').blocked.some((reason) => reason.code === 'block-entity-unsupported'), true);
   assert.equal(byId.get('place:3,64,0').instruction.rotation, 4);
 });
+
+test('compiles exact face and cursor strategies for axis blocks and slabs', () => {
+  const overrides = new Map([
+    ['-1,64,0', 'stone'],
+    ['2,64,-1', 'stone']
+  ]);
+  const graph = compilePlacementGraph(flatBot(overrides), {
+    policy: { scaffolding: ['dirt'] },
+    records: [
+      record('placeable', 0, 64, 'minecraft:oak_log[axis=x]'),
+      record('placeable', 2, 64, 'minecraft:stone_slab[type=top,waterlogged=false]'),
+      record('placeable', 4, 64, 'minecraft:stone_slab[type=double,waterlogged=false]')
+    ]
+  });
+  const byId = new Map(graph.operations.map((operation) => [operation.id, operation]));
+  assert.equal(byId.get('place:0,64,0').instruction.mode, 'axis');
+  assert.deepEqual(byId.get('place:0,64,0').instruction.clickedFace, { x: 1, y: 0, z: 0 });
+  assert.equal(byId.get('place:2,64,0').instruction.mode, 'slab');
+  assert.deepEqual(byId.get('place:2,64,0').instruction.clickedFace, { x: 0, y: 0, z: 1 });
+  assert.equal(byId.get('place:2,64,0').instruction.cursor.y, 0.75);
+  assert.equal(byId.get('place:4,64,0').blocked.some((reason) => reason.code === 'double-slab-unsupported'), true);
+});
