@@ -19,6 +19,7 @@ const { WorkflowRunner } = require('./workflow-runtime');
 const { DebugEvaluator } = require('./debug-evaluator');
 const { resolveMiningPolicy } = require('./mining-presets');
 const { Vec3 } = require('vec3');
+const { installToolkit } = require('../../packages/mineflayer-toolkit');
 
 class BotSession {
   constructor({ id, rootPath, privateCommandsPath, store, logger, emit }) {
@@ -86,6 +87,19 @@ class BotSession {
       logger,
       onChange: () => this.publishSnapshot()
     });
+    this.client.setPluginInstaller((bot) => installToolkit(bot, {
+      runtime: { activities: this.activities, logger: this.logger },
+      mining: { client: this.client, service: this.mining },
+      trees: { client: this.client, service: this.trees },
+      inventory: { client: this.client, service: this.inventory, crafting: this.crafting, stash: this.stash },
+      interactions: {
+        client: this.client,
+        store: this.store,
+        relationships: this.relationships,
+        playerActions: this.playerActions,
+        targets: this.targets
+      }
+    }));
     this.workflows = new WorkflowRunner({ automation: this.automation, commands: this.commands, logger });
     this.debug = new DebugEvaluator({ context: () => this.debugContext(), logger });
     this.ready = Promise.resolve(this.init());
@@ -98,8 +112,14 @@ class BotSession {
   }
 
   commandContext(origin = {}) {
+    const mining = this.capability('mining')?.service || this.mining;
+    const trees = this.capability('trees')?.service || this.trees;
+    const inventory = this.capability('inventory')?.service || this.inventory;
+    const crafting = this.capability('inventory')?.crafting || this.crafting;
+    const stash = this.capability('inventory')?.stash || this.stash;
+    const interactions = this.capability('interactions');
     return Object.freeze({
-      actions: this.playerActions,
+      actions: interactions?.players || this.playerActions,
       activities: this.activities,
       automation: this.automation,
       bot: this.client.bot,
@@ -107,16 +127,16 @@ class BotSession {
       client: this.client,
       commands: this.commands,
       connections: this.connections,
-      crafting: this.crafting,
+      crafting,
       debug: this.debug,
       interfaceState: this.interface,
-      inventory: this.inventory,
+      inventory,
       logger: this.logger,
-      mining: this.mining,
-      trees: this.trees,
-      stash: this.stash,
-      relationships: this.relationships,
-      targets: this.targets,
+      mining,
+      trees,
+      stash,
+      relationships: interactions?.relationships || this.relationships,
+      targets: interactions?.targets || this.targets,
       store: this.store,
       workflowRunner: this.workflows,
       dispatchPlayerAction: (request, childOrigin = {}) => this.executePlayerAction(request, childOrigin),
@@ -154,13 +174,13 @@ class BotSession {
   }
 
   async inventoryAction(request) {
-    const result = await this.inventory.execute(request);
+    const result = await (this.capability('inventory')?.execute(request) || this.inventory.execute(request));
     this.logger.log(result.message);
     return { ok: true, ...result };
   }
 
   inventoryInspect(request) {
-    return this.inventory.inspect(request);
+    return this.capability('inventory')?.inspect(request) || this.inventory.inspect(request);
   }
 
   debugEvaluate(request) {
@@ -170,6 +190,7 @@ class BotSession {
   debugContext() {
     return {
       bot: this.client.bot,
+      runtime: this.client.bot?.mineprompt || null,
       session: this,
       client: this.client,
       inventory: this.inventory,
@@ -187,11 +208,10 @@ class BotSession {
 
   async executePlayerAction(request, origin = { type: 'terminal' }) {
     if (!this.client.bot?.entity) throw new Error('An active connection is required.');
-    const result = await this.playerActions.execute(request, {
-      bot: this.client.bot,
-      activities: this.activities,
-      origin: origin || { type: 'terminal' }
-    });
+    const interactions = this.capability('interactions');
+    const result = interactions
+      ? await interactions.executePlayer(request, origin || { type: 'terminal' })
+      : await this.playerActions.execute(request, { bot: this.client.bot, activities: this.activities, origin: origin || { type: 'terminal' } });
     this.logger.log(result.message);
     this.publishSnapshot();
     return { ok: true, ...result };
@@ -203,7 +223,9 @@ class BotSession {
 
   async targetAction(request, origin = { type: 'gui' }) {
     const worldAction = String(request?.actionId || '').startsWith('block.mine') || request?.actionId === 'block.dig' || String(request?.actionId || '').startsWith('block.tree-');
-    const result = await this.targets.execute(worldAction ? { ...request, policy: this.resolveMiningPolicy(request.policy, request.presetId || request.preset) } : request, origin);
+    const input = worldAction ? { ...request, policy: this.resolveMiningPolicy(request.policy, request.presetId || request.preset) } : request;
+    const interactions = this.capability('interactions');
+    const result = interactions ? await interactions.executeTarget(input, origin) : await this.targets.execute(input, origin);
     this.logger.log(result.message);
     this.publishSnapshot();
     return { ok: true, ...result };
@@ -211,8 +233,9 @@ class BotSession {
 
   async miningAction(request = {}, origin = { type: 'agent' }) {
     const action = String(request.action || 'status');
-    if (action === 'stop') return { ok: this.activities.stop('regionmine') || this.activities.stop('consistentmine') };
-    if (action === 'status') return { ok: true, status: this.mining.status(), activities: this.activities.snapshot().filter((activity) => ['regionmine', 'consistentmine'].includes(activity.id)) };
+    const mining = this.capability('mining');
+    if (action === 'stop') return { ok: mining ? mining.stop() : this.activities.stop('regionmine') || this.activities.stop('consistentmine') };
+    if (action === 'status') return { ok: true, status: mining?.status() || this.mining.status(), activities: this.activities.snapshot().filter((activity) => ['regionmine', 'consistentmine'].includes(activity.id)) };
     const bot = this.client.bot;
     if (!bot?.entity) throw new Error('An active connection is required.');
     const policy = this.resolveMiningPolicy(request.policy, request.presetId || request.preset);
@@ -221,49 +244,73 @@ class BotSession {
       const block = position ? bot.blockAt(position) : bot.blockAtCursor?.(32);
       if (!block || ['air', 'cave_air', 'void_air'].includes(block.name)) throw new Error('The mining target is no longer available.');
       if (action === 'once') {
-        const result = await this.mining.mineOnce(block, policy);
+        const result = mining ? await mining.mine(block, policy) : await this.mining.mineOnce(block, policy);
         this.publishSnapshot();
         return { ok: true, ...result };
       }
-      return { ok: true, ...this.mining.startConsistent(block, Math.max(1, Math.min(16, Number(request.depth) || 1)), policy) };
+      const result = mining ? mining.consistent(block, Math.max(1, Math.min(16, Number(request.depth) || 1)), policy) : this.mining.startConsistent(block, Math.max(1, Math.min(16, Number(request.depth) || 1)), policy);
+      return { ok: true, ...result };
     }
     if (action === 'region') {
       if (!request.from || !request.to) throw new Error('Region mining requires from and to positions.');
-      return { ok: true, ...this.mining.startRegion(request.from, request.to, policy) };
+      return { ok: true, ...(mining ? mining.region(request.from, request.to, policy) : this.mining.startRegion(request.from, request.to, policy)) };
     }
     if (action === 'chunk') {
       const depth = Math.max(1, Math.min(16, Number(request.depth) || 1));
       const originPosition = bot.entity.position.floored();
       const x = Math.floor(originPosition.x / 16) * 16;
       const z = Math.floor(originPosition.z / 16) * 16;
-      return { ok: true, ...this.mining.startRegion({ x, y: originPosition.y - depth + 1, z }, { x: x + 15, y: originPosition.y, z: z + 15 }, policy) };
+      const from = { x, y: originPosition.y - depth + 1, z };
+      const to = { x: x + 15, y: originPosition.y, z: z + 15 };
+      return { ok: true, ...(mining ? mining.region(from, to, policy) : this.mining.startRegion(from, to, policy)) };
     }
     throw new Error('Unknown mining action.');
   }
 
   treeAction(request = {}) {
     const action = String(request.action || 'inspect').toLowerCase();
-    if (action === 'status') return { ok: true, status: this.trees.status() };
-    if (action === 'stop') return { ok: this.trees.stop(), status: this.trees.status() };
+    const trees = this.capability('trees');
+    if (action === 'status') return { ok: true, status: trees?.status() || this.trees.status() };
+    if (action === 'stop') return { ok: trees ? trees.stop() : this.trees.stop(), status: trees?.status() || this.trees.status() };
     const policy = this.resolveMiningPolicy(request.policy, request.presetId || request.preset);
     const treePolicy = { ...policy, ...(request.policy || {}) };
-    if (action === 'inspect') return { ok: true, ...this.trees.inspect({ ...request, policy: treePolicy }) };
-    if (action === 'fell' || action === 'farm') return { ok: true, status: this.trees.start({ ...request, mode: action, policy: treePolicy }) };
+    if (action === 'inspect') return { ok: true, ...(trees ? trees.inspect({ ...request, policy: treePolicy }) : this.trees.inspect({ ...request, policy: treePolicy })) };
+    if (action === 'fell' || action === 'farm') {
+      const status = trees ? trees[action]({ ...request, policy: treePolicy }) : this.trees.start({ ...request, mode: action, policy: treePolicy });
+      return { ok: true, status };
+    }
     throw new Error('Unknown tree action.');
   }
 
   stashAction(request = {}) {
     const action = String(request.action || 'nearby').toLowerCase();
-    if (action === 'status') return { ok: true, status: this.stash.status() };
-    if (action === 'stop') return { ok: this.stash.stop(), status: this.stash.status() };
-    const status = this.stash.start({
+    const inventory = this.capability('inventory');
+    if (action === 'status') return { ok: true, status: inventory?.stashStatus() || this.stash.status() };
+    if (action === 'stop') return { ok: inventory ? inventory.stopStash() : this.stash.stop(), status: inventory?.stashStatus() || this.stash.status() };
+    const input = {
       mode: action,
       selector: request.selector,
       confirmed: request.confirmed,
       collectionRadius: request.collectionRadius,
       containerRadius: request.containerRadius
-    });
+    };
+    const status = inventory ? inventory.startStash(input) : this.stash.start(input);
     return { ok: true, status };
+  }
+
+  capabilities() {
+    const runtime = this.client.bot?.mineprompt;
+    if (!runtime) return { apiVersion: null, revision: 0, capabilities: [], actions: [], activities: this.activities.snapshot(), tasks: { active: [], recent: [] } };
+    return runtime.snapshot();
+  }
+
+  capabilityAction(request = {}, origin = { type: 'agent' }) {
+    const runtime = this.client.bot?.mineprompt;
+    if (!runtime) throw new Error('An active connection with MinePrompt plugins is required.');
+    const actionId = String(request.actionId || '').trim();
+    if (!actionId) throw new Error('A capability action id is required.');
+    const input = request.input && typeof request.input === 'object' && !Array.isArray(request.input) ? request.input : {};
+    return runtime.actions.execute(actionId, input, { origin: origin || { type: 'agent' }, bot: this.client.bot, runtime });
   }
 
   resolveMiningPolicy(policy = {}, reference = null) {
@@ -272,11 +319,11 @@ class BotSession {
   }
 
   recipes(request = {}) {
-    return this.crafting.list(request);
+    return this.capability('inventory')?.recipes(request) || this.crafting.list(request);
   }
 
   async craft(request = {}) {
-    const result = await this.crafting.craft(request);
+    const result = await (this.capability('inventory')?.craft(request) || this.crafting.craft(request));
     this.logger.log(result.message);
     return { ok: true, ...result };
   }
@@ -293,7 +340,12 @@ class BotSession {
     return { ok: stopped };
   }
 
+  capability(id) {
+    return this.client.bot?.mineprompt?.get(id) || null;
+  }
+
   snapshot() {
+    const extensions = this.capabilities();
     return {
       id: this.id,
       state: this.interface.snapshot(),
@@ -301,6 +353,13 @@ class BotSession {
       session: { ...this.client.snapshot(), targets: this.targets.snapshot() },
       commands: this.commands.descriptors(),
       diagnostics: { inventory: this.inventoryPipeline.telemetry.snapshot() },
+      extensions: {
+        apiVersion: extensions.apiVersion,
+        revision: extensions.revision,
+        capabilities: extensions.capabilities,
+        actionCount: extensions.actions.length,
+        tasks: { active: extensions.tasks.active }
+      },
       process: { isolated: false, pid: process.pid, status: 'running' }
     };
   }

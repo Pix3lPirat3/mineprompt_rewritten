@@ -170,6 +170,14 @@ class ApplicationRuntime {
     return this.sessionRequest(request.sessionId, 'stashAction', request);
   }
 
+  capabilities(request = {}) {
+    return this.sessionRequest(request.sessionId, 'capabilities');
+  }
+
+  capabilityAction(request = {}, origin = { type: 'agent' }) {
+    return this.sessionRequest(request.sessionId, 'capabilityAction', request, origin || { type: 'agent' });
+  }
+
   recipes(request = {}) {
     return this.sessionRequest(request.sessionId, 'recipes', request);
   }

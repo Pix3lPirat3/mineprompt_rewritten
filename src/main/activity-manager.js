@@ -3,8 +3,10 @@
 class ActivityManager {
   constructor(onChange = () => {}) {
     this.onChange = onChange;
+    this.subscribers = new Set();
     this.activities = new Map();
     this.resources = new Map();
+    this.revision = 0;
   }
 
   register(id, { label, detail = '', resources = [], stop }) {
@@ -59,6 +61,13 @@ class ActivityManager {
     return [...this.activities.values()].map(({ stop, ...activity }) => ({ ...activity }));
   }
 
+  subscribe(subscriber, emitInitial = true) {
+    if (typeof subscriber !== 'function') throw new TypeError('An activity subscriber must be a function.');
+    this.subscribers.add(subscriber);
+    if (emitInitial) subscriber(this.snapshot(), this.revision);
+    return () => this.subscribers.delete(subscriber);
+  }
+
   update(id, detail) {
     const activity = this.activities.get(id);
     if (!activity) return false;
@@ -74,7 +83,10 @@ class ActivityManager {
   }
 
   publish() {
-    this.onChange(this.snapshot());
+    this.revision += 1;
+    const snapshot = this.snapshot();
+    this.onChange(snapshot, this.revision);
+    for (const subscriber of this.subscribers) subscriber(snapshot, this.revision);
   }
 }
 

@@ -33,6 +33,10 @@ class ActionDispatcher {
     return this.actions.get(String(id || '')) || null;
   }
 
+  list() {
+    return [...this.actions.values()].map(({ execute, validate, ...action }) => ({ ...action }));
+  }
+
   evaluate(action, context) {
     const result = { visible: true, enabled: true, reason: '', relationshipProtected: false, overrideAllowed: false };
     for (const policy of this.policies) {

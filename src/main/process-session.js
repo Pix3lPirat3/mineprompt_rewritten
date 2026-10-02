@@ -59,6 +59,7 @@ function emptySession(id) {
       targets: { cursorBlock: null, cursorEntity: null, entities: [] }
     },
     commands: [],
+    extensions: { apiVersion: null, revision: 0, capabilities: [], actionCount: 0, tasks: { active: [] } },
     diagnostics: { inventory: null },
     process: { isolated: true, pid: null, status: 'starting' }
   };

@@ -50,7 +50,8 @@ class MineflayerClient {
     schedule = setTimeout,
     cancelSchedule = clearTimeout,
     playerActions = null,
-    sessionId = null
+    sessionId = null,
+    installPlugins = () => {}
   }) {
     this.logger = logger;
     this.interface = interfaceState;
@@ -67,6 +68,7 @@ class MineflayerClient {
     this.cancelSchedule = cancelSchedule;
     this.playerActions = playerActions;
     this.sessionId = sessionId;
+    this.installPlugins = installPlugins;
     this.bot = null;
     this.chatMessageClass = null;
     this.connectionAttempt = 0;
@@ -103,21 +105,36 @@ class MineflayerClient {
     }
     this.bot = bot;
     this.effectFlags.clear();
-    this.presentation = createMineflayerUiState(bot, {
-      onChange: () => {
-        if (this.isCurrent(bot, attempt)) this.onSnapshot();
-      },
-      onError: (error) => {
-        this.logger.warn(`[Presentation] ${error instanceof Error ? error.message : String(error)}`);
-        if (error instanceof Error && error.stack) this.logger.debug(error.stack);
-      },
-      schedule: this.schedule,
-      cancelSchedule: this.cancelSchedule
-    });
-    bot.lastOptions = { ...options };
-    bot.loadPlugin(this.pathfinderPlugin);
+    try {
+      this.presentation = createMineflayerUiState(bot, {
+        onChange: () => {
+          if (this.isCurrent(bot, attempt)) this.onSnapshot();
+        },
+        onError: (error) => {
+          this.logger.warn(`[Presentation] ${error instanceof Error ? error.message : String(error)}`);
+          if (error instanceof Error && error.stack) this.logger.debug(error.stack);
+        },
+        schedule: this.schedule,
+        cancelSchedule: this.cancelSchedule
+      });
+      bot.lastOptions = { ...options };
+      bot.loadPlugin(this.pathfinderPlugin);
+      await this.installPlugins(bot);
+    } catch (error) {
+      this.presentation?.close();
+      this.presentation = null;
+      this.bot = null;
+      try { bot.quit('Plugin initialization failed'); } catch { bot.end('Plugin initialization failed'); }
+      this.interface.setFailure(error instanceof Error ? error.message : String(error));
+      throw error;
+    }
     this.bindEvents(bot, { ...connectionOptions, accountUsername }, attempt);
     return bot;
+  }
+
+  setPluginInstaller(installer) {
+    if (typeof installer !== 'function') throw new TypeError('A Mineflayer plugin installer must be a function.');
+    this.installPlugins = installer;
   }
 
   bindEvents(bot, options, attempt) {

@@ -18,9 +18,18 @@ const packagedFiles = listPackage(asarPath).map((file) => file.replaceAll('\\', 
 for (const excluded of ['/test/', '/scripts/', '/.github/', '/CHANGELOG.md', '/TERMS.md']) {
   assert.equal(packagedFiles.some((file) => file === excluded.slice(0, -1) || file.startsWith(excluded)), false, `Unexpected packaged path ${excluded}`);
 }
-for (const relative of ['src/session-worker.js', 'src/main/process-session.js', 'packages/mineflayer-ui/package.json', 'packages/mineflayer-ui/index.cjs']) {
+for (const relative of [
+  'src/session-worker.js',
+  'src/main/process-session.js',
+  'packages/mineflayer-ui/package.json',
+  'packages/mineflayer-ui/index.cjs',
+  'packages/mineflayer-toolkit/package.json',
+  'packages/mineflayer-toolkit/dist/index.cjs'
+]) {
   assert.equal(fs.existsSync(path.join(runtimeRoot, relative)), true, `Missing packaged runtime file ${relative}`);
 }
 const ui = require(path.join(runtimeRoot, 'packages', 'mineflayer-ui'));
 assert.equal(typeof ui.emptyPresentation, 'function');
+const toolkit = require(path.join(runtimeRoot, 'packages', 'mineflayer-toolkit'));
+assert.equal(typeof toolkit.installToolkit, 'function');
 process.stdout.write('[Package] Runtime contents verified.\n');

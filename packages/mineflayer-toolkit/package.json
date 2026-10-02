@@ -1,0 +1,66 @@
+{
+  "name": "@mineprompt/mineflayer-toolkit",
+  "version": "0.1.0",
+  "description": "Composable Mineflayer automation, interaction, and task plugins.",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./runtime": {
+      "types": "./index.d.ts",
+      "import": "./dist/runtime.js",
+      "require": "./dist/runtime.cjs"
+    },
+    "./navigation": {
+      "types": "./index.d.ts",
+      "import": "./dist/navigation.js",
+      "require": "./dist/navigation.cjs"
+    },
+    "./mining": {
+      "types": "./index.d.ts",
+      "import": "./dist/mining.js",
+      "require": "./dist/mining.cjs"
+    },
+    "./trees": {
+      "types": "./index.d.ts",
+      "import": "./dist/trees.js",
+      "require": "./dist/trees.cjs"
+    },
+    "./inventory": {
+      "types": "./index.d.ts",
+      "import": "./dist/inventory.js",
+      "require": "./dist/inventory.cjs"
+    },
+    "./interactions": {
+      "types": "./index.d.ts",
+      "import": "./dist/interactions.js",
+      "require": "./dist/interactions.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "index.d.ts",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "node build.cjs",
+    "prepack": "node build.cjs"
+  },
+  "sideEffects": false,
+  "license": "ISC",
+  "dependencies": {
+    "ajv": "^8.20.0",
+    "prismarine-nbt": "^2.8.0",
+    "vec3": "^0.2.0"
+  },
+  "peerDependencies": {
+    "mineflayer": ">=4.20.0",
+    "mineflayer-pathfinder": ">=2.4.0"
+  }
+}

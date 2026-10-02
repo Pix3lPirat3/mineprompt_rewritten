@@ -17,7 +17,8 @@ module.exports = [
       'storage/**',
       'test-lab/**',
       'src/renderer/dist/**',
-      'packages/mineflayer-ui/index.cjs'
+      'packages/mineflayer-ui/index.cjs',
+      'packages/mineflayer-toolkit/dist/**'
     ]
   },
   ...tseslint.configs.recommended.map((config) => ({ ...config, files: ['src/renderer/**/*.{ts,tsx}'] })),

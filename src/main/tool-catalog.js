@@ -125,6 +125,20 @@ class ToolCatalog {
       sessionId: SessionId,
       scope: Type.Union([Type.Literal('commands'), Type.Literal('renderer'), Type.Literal('all')])
     }, { additionalProperties: false }), async (runtime, input) => runtime.reload(input), { idempotent: true, capability: 'debug' }));
+    this.register(tool('mineprompt_capabilities', 'List installed Mineflayer capability plugins and their live structured action manifests for a bot session.', Type.Object({ sessionId: SessionId }, { additionalProperties: false }),
+      async (runtime, input) => runtime.capabilities(input), { readOnly: true, capability: 'status', openWorld: true }));
+    this.register(tool('mineprompt_capability_action', 'Execute an installed capability action. Inspect mineprompt_capabilities first, then provide an action id and a JSON object matching its input schema.', Type.Object({
+      sessionId: SessionId,
+      actionId: Type.String({ minLength: 1, maxLength: 128 }),
+      inputJson: Type.Optional(Type.String({ maxLength: 65536 }))
+    }, { additionalProperties: false }), async (runtime, input, origin) => {
+      let details = {};
+      if (input.inputJson) {
+        try { details = JSON.parse(input.inputJson); } catch { throw new Error('Capability action input must be a valid JSON object.'); }
+        if (!details || typeof details !== 'object' || Array.isArray(details)) throw new Error('Capability action input must be a JSON object.');
+      }
+      return runtime.capabilityAction({ sessionId: input.sessionId, actionId: input.actionId, input: details }, origin);
+    }, { destructive: true, capability: 'plugins.execute', approval: 'required', openWorld: true }));
     this.register(tool('mineprompt_player_action', 'Inspect or interact with an online player through relationship-aware safety policies.', Type.Object({
       sessionId: SessionId,
       username: Type.String({ minLength: 1, maxLength: 16 }),

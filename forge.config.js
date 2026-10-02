@@ -7,7 +7,9 @@ function packageIgnore(file) {
   file = file.replaceAll('\\', '/');
   const roots = ['/.vite', '/commands', '/node_modules', '/package.json', '/packages', '/src'];
   if (!roots.some((root) => file === root || file.startsWith(`${root}/`))) return true;
-  if (file.startsWith('/packages/') && !['/packages/mineflayer-ui', '/packages/mineflayer-ui/package.json', '/packages/mineflayer-ui/index.cjs'].includes(file)) return true;
+  if (file.startsWith('/packages/mineflayer-ui') && !['/packages/mineflayer-ui', '/packages/mineflayer-ui/package.json', '/packages/mineflayer-ui/index.cjs'].includes(file)) return true;
+  if (file.startsWith('/packages/mineflayer-toolkit') && !file.startsWith('/packages/mineflayer-toolkit/dist') && !['/packages/mineflayer-toolkit', '/packages/mineflayer-toolkit/package.json'].includes(file)) return true;
+  if (file.startsWith('/packages/') && !file.startsWith('/packages/mineflayer-ui') && !file.startsWith('/packages/mineflayer-toolkit')) return true;
   if (file.startsWith('/src/') && file !== '/src/main' && file !== '/src/session-worker.js' && !file.startsWith('/src/main/')) return true;
   const bedrockData = '/node_modules/minecraft-data/minecraft-data/data/bedrock';
   const bedrockCommon = `${bedrockData}/common`;

@@ -31,6 +31,7 @@ test('runs global commands through the application runtime', async (context) => 
   assert.deepEqual(runtime.relationships.friendNames(), ['Builder']);
   assert.equal(runtime.snapshot().miningPresets[0].policy.minimumDurability, 32);
   assert.equal(events.some((event) => event.type === 'snapshot'), true);
+  assert.deepEqual((await runtime.capabilities()).capabilities, []);
 });
 
 test('validates profile and security preference updates', async (context) => {

@@ -3,13 +3,13 @@
 const SESSION_METHOD_NAMES = Object.freeze([
   'connect', 'execute', 'complete', 'disconnect', 'reloadCommands',
   'inventoryAction', 'inventoryInspect', 'debugEvaluate', 'playerAction', 'targetAction', 'miningAction', 'treeAction', 'stashAction',
-  'recipes', 'craft', 'runWorkflow', 'stopWorkflow', 'close'
+  'capabilities', 'capabilityAction', 'recipes', 'craft', 'runWorkflow', 'stopWorkflow', 'close'
 ]);
 
 const HOST_METHOD_NAMES = Object.freeze([
   'snapshot', 'execute', 'complete', 'connect', 'disconnect', 'selectSession', 'closeSession', 'reloadCommands', 'reload',
   'inventoryAction', 'inventoryInspect', 'debugEvaluate', 'playerAction', 'targetAction', 'miningAction', 'treeAction', 'stashAction',
-  'recipes', 'craft', 'saveWorkflow', 'removeWorkflow', 'runWorkflow', 'stopWorkflow',
+  'capabilities', 'capabilityAction', 'recipes', 'craft', 'saveWorkflow', 'removeWorkflow', 'runWorkflow', 'stopWorkflow',
   'saveProfile', 'removeProfile', 'saveServer', 'removeServer', 'savePreferences', 'saveMiningPreset', 'removeMiningPreset',
   'selectMiningPreset', 'diagnostics', 'uiState', 'reportRendererIssue', 'reportRendererState', 'relationshipsList',
   'relationshipAdd', 'relationshipRemove', 'tools', 'callTool', 'openAiTools'

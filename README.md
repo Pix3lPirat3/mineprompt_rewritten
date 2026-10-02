@@ -205,6 +205,41 @@ The Mining policies window creates, edits, selects, and removes the same policie
 
 Inventory and container tooltips follow the pointer with Minecraft-style viewport flipping. Custom names and lore retain their supported Minecraft color and text formatting, while Alt reveals bounded component and NBT details for development without crowding ordinary gameplay tooltips.
 
+## Reusable Mineflayer plugins
+
+`@mineprompt/mineflayer-toolkit` exposes MinePrompt's runtime, navigation, mining, tree, inventory, and interaction systems to ordinary Mineflayer applications. It has no Electron, React, GUI, MCP, or MinePrompt host requirement. Each bot receives an isolated `bot.mineprompt` runtime with capability discovery, validated actions, exclusive resource ownership, cancellable tasks, progress events, and deterministic disconnect cleanup.
+
+```js
+const mineflayer = require('mineflayer');
+const { pathfinder } = require('mineflayer-pathfinder');
+const { runtimePlugin, miningPlugin, treePlugin } = require('@mineprompt/mineflayer-toolkit');
+
+const bot = mineflayer.createBot({ host: 'localhost', username: 'Logger' });
+bot.loadPlugin(pathfinder);
+bot.loadPlugin(runtimePlugin());
+bot.loadPlugin(miningPlugin());
+bot.loadPlugin(treePlugin());
+
+bot.once('spawn', () => bot.mineprompt.trees.farm({
+  policy: { radius: 32, maxTrees: 12, replant: 'available', onFailure: 'skip' }
+}));
+```
+
+Consumers can import the complete package or the `runtime`, `navigation`, `mining`, `trees`, `inventory`, and `interactions` subpaths. CommonJS and ESM exports share generated declarations. Mineflayer and Mineflayer Pathfinder remain peer dependencies, preventing extra bot or pathfinder copies.
+
+The desktop app installs these same capabilities with its persistent services. Terminal commands, GUI controls, headless sessions, and agent tools therefore call the same service instances exposed to library users. The `capability` terminal command lists installed plugins, action schemas, and live plugin tasks:
+
+```text
+capability list
+capability show trees
+capability show trees.inspect
+capability run trees.inspect {"target":"nearest"}
+capability tasks
+capability stop trees.farm
+```
+
+Third-party plugins can register a versioned capability and structured actions through `bot.mineprompt.register` and `bot.mineprompt.actions.register`. The runtime publishes those manifests through `mineprompt_capabilities`; `mineprompt_capability_action` executes a discovered action after applying its JSON Schema and normal safety approval flow.
+
 ## Reusable Mineflayer UI state
 
 `@mineprompt/mineflayer-ui` is a theme-neutral workspace package that converts a Mineflayer bot into serializable presentation state. It tracks HUD vitals, oxygen, experience, held-item use, mounts, boss bars, scoreboard state, titles, subtitles, and the action bar without depending on React or Electron. MinePrompt's renderer is one consumer; another app can supply its own layout and assets.
@@ -364,7 +399,7 @@ Start the local MCP server for an AI client:
 npm run start:mcp
 ```
 
-The MCP process attaches to an existing host or becomes the host when none is running. The desktop app also starts an attachable host when it launches first, so opening MCP later reaches the bots already visible in the GUI. Tool discovery is generated at runtime, so connected commands and private command modules appear without maintaining a separate agent document. `mineprompt_ui_state` returns the selected bot snapshot together with the renderer's viewport, inventory fit, visible controls, broken images, component failures, inventory pipeline timing, transport delay, renderer update volume, DOM mutation volume, and long tasks. `mineprompt_diagnostics` returns a bounded, redacted support snapshot. `mineprompt_reload` reloads commands, the renderer, or both without disconnecting bots. `mineprompt_inventory_inspect` reads complete rendered item details without changing state. `mineprompt_debug_evaluate` exposes the live evaluator with an `acknowledgeUnsafe: true` requirement and destructive safety annotations. State-changing tools publish MCP safety annotations, and friend overrides require both `overrideFriendProtection` and `confirmOverride` for agent callers.
+The MCP process attaches to an existing host or becomes the host when none is running. The desktop app also starts an attachable host when it launches first, so opening MCP later reaches the bots already visible in the GUI. Tool discovery is generated at runtime, so connected commands, private command modules, and installed Mineflayer capabilities appear without maintaining a separate agent document. `mineprompt_capabilities` returns live plugin manifests and schemas, while `mineprompt_capability_action` provides a guarded generic execution path for third-party actions. `mineprompt_ui_state` returns the selected bot snapshot together with the renderer's viewport, inventory fit, visible controls, broken images, component failures, inventory pipeline timing, transport delay, renderer update volume, DOM mutation volume, and long tasks. `mineprompt_diagnostics` returns a bounded, redacted support snapshot. `mineprompt_reload` reloads commands, the renderer, or both without disconnecting bots. `mineprompt_inventory_inspect` reads complete rendered item details without changing state. `mineprompt_debug_evaluate` exposes the live evaluator with an `acknowledgeUnsafe: true` requirement and destructive safety annotations. State-changing tools publish MCP safety annotations, and friend overrides require both `overrideFriendProtection` and `confirmOverride` for agent callers.
 
 Clients that accept OpenAI function definitions instead of MCP can generate strict JSON Schema tools:
 

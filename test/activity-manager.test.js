@@ -30,3 +30,13 @@ test('prevents activities from competing for exclusive resources', () => {
   manager.register('mine', { label: 'Mine', resources: ['movement', 'world'], stop() {} });
   assert.deepEqual(manager.snapshot()[0].resources, ['movement', 'world']);
 });
+
+test('supports independent activity subscribers', () => {
+  const manager = new ActivityManager();
+  const revisions = [];
+  const unsubscribe = manager.subscribe((snapshot, revision) => revisions.push([snapshot.length, revision]));
+  manager.register('one', { label: 'One', stop() {} });
+  unsubscribe();
+  manager.stop('one');
+  assert.deepEqual(revisions, [[0, 0], [1, 1]]);
+});

@@ -27,7 +27,7 @@ test('decodes version-aware potion effect visibility flags', () => {
   assert.deepEqual(effectVisibility(2, '1.12.2'), { ambient: false, showParticles: true, showIcon: true });
 });
 
-function fixture(settings = {}) {
+function fixture(settings = {}, options = {}) {
   const log = [];
   const state = [];
   const commands = [];
@@ -42,6 +42,7 @@ function fixture(settings = {}) {
     setHunger: (value) => state.push(['hunger', value]),
     setVitals: (value) => state.push(['vitals', value]),
     setPotionEffects: (value) => state.push(['effects', value]),
+    setFailure: (value) => state.push(['failure', value]),
     reset: () => state.push(['reset']),
     stopRuntime: () => state.push(['stop'])
   };
@@ -149,13 +150,15 @@ function fixture(settings = {}) {
     cancelSchedule: (callback) => {
       const index = scheduled.indexOf(callback);
       if (index >= 0) scheduled.splice(index, 1);
-    }
+    },
+    installPlugins: options.installPlugins
   });
   return { client, get bot() { return bot; }, log, state, commands, inventoryEvents, scheduled, runningActivities };
 }
 
 test('tracks a complete connection lifecycle', async () => {
-  const context = fixture();
+  const plugins = [];
+  const context = fixture({}, { installPlugins: (bot) => plugins.push(bot) });
   const bot = await context.client.startClient({
     username: 'Account@example.com',
     accountUsername: 'Account@example.com',
@@ -163,6 +166,7 @@ test('tracks a complete connection lifecycle', async () => {
     port: 25565
   });
   assert.equal(bot.plugin, 'pathfinder-plugin');
+  assert.deepEqual(plugins, [bot]);
   assert.deepEqual(context.commands[0], ['set', 'mineflayer']);
   assert.deepEqual(context.state[0], ['status', 'connecting']);
 
@@ -216,6 +220,17 @@ test('tracks a complete connection lifecycle', async () => {
   bot.emit('end', 'server closed');
   assert.equal(context.client.bot, null);
   assert.equal(context.state.some((entry) => entry[0] === 'reset'), true);
+});
+
+test('cleans up a connection when plugin initialization fails', async () => {
+  const context = fixture({}, { installPlugins: () => { throw new Error('Plugin failed'); } });
+  await assert.rejects(
+    context.client.startClient({ username: 'Bot', host: 'localhost', port: 25565 }),
+    /Plugin failed/u
+  );
+  assert.equal(context.client.bot, null);
+  assert.equal(context.bot.quitReason, 'Plugin initialization failed');
+  assert.deepEqual(context.state.at(-1), ['failure', 'Plugin failed']);
 });
 
 test('enforces resource-pack and remote-command policies', async () => {
