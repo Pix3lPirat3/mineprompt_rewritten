@@ -2,7 +2,7 @@
 
 const { Vec3 } = require('vec3');
 const { isAirState, parseBlockState } = require('./blueprint-model');
-const { directionalLook, placementMode } = require('./placement-strategy');
+const { directionalLook, multiblockLook, placementMode } = require('./placement-strategy');
 const { PriorityQueue } = require('./priority-queue');
 
 const MAX_PLACEMENT_OPERATIONS = 1048576;
@@ -130,13 +130,19 @@ function placementInstruction(operation, support, rule) {
   }
   if (parsed.properties.half === 'top' || parsed.properties.type === 'top') cursor.y = 0.75;
   if (parsed.properties.half === 'bottom' || parsed.properties.type === 'bottom') cursor.y = 0.25;
+  if (parsed.name.endsWith('_door') && ['left', 'right'].includes(parsed.properties.hinge) && facing) {
+    const right = { x: -facing.z, z: facing.x };
+    const amount = parsed.properties.hinge === 'right' ? 0.8 : 0.2;
+    if (right.x) cursor.x = right.x > 0 ? amount : 1 - amount;
+    if (right.z) cursor.z = right.z > 0 ? amount : 1 - amount;
+  }
   const mode = placementMode(parsed, rule.kind, operation.groupId);
   return {
     supportPosition: support ? { ...support } : null,
     clickedFace: face,
     cursor,
     facing: facing ? { ...facing } : null,
-    look: directionalLook(parsed),
+    look: directionalLook(parsed) || multiblockLook(parsed),
     rotation: parsed.properties.rotation === undefined ? null : Number(parsed.properties.rotation),
     sneak: false,
     supportKind: rule.kind,
@@ -144,6 +150,39 @@ function placementInstruction(operation, support, rule) {
     stateProperties: { ...parsed.properties },
     special: mode !== 'simple'
   };
+}
+
+function groupOrder(operation) {
+  const properties = parseBlockState(operation.expected).properties;
+  if (properties.half === 'lower' || properties.part === 'foot') return 0;
+  if (properties.half === 'upper' || properties.part === 'head') return 1;
+  return 2;
+}
+
+function comparableState(operation, omitted) {
+  const parsed = parseBlockState(operation.expected);
+  return JSON.stringify({
+    name: parsed.name,
+    properties: Object.fromEntries(Object.entries(parsed.properties).filter(([key]) => key !== omitted).sort(([left], [right]) => left.localeCompare(right)))
+  });
+}
+
+function validateGeneratedGroup(group) {
+  if (group.length !== 2) return false;
+  const first = parseBlockState(group[0].expected);
+  if (group[0].groupId.startsWith('vertical:')) {
+    const lower = group.find((operation) => parseBlockState(operation.expected).properties.half === 'lower');
+    const upper = group.find((operation) => parseBlockState(operation.expected).properties.half === 'upper');
+    return Boolean(first.name.endsWith('_door') && lower && upper && comparableState(lower, 'half') === comparableState(upper, 'half') && upper.position.x === lower.position.x && upper.position.y === lower.position.y + 1 && upper.position.z === lower.position.z);
+  }
+  if (group[0].groupId.startsWith('horizontal:')) {
+    const foot = group.find((operation) => parseBlockState(operation.expected).properties.part === 'foot');
+    const head = group.find((operation) => parseBlockState(operation.expected).properties.part === 'head');
+    if (!first.name.endsWith('_bed') || !foot || !head || comparableState(foot, 'part') !== comparableState(head, 'part')) return false;
+    const facing = DIRECTIONS[parseBlockState(foot.expected).properties.facing];
+    return Boolean(facing && head.position.x === foot.position.x + facing.x && head.position.y === foot.position.y && head.position.z === foot.position.z + facing.z);
+  }
+  return true;
 }
 
 function topologicalOrder(operations) {
@@ -260,7 +299,15 @@ function compilePlacementGraph(bot, analysis) {
     groups.set(operation.groupId, group);
   }
   for (const group of groups.values()) {
-    const ordered = group.sort(compareOperations);
+    const ordered = group.sort((left, right) => groupOrder(left) - groupOrder(right) || compareOperations(left, right));
+    if (!ordered[0].groupId.startsWith('container:')) {
+      if (!validateGeneratedGroup(ordered)) {
+        for (const operation of ordered) operation.blocked.push({ code: 'invalid-multiblock', message: 'The generated multi-block structure is incomplete or inconsistent.' });
+      } else {
+        const companions = ordered.map((operation) => ({ position: { ...operation.position }, expected: operation.expected }));
+        for (const operation of ordered) operation.companions = companions;
+      }
+    }
     for (let index = 1; index < ordered.length; index += 1) {
       ordered[index].dependencies = [...new Set([...ordered[index].dependencies, ordered[index - 1].id])].sort();
     }

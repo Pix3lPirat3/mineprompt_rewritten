@@ -1,7 +1,7 @@
 'use strict';
 
 const FACE_DETERMINED_WALL_BLOCKS = /(?:wall_torch|ladder|button|lever|tripwire_hook|wall_sign|wall_hanging_sign|wall_banner)$/u;
-const EXECUTABLE_PLACEMENT_MODES = new Set(['simple', 'gravity', 'scaffold', 'axis', 'slab', 'wall-attached', 'directional']);
+const EXECUTABLE_PLACEMENT_MODES = new Set(['simple', 'gravity', 'scaffold', 'axis', 'slab', 'wall-attached', 'directional', 'multiblock']);
 const TOWARD_YAW = Object.freeze({ south: 0, east: Math.PI / 2, north: Math.PI, west: -Math.PI / 2 });
 const AWAY_YAW = Object.freeze({ north: 0, west: Math.PI / 2, south: Math.PI, east: -Math.PI / 2 });
 
@@ -21,8 +21,17 @@ function directionalLook(parsed) {
   return null;
 }
 
+function multiblockLook(parsed) {
+  const properties = parsed.properties;
+  const facing = properties.facing;
+  if (!Object.hasOwn(AWAY_YAW, facing)) return null;
+  if (parsed.name.endsWith('_door') && ['lower', 'upper'].includes(properties.half) && ['left', 'right'].includes(properties.hinge) && falseState(properties.open) && falseState(properties.powered)) return { yaw: AWAY_YAW[facing], pitch: 0 };
+  if (parsed.name.endsWith('_bed') && ['foot', 'head'].includes(properties.part) && falseState(properties.occupied)) return { yaw: AWAY_YAW[facing], pitch: 0 };
+  return null;
+}
+
 function placementMode(parsed, supportKind, groupId) {
-  if (groupId && !groupId.startsWith('container:')) return 'multiblock';
+  if (groupId && !groupId.startsWith('container:')) return multiblockLook(parsed) ? 'multiblock' : 'multiblock-unsupported';
   if (supportKind === 'wall') return parsed.properties.facing && FACE_DETERMINED_WALL_BLOCKS.test(parsed.name) ? 'wall-attached' : 'attached';
   if (supportKind === 'ceiling' || supportKind === 'floor') return 'attached';
   if (supportKind === 'gravity' || supportKind === 'scaffold' || supportKind === 'axis' || supportKind === 'slab') return supportKind;
@@ -39,5 +48,6 @@ module.exports = {
   EXECUTABLE_PLACEMENT_MODES,
   directionalLook,
   executablePlacementMode,
+  multiblockLook,
   placementMode
 };

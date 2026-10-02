@@ -422,6 +422,28 @@ class BuildExecutor {
     const expected = operation.kind === 'remove' || operation.kind === 'scaffold-remove' ? null : operation.expected;
     const observed = liveState(bot, operation.position);
     if (expected ? observed !== expected : !isAirState(observed || '')) throw new Error(`Verification failed for ${operation.id}; observed ${observed || 'an unloaded block'}.`);
+    if (expected && Array.isArray(operation.companions)) await this.verifyCompanions(bot, operation.companions, active.controller.signal);
+  }
+
+  async verifyCompanions(bot, companions, signal) {
+    let mismatch = null;
+    for (let attempt = 0; attempt <= 5; attempt += 1) {
+      signal.throwIfAborted();
+      mismatch = null;
+      for (const companion of companions) {
+        const observed = liveState(bot, companion.position);
+        if (observed !== companion.expected) {
+          mismatch = { companion, observed };
+          break;
+        }
+      }
+      if (!mismatch) return;
+      if (attempt < 5) {
+        if (typeof bot.waitForTicks === 'function') await bot.waitForTicks(1);
+        else await abortableDelay(50, signal);
+      }
+    }
+    throw new Error(`Multi-block verification failed at ${positionKey(mismatch.companion.position)}; observed ${mismatch.observed || 'an unloaded block'}.`);
   }
 
   async reachStance(bot, operation, planned, signal) {

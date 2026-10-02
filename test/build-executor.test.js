@@ -34,6 +34,7 @@ function harness(options = {}) {
   const itemName = options.itemName || 'stone';
   const lookCalls = [];
   const placementCalls = [];
+  let deferredExtras = [];
   const bot = {
     entity: { position: new Vec3(0, 64, 0), dimension: 'overworld' },
     game: { dimension: 'overworld' },
@@ -46,7 +47,11 @@ function harness(options = {}) {
     },
     async equip() {},
     async look(yaw, pitch, force) { lookCalls.push({ yaw, pitch, force }); },
-    async waitForTicks(ticks) { lookCalls.push({ ticks }); },
+    async waitForTicks(ticks) {
+      lookCalls.push({ ticks });
+      for (const extra of deferredExtras) blocks.set(key(extra.position), block(extra.name, extra.position, extra.properties));
+      deferredExtras = [];
+    },
     setControlState(control, value) { this.controlState[control] = value; },
     async _placeBlockWithOptions(reference, face, placementOptions) {
       const position = reference.position.plus(face);
@@ -61,6 +66,8 @@ function harness(options = {}) {
         }
       });
       blocks.set(key(position), block(options.placeAs || 'stone', position, options.placeProperties));
+      if (options.delayPlaceExtras) deferredExtras = options.placeExtras || [];
+      else for (const extra of options.placeExtras || []) blocks.set(key(extra.position), block(extra.name, extra.position, extra.properties));
     },
     async dig(value) { blocks.set(key(value.position), block('air', value.position)); },
     clearControlStates() {}
@@ -81,7 +88,8 @@ function harness(options = {}) {
       cursor: { x: 0.5, y: 1, z: 0.5 },
       mode: 'simple',
       stateProperties: {}
-    }
+    },
+    companions: options.companions
   };
   const compiled = {
     analysis: {
@@ -350,4 +358,31 @@ test('executes directional placement after synchronizing the required heading', 
     swingArm: 'right',
     showHand: true
   });
+});
+
+test('verifies every generated block from one multi-block placement', async () => {
+  const upper = { x: 1, y: 65, z: 0 };
+  const lowerState = 'minecraft:oak_door[facing=north,half=lower,hinge=right,open=false,powered=false]';
+  const upperState = 'minecraft:oak_door[facing=north,half=upper,hinge=right,open=false,powered=false]';
+  const value = harness({
+    expectedState: lowerState,
+    itemName: 'oak_door',
+    placeAs: 'oak_door',
+    placeProperties: { facing: 'north', half: 'lower', hinge: 'right', open: false, powered: false },
+    delayPlaceExtras: true,
+    placeExtras: [{ position: upper, name: 'oak_door', properties: { facing: 'north', half: 'upper', hinge: 'right', open: false, powered: false } }],
+    companions: [{ position: { x: 1, y: 64, z: 0 }, expected: lowerState }, { position: upper, expected: upperState }],
+    instruction: {
+      supportPosition: { x: 1, y: 63, z: 0 },
+      clickedFace: { x: 0, y: 1, z: 0 },
+      cursor: { x: 0.8, y: 1, z: 0.5 },
+      mode: 'multiblock',
+      look: { yaw: 0, pitch: 0 },
+      stateProperties: { facing: 'north', half: 'lower', hinge: 'right', open: 'false', powered: 'false' }
+    }
+  });
+  await value.executor.start('test', { anchor: value.target });
+  await value.executor.waitForIdle();
+  assert.equal(value.data.buildJobs[0].status, 'complete', value.data.buildJobs[0].latestError || 'No build error was recorded.');
+  assert.equal(blockStateFromWorld(value.blocks.get('1,65,0')), upperState);
 });

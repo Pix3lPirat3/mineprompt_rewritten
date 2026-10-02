@@ -11,12 +11,13 @@ function entry(state, options = {}) {
 }
 
 function record(kind, x, y, state, options = {}) {
+  const z = options.z || 0;
   return {
     index: options.index || 0,
     paletteIndex: options.paletteIndex || 0,
     kind,
-    local: { x, y: y - 64, z: 0 },
-    position: { x, y, z: 0 },
+    local: { x, y: y - 64, z },
+    position: { x, y, z },
     expected: state,
     current: options.current || 'minecraft:air',
     blockName: options.blockName || 'air',
@@ -233,4 +234,32 @@ test('compiles verified heading strategies for bounded directional states', () =
   assert.equal(byId.get('place:2,64,0').instruction.cursor.y, 0.75);
   assert.equal(byId.get('place:4,64,0').instruction.mode, 'directional-unsupported');
   assert.equal(byId.get('place:4,64,0').instruction.look, null);
+});
+
+test('validates generated doors and beds as ordered atomic groups', () => {
+  const graph = compilePlacementGraph(flatBot(), {
+    policy: { scaffolding: ['dirt'] },
+    records: [
+      record('placeable', 0, 64, 'minecraft:oak_door[facing=north,half=lower,hinge=right,open=false,powered=false]'),
+      record('placeable', 0, 65, 'minecraft:oak_door[facing=north,half=upper,hinge=right,open=false,powered=false]'),
+      record('placeable', 3, 64, 'minecraft:white_bed[facing=east,occupied=false,part=foot]'),
+      record('placeable', 4, 64, 'minecraft:white_bed[facing=east,occupied=false,part=head]'),
+      record('placeable', 6, 64, 'minecraft:birch_door[facing=south,half=lower,hinge=left,open=false,powered=false]')
+    ]
+  });
+  const byId = new Map(graph.operations.map((operation) => [operation.id, operation]));
+  const door = byId.get('place:0,64,0');
+  const upper = byId.get('place:0,65,0');
+  const foot = byId.get('place:3,64,0');
+  const head = byId.get('place:4,64,0');
+  assert.equal(door.instruction.mode, 'multiblock');
+  assert.deepEqual(door.instruction.look, { yaw: 0, pitch: 0 });
+  assert.equal(door.instruction.cursor.x, 0.8);
+  assert.equal(door.companions.length, 2);
+  assert.equal(upper.dependencies.includes(door.id), true);
+  assert.equal(foot.instruction.mode, 'multiblock');
+  assert.deepEqual(foot.instruction.look, { yaw: -Math.PI / 2, pitch: 0 });
+  assert.equal(head.dependencies.includes(foot.id), true);
+  assert.deepEqual(foot.companions, head.companions);
+  assert.equal(byId.get('place:6,64,0').blocked.some((reason) => reason.code === 'invalid-multiblock'), true);
 });
