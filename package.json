@@ -51,7 +51,7 @@
     "@sinclair/typebox": "^0.34.52",
     "ajv": "^8.20.0",
     "electron-squirrel-startup": "^1.0.1",
-    "minecraft-data": "^3.117.0",
+    "minecraft-data": "^3.119.0",
     "minecraft-folder-path": "^1.2.0",
     "mineflayer": "4.39.0",
     "mineflayer-pathfinder": "2.4.5",
